@@ -1,4 +1,5 @@
-import type { EvalCase, Label, ScenarioClass } from "./corpus.js";
+// TODO(day2): define these locally — the eval corpus types. See context/PROJECT.md.
+type ScenarioClass = string; type Label = "benign" | "malicious"; type EvalCase = { scenarioClass: ScenarioClass; label: Label };
 
 export type Prediction = "allow" | "block";
 
