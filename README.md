@@ -58,10 +58,3 @@ npm run bench               # the two-arm scoreboard
 
 Node + TypeScript · Fastify · PostgreSQL (append-only audit ledger) · Redis + BullMQ · Mastra +
 Gemini 2.5 Flash · React + Vite · Docker Compose.
-
-## History
-
-This project was pivoted from **Aegis**, an authorization/trust layer for agentic payments.
-Aegis was solid engineering aimed at the wrong problem — authorization is deterministic, so the
-AI had no real job. Payment recovery is where an agent genuinely earns its place. The full story
-is our "what broke, and how you got out." Aegis is preserved on a separate branch.

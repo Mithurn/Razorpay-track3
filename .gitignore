@@ -1,5 +1,15 @@
 node_modules/
 dist/
+.mastra/
+*.log
+
+# secrets
 .env
-.playwright-mcp/
+.env.local
+
+# internal planning / competition notes — not for the public repo
+context/
+
+# test + build artifacts
+coverage/
 test-results/

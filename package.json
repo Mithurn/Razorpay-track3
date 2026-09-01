@@ -1,24 +1,24 @@
 {
   "name": "recovery-room",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "engines": {
     "node": ">=20"
   },
   "scripts": {
-    "dev": "tsx --env-file-if-exists=.env src/index.ts",
+    "dev": "tsx watch --env-file-if-exists=.env src/main.ts",
     "web": "vite --config web/vite.config.ts",
     "agent": "mastra dev",
     "bench": "tsx --env-file-if-exists=.env bench/run.ts",
-    "build": "tsc",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run --exclude '**/*.integration.test.ts'",
-    "db:schema": "psql \"$ADMIN_DATABASE_URL\" -f db/init.sql"
+    "db:schema": "psql \"$ADMIN_DATABASE_URL\" -f db/schema.sql"
   },
   "dependencies": {
-    "@ai-sdk/google": "4.0.8",
+    "@ai-sdk/google": "1.0.8",
     "@mastra/core": "^1.51.0",
-    "@mastra/pg": "^1.16.0",
     "ai": "7.0.14",
     "bullmq": "^5.34.0",
     "fastify": "^5.2.0",
