@@ -44,15 +44,43 @@ change, and you think it is wrong or risky:
   works against that, flag it.
 - Once the user has heard the objection and still decides, follow the decision and move on.
 
-## Stack — locked
+## How to work
 
-Node 20+ / TypeScript (ESM, `tsx` for dev, no build step for dev) · Fastify · PostgreSQL 16 ·
-Redis + BullMQ · **Mastra** (`@mastra/core`) for the agent, no other agent framework ·
-`@ai-sdk/google` with a plain `GEMINI_API_KEY` (Gemini 2.5 Flash; no GCP/Vertex) · Zod at every
-external boundary · Razorpay test-mode APIs · React + Vite (thin UI) · Docker Compose · Vitest.
+- **Load this file's rules before writing any code**, every time. This is the contract; the
+  product brief and plan are `context/PROJECT.md`.
+- **Every feature must serve a specific rubric criterion or a phrase in the Track 3 bar.** Before
+  building something, say which. If it serves none, don't build it — say so.
+- **When the user flags something as wrong, or asks a question: stop and resolve it before
+  continuing.** Do not proceed on an assumption around a flagged concern.
+- **When a decision is genuinely ambiguous or a fork in the road: ask.** Don't guess and don't
+  quietly pick. A one-line question now beats an hour of the wrong direction.
+- **No rabbit-holes.** If a task isn't working after ~2 focused hours, stop, say so, and propose
+  cutting scope or the Track 4 fallback (`context/PROJECT.md §9`). Momentum matters more than any
+  one feature over three days.
+- **End each working block with an honest status** against the plan — what's done, what's
+  blocked, what changed. Re-plan if behind.
 
-Do not add a dependency without stating what problem it solves and why the stack can't. No ORM
-(use `pg` + hand-written SQL). No `@assistant-ui/*`.
+## Comments — near zero
+
+Default to no comments. The code, the names, and the types carry the meaning. Add a comment
+**only** when the code genuinely cannot say it — a non-obvious constraint, a surprising external
+behaviour, an unavoidable workaround — and keep it to one line. Never restate what a line does,
+never narrate, never leave a JSDoc block, never a `TODO`. When in doubt, delete it.
+
+## Stack — current choices, not sacred
+
+Working defaults, each picked for a reason:
+
+Node 20+ / TypeScript (ESM, `tsx` for dev) · Fastify · PostgreSQL 16 · Redis + BullMQ ·
+**Mastra** (`@mastra/core`) for the agent · `@ai-sdk/google` + a plain `GEMINI_API_KEY`
+(Gemini 2.5 Flash; no GCP/Vertex) · Zod at every external boundary · Razorpay test-mode APIs ·
+React + Vite (thin UI) · Docker Compose · Vitest · `pg` + hand-written SQL (no ORM).
+
+These are not frozen. If you hit a wall, or find a genuinely better tool for a specific job:
+**say so, with the reason and the trade-off, and get the user's OK before switching.** Do not
+swap a framework or add a dependency mid-feature, and do not churn — a "better" tool that costs
+half a day to integrate is not better with three days on the clock. State what problem any new
+dependency solves and why the current stack can't.
 
 ## Repository structure — keep it this shape
 

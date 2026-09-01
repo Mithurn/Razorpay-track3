@@ -1,9 +1,6 @@
 import { z } from "zod";
+import type { RootCause } from "./failure.js";
 
-/**
- * A recovery move. The agent *proposes* one of these; the safety gate may only
- * substitute a more cautious one (never a less cautious one).
- */
 export const recoveryAction = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("RETRY_NOW") }),
   z.object({ kind: z.literal("RETRY_SCHEDULED"), atHoursFromNow: z.number().positive().max(720) }),
@@ -15,18 +12,14 @@ export const recoveryAction = z.discriminatedUnion("kind", [
 
 export type RecoveryAction = z.infer<typeof recoveryAction>;
 
-/** What the agent hands back after a bounded investigation. */
 export type AgentProposal = {
   action: RecoveryAction;
-  diagnosisRootCause: import("./failure.js").RootCause;
+  diagnosisRootCause: RootCause;
   reasoning: string;
   toolCalls: number;
 };
 
-/**
- * Caution ordering. The safety gate can move an action UP this ladder, never down.
- * WRITE_OFF and ESCALATE are terminal (no money moves), so they rank highest.
- */
+// The safety gate may move an action up this ladder, never down.
 export const CAUTION_RANK: Record<RecoveryAction["kind"], number> = {
   RETRY_NOW: 0,
   RETRY_SCHEDULED: 1,

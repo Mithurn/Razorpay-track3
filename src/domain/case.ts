@@ -14,7 +14,6 @@ export type Lane = z.infer<typeof lane>;
 
 export const TERMINAL_LANES: readonly Lane[] = ["RECOVERED", "ESCALATED", "WRITTEN_OFF"];
 
-/** A prior payment by the same customer — the agent's main investigative signal. */
 export const customerPayment = z.object({
   paidAt: z.string().datetime(),
   amountPaise: z.number().int().nonnegative(),
