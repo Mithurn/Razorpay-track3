@@ -7,6 +7,43 @@ Read `context/PROJECT.md` in full before writing any code — it is the product 
 Deadline: **5 September 2026.** Ship fast, but the repo must read like production code:
 clean, layered, SOLID, every value real, every failure path handled and tested.
 
+## The goal — keep this in view at all times
+
+This is a hiring filter. The only thing that matters is: **would a Razorpay engineer look at
+this repo, this 5-minute video, and this architecture and want to hire the person who built
+it.** Every decision — scope, framework, what to polish, what to cut — is judged against that,
+not against "is it done."
+
+What Razorpay grades (their words):
+1. **Problem taste** — did you pick something that actually matters to a Razorpay merchant.
+2. **Build quality** — does it run, is it structured, would you trust it.
+3. **AI judgment** — the right tool in the right place, *and where you chose not to use one*.
+4. **Failure recovery** — what broke, and what you did about it.
+
+Track 3 bar (verbatim): *"Don't just identify the problem. Show measured money recovered across
+a batch, with compliant escalation, stopping rules, and an audit trail."*
+
+The application form has 12 fields; the last is *"What broke, and how you got out"* — *"the one
+we read first."* Treat `context/BREAKS.md` as a graded deliverable, not internal hygiene.
+
+Full track briefs and the rubric are in `context/website.md`. Re-read them whenever a scope or
+design question comes up.
+
+## Push back — do not be a yes-machine
+
+When the user proposes an architecture, a framework, a library, a data model, or a scope
+change, and you think it is wrong or risky:
+
+- **Say so, before doing it.** State the concern plainly, give the trade-off, and recommend an
+  alternative. Ask the question you need answered.
+- Do not silently comply with a decision that will hurt the submission, and do not pad a real
+  objection with "yes, and…". A short, direct "I think this is the wrong call because X — here's
+  what I'd do instead. Which do you want?" is what's wanted.
+- The user has explicitly asked for this. Agreeing to be agreeable wastes their time and the
+  three days. Their actual instruction is: build the thing Razorpay will want — if a request
+  works against that, flag it.
+- Once the user has heard the objection and still decides, follow the decision and move on.
+
 ## Stack — locked
 
 Node 20+ / TypeScript (ESM, `tsx` for dev, no build step for dev) · Fastify · PostgreSQL 16 ·
