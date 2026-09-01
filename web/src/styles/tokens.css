@@ -1,0 +1,83 @@
+:root {
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-sans: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.9375rem;
+  --text-md: 1.1875rem;
+  --text-lg: 1.5rem;
+  --text-xl: 1.875rem;
+  --text-2xl: 2.375rem;
+  --text-3xl: 3rem;
+
+  --leading-tight: 1.15;
+  --leading-snug: 1.35;
+  --leading-body: 1.55;
+
+  --space-2xs: 4px;
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+  --space-3xl: 72px;
+  --space-4xl: 112px;
+
+  --dur-fast: 120ms;
+  --dur: 180ms;
+  --dur-slow: 260ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  --z-sticky: 10;
+  --z-dropdown: 20;
+  --z-modal: 30;
+  --z-toast: 40;
+
+  --measure: 68ch;
+}
+
+[data-surface="room"] {
+  --bg: oklch(16% 0.008 250);
+  --bg-raised: oklch(19.5% 0.009 250);
+  --bg-inset: oklch(13% 0.008 250);
+  --line: oklch(28% 0.01 250);
+  --line-strong: oklch(40% 0.012 250);
+  --text: oklch(93% 0.005 250);
+  --text-muted: oklch(72% 0.008 250);
+  --text-faint: oklch(59% 0.008 250);
+
+  --accent: oklch(76% 0.14 75);
+  --accent-dim: oklch(38% 0.06 75);
+  --deny: oklch(64% 0.16 25);
+  --deny-dim: oklch(34% 0.07 25);
+  --clear: oklch(72% 0.1 155);
+  --clear-dim: oklch(34% 0.05 155);
+
+  --radius: 2px;
+  --font-ui: var(--font-mono);
+  --font-prose: var(--font-sans);
+}
+
+[data-surface="store"] {
+  --bg: oklch(97% 0.006 85);
+  --bg-raised: oklch(99.2% 0.004 85);
+  --bg-inset: oklch(93.5% 0.009 85);
+  --line: oklch(88% 0.011 85);
+  --line-strong: oklch(74% 0.014 85);
+  --text: oklch(24% 0.012 60);
+  --text-muted: oklch(46% 0.012 60);
+  --text-faint: oklch(58% 0.011 60);
+
+  --accent: oklch(48% 0.11 35);
+  --accent-dim: oklch(92% 0.02 35);
+  --deny: oklch(48% 0.15 25);
+  --clear: oklch(45% 0.09 155);
+
+  --radius: 4px;
+  --font-ui: var(--font-sans);
+  --font-prose: var(--font-sans);
+}
