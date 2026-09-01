@@ -209,9 +209,10 @@ Any material decision (stack, architecture, scope cut) → a dated entry in `con
 
 ## Git
 
-Never commit, push, or open PRs unless asked. Repo Git identity only. Concise commit messages:
-what changed and how. No em dashes. One logical change per commit. `context/` and `.env` are
-gitignored — keep it that way.
+Never commit, push, or open PRs unless asked. **Author is the repository Git identity only — no
+`Co-Authored-By` trailers, no "Claude" / AI attribution, no session links, ever.** Concise commit
+messages: what changed and how. No em dashes. One logical change per commit. `context/` and
+`.env` are gitignored — keep it that way.
 
 ## Definition of done (per task)
 
