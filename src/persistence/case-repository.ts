@@ -87,6 +87,16 @@ export class PostgresCaseRepository implements CaseRepository {
     return rows.map((r) => toCase(r as Row));
   }
 
+  async listStaleInLane(lane: Lane, olderThan: Date): Promise<RecoveryCase[]> {
+    const { rows } = await this.db.query(
+      `SELECT ${COLUMNS} FROM recovery_cases
+        WHERE run_id IS NULL AND lane = $1 AND updated_at < $2
+        ORDER BY updated_at`,
+      [lane, olderThan],
+    );
+    return rows.map((r) => toCase(r as Row));
+  }
+
   async moveLane(id: string, from: Lane, to: Lane): Promise<boolean> {
     const { rowCount } = await this.db.query(
       "UPDATE recovery_cases SET lane = $3, updated_at = now() WHERE id = $1 AND lane = $2",

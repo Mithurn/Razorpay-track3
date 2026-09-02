@@ -41,7 +41,10 @@ const kase = (over: Partial<RecoveryCase>): RecoveryCase => ({
 describe("reconcile sweep", () => {
   it("re-queues each case that owns a parked attempt, once", async () => {
     const attempts = { listUnsettled: async () => [attempt({}), attempt({ id: "a2", attemptNo: 2 })] } as unknown as AttemptRepository;
-    const cases = { byId: async () => kase({}) } as unknown as CaseRepository;
+    const cases = {
+      byId: async () => kase({}),
+      listStaleInLane: async () => [],
+    } as unknown as CaseRepository;
     const add = vi.fn(async () => undefined);
 
     const { stop } = startReconcileSweep(attempts, cases, { add } as never, 10);
@@ -55,7 +58,10 @@ describe("reconcile sweep", () => {
 
   it("skips a case that already reached a terminal lane", async () => {
     const attempts = { listUnsettled: async () => [attempt({})] } as unknown as AttemptRepository;
-    const cases = { byId: async () => kase({ lane: "RECOVERED" }) } as unknown as CaseRepository;
+    const cases = {
+      byId: async () => kase({ lane: "RECOVERED" }),
+      listStaleInLane: async () => [],
+    } as unknown as CaseRepository;
     const add = vi.fn(async () => undefined);
 
     const { stop } = startReconcileSweep(attempts, cases, { add } as never, 10);
@@ -63,5 +69,24 @@ describe("reconcile sweep", () => {
     stop();
 
     expect(add).not.toHaveBeenCalled();
+  });
+
+  it("force-reclaims a case orphaned in DIAGNOSING with no live job behind it", async () => {
+    const attempts = { listUnsettled: async () => [] } as unknown as AttemptRepository;
+    const cases = {
+      byId: async () => kase({ lane: "DIAGNOSING" }),
+      listStaleInLane: async () => [kase({ lane: "DIAGNOSING" })],
+    } as unknown as CaseRepository;
+    const add = vi.fn(async () => undefined);
+
+    const { stop } = startReconcileSweep(attempts, cases, { add } as never, 10);
+    await new Promise((r) => setTimeout(r, 30));
+    stop();
+
+    expect(add).toHaveBeenCalled();
+    const [, data, opts] = add.mock.calls[0] as unknown[];
+    expect((data as { caseId: string }).caseId).toBe("c1");
+    expect((data as { reclaim?: boolean }).reclaim).toBe(true);
+    expect((opts as { jobId: string }).jobId).toBe("c1");
   });
 });

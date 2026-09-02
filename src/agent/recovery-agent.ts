@@ -143,7 +143,10 @@ export async function runRecoveryAgent(
     events.onConcluded?.(proposal);
     return proposal;
   } catch (err) {
-    const reason = err instanceof Error && err.name === "TimeoutError" ? "deadline" : "error";
+    const reason =
+      err instanceof Error && err.name === "TimeoutError"
+        ? "deadline"
+        : `error: ${err instanceof Error ? err.message : String(err)}`;
     const fallback = degrade(reason, toolCalls);
     events.onConcluded?.(fallback);
     return fallback;

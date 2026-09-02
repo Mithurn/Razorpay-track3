@@ -3,7 +3,8 @@ import { Redis } from "ioredis";
 
 export const RECOVERY_QUEUE = "recovery";
 
-export type RecoveryJob = { caseId: string };
+// reclaim: set only by the reconcile sweep, for a case orphaned in DIAGNOSING with no live job.
+export type RecoveryJob = { caseId: string; reclaim?: boolean };
 
 export function redisConnection(url: string): ConnectionOptions {
   return new Redis(url, { maxRetriesPerRequest: null });
@@ -28,9 +29,9 @@ export function recoveryQueue(connection: ConnectionOptions): Queue<RecoveryJob>
 export async function enqueueRecovery(
   queue: Queue<RecoveryJob>,
   caseId: string,
-  opts: { delay?: number } = {},
+  opts: { delay?: number; reclaim?: boolean } = {},
 ): Promise<void> {
-  await queue.add(RECOVERY_QUEUE, { caseId }, { jobId: caseId, delay: opts.delay });
+  await queue.add(RECOVERY_QUEUE, { caseId, reclaim: opts.reclaim }, { jobId: caseId, delay: opts.delay });
 }
 
 export function recoveryWorker(

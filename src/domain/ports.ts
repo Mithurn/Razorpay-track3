@@ -73,6 +73,8 @@ export interface CaseRepository {
   listByRun(runId: string): Promise<RecoveryCase[]>;
   listLive(): Promise<RecoveryCase[]>;
   listByLane(lane: Lane): Promise<RecoveryCase[]>;
+  /** Live cases stuck in `lane` since before the cutoff — a worker that died mid-turn leaves one. */
+  listStaleInLane(lane: Lane, olderThan: Date): Promise<RecoveryCase[]>;
   /**
    * How cases with this failure reason actually ended: the last settled attempt of each already
    * resolved case, its action and outcome. Scoped to the same run (null run = live lane) and to

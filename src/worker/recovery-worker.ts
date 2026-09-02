@@ -9,7 +9,7 @@ import type { CaseEventBus } from "../api/event-bus.js";
 
 export function makeProcessor(pipeline: RecoveryPipeline, queue: Queue<RecoveryJob>, bus: CaseEventBus) {
   return async function process(job: RecoveryJob, meta: { attemptsMade?: number } = {}): Promise<void> {
-    const { caseId } = job;
+    const { caseId, reclaim: forcedReclaim } = job;
     const outcome = await pipeline.advance(
       caseId,
       {
@@ -28,7 +28,7 @@ export function makeProcessor(pipeline: RecoveryPipeline, queue: Queue<RecoveryJ
           });
         },
       },
-      { reclaim: (meta.attemptsMade ?? 0) > 0 },
+      { reclaim: forcedReclaim === true || (meta.attemptsMade ?? 0) > 0 },
     );
 
     if (outcome.kind === "not_claimed") return;
