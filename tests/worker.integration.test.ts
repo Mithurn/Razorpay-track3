@@ -9,10 +9,13 @@ import { PostgresEventLog } from "../src/persistence/event-log.js";
 import { RecoveryPipeline } from "../src/worker/pipeline.js";
 import { makeProcessor } from "../src/worker/recovery-worker.js";
 import { CaseEventBus } from "../src/api/event-bus.js";
-import { RECOVERY_QUEUE, type RecoveryJob } from "../src/worker/queue.js";
+import { type RecoveryJob } from "../src/worker/queue.js";
 import type { AgentProposal } from "../src/domain/recovery-action.js";
 import type { OutcomeResolver, OutcomeVerdict } from "../src/domain/ports.js";
 import type { GatewayOrder, GatewayPayment, GatewayPaymentLink, PaymentGateway } from "../src/domain/gateway.js";
+
+// A test-only queue name so a dev worker running locally never steals these jobs.
+const RECOVERY_QUEUE = `recovery-test-${randomUUID().slice(0, 8)}`;
 
 const adminUrl = process.env.ADMIN_DATABASE_URL;
 const redisUrl = process.env.REDIS_URL;

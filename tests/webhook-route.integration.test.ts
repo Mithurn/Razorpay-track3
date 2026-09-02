@@ -132,6 +132,7 @@ describe.runIf(adminUrl)("POST /webhooks/razorpay", () => {
       webhookHandler: handler,
       bus: new CaseEventBus(),
       modelHealth: async () => ({ model: "test", reachable: true }),
+      razorpayWebhookSecret: SECRET,
     });
   }
 

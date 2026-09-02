@@ -74,6 +74,7 @@ export async function runRecoveryAgent(
       system: SYSTEM_PROMPT,
       prompt: caseBrief(deps.kase, deps.priorAttempts.length),
       tools,
+      maxRetries: 2,
       abortSignal: AbortSignal.timeout(config.deadlineMs),
       stopWhen: [stepCountIs(config.stepBudget), hasToolCall("submit_proposal")],
       prepareStep: ({ stepNumber }) =>

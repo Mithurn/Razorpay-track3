@@ -15,8 +15,10 @@ const schema = z.object({
   RAZORPAY_KEY_ID: z.string().min(1),
   RAZORPAY_KEY_SECRET: z.string().min(1),
   RAZORPAY_WEBHOOK_SECRET: z.string().min(1),
-  AGENT_TIMEOUT_MS: z.coerce.number().int().positive().default(60_000),
+  AGENT_TIMEOUT_MS: z.coerce.number().int().positive().default(90_000),
   AGENT_STEP_BUDGET: z.coerce.number().int().positive().default(6),
+  // Hard ceiling on model spend for the whole server process. The agent throws past this.
+  AGENT_SESSION_CAP_USD: z.coerce.number().positive().default(0.5),
   PORT: z.coerce.number().int().positive().default(3000),
 });
 

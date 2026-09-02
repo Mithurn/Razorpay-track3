@@ -13,6 +13,7 @@ import { WebhookHandler } from "./execution/webhook-handler.js";
 import { RecoveryPipeline, agentRunnerFor } from "./worker/pipeline.js";
 import { resolveModel } from "./agent/model.js";
 import { checkModelHealth } from "./agent/model-health.js";
+import { createBudget, guardModel } from "./agent/budget.js";
 import { redisConnection, recoveryQueue, recoveryWorker } from "./worker/queue.js";
 import { makeProcessor } from "./worker/recovery-worker.js";
 import { startReconcileSweep } from "./worker/reconcile-sweep.js";
@@ -48,10 +49,13 @@ const pipeline = new RecoveryPipeline({
   outcomeResolver,
   clock: systemClock,
   runAgent: agentRunnerFor({
-    model: resolveModel(config.AGENT_MODEL, {
-      openRouterApiKey: config.OPENROUTER_API_KEY,
-      googleApiKey: config.GOOGLE_GENERATIVE_AI_API_KEY,
-    }),
+    model: guardModel(
+      resolveModel(config.AGENT_MODEL, {
+        openRouterApiKey: config.OPENROUTER_API_KEY,
+        googleApiKey: config.GOOGLE_GENERATIVE_AI_API_KEY,
+      }),
+      createBudget(config.AGENT_SESSION_CAP_USD),
+    ),
     stepBudget: config.AGENT_STEP_BUDGET,
     deadlineMs: config.AGENT_TIMEOUT_MS,
   }),
@@ -85,6 +89,7 @@ await registerRoutes(app, {
   webhookHandler,
   bus,
   modelHealth: () => checkModelHealth(config.OPENROUTER_API_KEY, config.AGENT_MODEL),
+  razorpayWebhookSecret: config.RAZORPAY_WEBHOOK_SECRET,
 });
 
 await app.listen({ port: config.PORT, host: "0.0.0.0" });

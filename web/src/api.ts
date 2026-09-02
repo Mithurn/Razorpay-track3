@@ -21,6 +21,10 @@ export async function recover(id: string): Promise<void> {
   await fetch(`${BASE}/cases/${id}/recover`, { method: "POST" });
 }
 
+export async function simulateCapture(id: string): Promise<void> {
+  await fetch(`${BASE}/cases/${id}/simulate-capture`, { method: "POST" });
+}
+
 export async function decide(
   id: string,
   body: { decision: "approve" | "redirect" | "write_off"; redirectTo?: string },

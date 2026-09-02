@@ -75,6 +75,11 @@ export class WebhookHandler {
     });
 
     const settled = await this.executor.settle(attempt, kase.amountPaise, reconstructAction(attempt.action));
+
+    if (settled.status === "RECOVERED" && !["RECOVERED", "ESCALATED", "WRITTEN_OFF"].includes(kase.lane)) {
+      await this.cases.moveLane(kase.id, kase.lane, "RECOVERED");
+      await this.events.append({ caseId: kase.id, type: "CASE_RESOLVED", payload: { lane: "RECOVERED", via: "webhook" } });
+    }
     return { status: "processed", attemptStatus: settled.status };
   }
 }

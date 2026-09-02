@@ -201,14 +201,16 @@
 }
 
 .stream {
-  flex: 1;
-  min-height: 0;
+  flex: 1 1 auto;
+  min-height: 160px;
+  max-height: 340px;
   overflow-y: auto;
   line-height: var(--leading-body);
   font-family: var(--font-prose);
-  color: var(--text-muted);
+  color: var(--text);
   white-space: pre-wrap;
   font-size: var(--text-sm);
+  padding-right: var(--space-xs);
 }
 .sk-word {
   animation: word-fade 380ms var(--ease-out) both;

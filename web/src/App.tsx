@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./styles/room.css";
 import type { CaseDetail, Lane, RecoveryCase, RunSummary, StreamEvent } from "./types.js";
-import { caseDetail, decide, listCases, queue, recover, scoreboard, streamCase } from "./api.js";
+import { caseDetail, decide, listCases, queue, recover, scoreboard, simulateCapture, streamCase } from "./api.js";
 
 const LANE_ORDER: Lane[] = [
   "INCOMING",
@@ -96,7 +96,7 @@ export function App() {
         })}
       </section>
 
-      <CasePane caseId={selected} onRecover={recover} />
+      <CasePane caseId={selected} onRecover={recover} onSimulateCapture={simulateCapture} />
 
       <section className="panel">
         <div className="panel__label">
@@ -157,7 +157,15 @@ function Scoreboard({ board, liveCases }: { board: { agent?: RunSummary; fixed?:
   );
 }
 
-function CasePane({ caseId, onRecover }: { caseId: string | null; onRecover: (id: string) => Promise<void> }) {
+function CasePane({
+  caseId,
+  onRecover,
+  onSimulateCapture,
+}: {
+  caseId: string | null;
+  onRecover: (id: string) => Promise<void>;
+  onSimulateCapture: (id: string) => Promise<void>;
+}) {
   const [detail, setDetail] = useState<CaseDetail | null>(null);
   const [reasoning, setReasoning] = useState("");
   const [tools, setTools] = useState<string[]>([]);
@@ -233,6 +241,11 @@ function CasePane({ caseId, onRecover }: { caseId: string | null; onRecover: (id
       {kase?.lane === "INCOMING" && (
         <button className="btn btn--primary" onClick={() => onRecover(caseId)}>
           work this case now
+        </button>
+      )}
+      {kase?.lane === "ATTEMPTING" && attempt?.status === "PENDING" && attempt.razorpayRef && (
+        <button className="btn btn--primary" onClick={() => onSimulateCapture(caseId)}>
+          customer completes payment →
         </button>
       )}
 
