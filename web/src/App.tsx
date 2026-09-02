@@ -170,6 +170,7 @@ export function App() {
 
 function Scoreboard({ board, liveCases }: { board: { agent?: RunSummary; fixed?: RunSummary }; liveCases: RecoveryCase[] }) {
   const liveRecovered = liveCases.filter((c) => c.lane === "RECOVERED").reduce((s, c) => s + c.recoveredPaise, 0);
+  const liveCount = liveCases.filter((c) => c.lane === "RECOVERED").length;
   const a = board.agent;
   const f = board.fixed;
 
@@ -179,7 +180,9 @@ function Scoreboard({ board, liveCases }: { board: { agent?: RunSummary; fixed?:
         <div className="board__col board__col--agent">
           <span className="board__arm">recovered · this room</span>
           <span className="board__money">{rupees(liveRecovered)}</span>
-          <span className="board__meta">run the batch for the agent-vs-fixed number</span>
+          <span className="board__meta">
+            {liveCount > 0 ? `${liveCount} case${liveCount === 1 ? "" : "s"} recovered live` : "run the batch for the agent-vs-fixed number"}
+          </span>
         </div>
       </div>
     );
@@ -189,20 +192,21 @@ function Scoreboard({ board, liveCases }: { board: { agent?: RunSummary; fixed?:
   return (
     <div className="board">
       <div className="board__col board__col--agent">
-        <span className="board__arm">agent · batch of {a.cases}</span>
-        <span className="board__money">{rupees(a.recoveredPaise)}</span>
+        <span className="board__arm">recovered · this room</span>
+        <span className="board__money">{rupees(liveRecovered)}</span>
         <span className="board__meta">
-          {pct(a.recoveryRate)} recovered · {pct(a.escalationRate)} to a human · {a.meanAttemptsPerRecovery.toFixed(1)} tries
+          {liveCount} case{liveCount === 1 ? "" : "s"} recovered live · agent beat fixed by {rupees(Math.max(delta, 0))} in the batch
         </span>
       </div>
       <div className="board__col board__col--fixed">
-        <span className="board__arm">fixed schedule · day 1/3/5/7</span>
-        <span className="board__money">{rupees(f.recoveredPaise)}</span>
+        <span className="board__arm">agent vs fixed · batch of {a.cases}</span>
+        <span className="board__money">
+          {rupees(a.recoveredPaise)} <span className="board__vs">vs</span> {rupees(f.recoveredPaise)}
+        </span>
         <span className="board__meta">
-          {pct(f.recoveryRate)} recovered · {pct(f.escalationRate)} to a human
+          {pct(a.recoveryRate)} vs {pct(f.recoveryRate)} recovered · {pct(a.escalationRate)} vs {pct(f.escalationRate)} escalated
         </span>
       </div>
-      <span className="board__delta">+{rupees(delta)} recovered</span>
     </div>
   );
 }

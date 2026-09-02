@@ -183,6 +183,12 @@
 .board__col--fixed .board__money {
   color: var(--text-muted);
 }
+.board__vs {
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
 
 .board__meta {
   font-size: var(--text-xs);
