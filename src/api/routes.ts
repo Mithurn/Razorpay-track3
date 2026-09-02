@@ -16,6 +16,7 @@ export type RouteDeps = {
   queue: Queue<RecoveryJob>;
   webhookHandler: WebhookHandler;
   bus: CaseEventBus;
+  modelHealth: () => Promise<{ model: string; reachable: boolean; detail?: string }>;
 };
 
 const decisionBody = z.object({
@@ -28,6 +29,8 @@ export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Pro
   app.get("/cases", async () => ({ cases: await deps.cases.listLive() }));
 
   app.get("/queue", async () => ({ cases: await deps.cases.listByLane("ESCALATED") }));
+
+  app.get("/model-health", async () => deps.modelHealth());
 
   app.get("/cases/:id", async (req, reply) => {
     const { id } = req.params as { id: string };

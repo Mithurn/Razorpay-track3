@@ -12,8 +12,10 @@ import { AttemptExecutor } from "./execution/attempt-executor.js";
 import { WebhookHandler } from "./execution/webhook-handler.js";
 import { RecoveryPipeline, agentRunnerFor } from "./worker/pipeline.js";
 import { openRouterModel } from "./agent/model.js";
+import { checkModelHealth } from "./agent/model-health.js";
 import { redisConnection, recoveryQueue, recoveryWorker } from "./worker/queue.js";
 import { makeProcessor } from "./worker/recovery-worker.js";
+import { startReconcileSweep } from "./worker/reconcile-sweep.js";
 import { systemClock } from "./domain/attempt.js";
 import { CaseEventBus } from "./api/event-bus.js";
 import { registerRoutes } from "./api/routes.js";
@@ -55,6 +57,7 @@ const pipeline = new RecoveryPipeline({
 const connection = redisConnection(config.REDIS_URL);
 const queue = recoveryQueue(connection);
 const worker = recoveryWorker(connection, makeProcessor(pipeline, queue, bus));
+const sweep = startReconcileSweep(attempts, cases, queue);
 
 const webhookHandler = new WebhookHandler(razorpay, webhooks, attempts, cases, events, executor);
 
@@ -70,12 +73,22 @@ app.addContentTypeParser("application/json", { parseAs: "string" }, (req, body, 
   }
 });
 app.get("/health", async () => ({ status: "ok" }));
-await registerRoutes(app, { cases, attempts, events, runs, queue, webhookHandler, bus });
+await registerRoutes(app, {
+  cases,
+  attempts,
+  events,
+  runs,
+  queue,
+  webhookHandler,
+  bus,
+  modelHealth: () => checkModelHealth(config.OPENROUTER_API_KEY, config.AGENT_MODEL),
+});
 
 await app.listen({ port: config.PORT, host: "0.0.0.0" });
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => {
+    sweep.stop();
     void Promise.allSettled([app.close(), worker.close(), queue.close(), pool.end()]).then(() => process.exit(0));
   });
 }
