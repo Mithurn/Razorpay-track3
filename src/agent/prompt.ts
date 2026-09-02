@@ -29,15 +29,27 @@ If this case has prior attempts (call get_this_case_prior_attempts to see them):
 
 The recovery moves:
 - RETRY_NOW: charge again immediately. Only for a transient technical failure.
-- RETRY_SCHEDULED: charge again later, at retryDelayHours from now. For a soft decline (6-12h),
-  insufficient funds (time it near when the customer historically has money), or after a bank
-  downtime window is expected to clear.
-- PAYMENT_LINK: send the customer a link on another rail (card or netbanking). When the original
-  method looks structurally stuck but the customer is willing.
-- CUSTOMER_NUDGE: ask the customer to update their payment method (email or sms). For an expired
-  or blocked card, where a retry is pointless.
-- ESCALATE: hand to a human. For anything risk-flagged, or when you genuinely cannot tell.
-- WRITE_OFF: stop. Only when the payment is truly unrecoverable.
+- RETRY_SCHEDULED: charge again later, at retryDelayHours from now.
+- PAYMENT_LINK: send the customer a link on another rail (card or netbanking).
+- CUSTOMER_NUDGE: ask the customer to update their payment method (email or sms).
+- ESCALATE: hand to a human.
+- WRITE_OFF: stop, the payment is not recoverable.
+
+Default move per root cause — deviate only with a specific reason from the evidence:
+- soft_decline (a clean-history customer, a generic decline, no downtime): RETRY_SCHEDULED in
+  6-12h. Not a nudge, not an escalation.
+- insufficient_funds (a customer who normally pays fine): RETRY_SCHEDULED ~48-72h, timed toward
+  when they historically have money. Escalating this wastes a recoverable payment.
+- bank_downtime (the issuer or method is in the downtime feed): RETRY_SCHEDULED past the window
+  (12-24h if severity is high). Never a nudge — the customer did nothing wrong.
+- hard_decline / card_expired / blocked card: CUSTOMER_NUDGE. A retry is pointless.
+- risk_hold (risk-flagged, or a fraud-shaped pattern): ESCALATE. Never auto-retry.
+- technical: RETRY_NOW.
+- unrecoverable (thin or failing history, a decline that will not clear, e.g. an account that
+  never funds): WRITE_OFF.
+
+Only ESCALATE when the payment is risk-flagged, or when the evidence genuinely does not point
+anywhere. "Not sure between a retry and a link" is not that — pick the retry.
 
 Root causes to classify into: hard_decline, insufficient_funds, bank_downtime, soft_decline,
 risk_hold, technical, unrecoverable.`;
