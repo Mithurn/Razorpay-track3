@@ -15,7 +15,8 @@
     "test:unit": "vitest run --exclude '**/*.integration.test.ts'",
     "db:schema": "psql \"${ADMIN_DATABASE_URL:-postgres://recovery:recovery_dev@localhost:5434/recovery}\" -f db/schema.sql",
     "web:build": "vite build --config web/vite.config.ts",
-    "api": "tsx watch --env-file-if-exists=.env src/main.ts"
+    "api": "tsx watch --env-file-if-exists=.env src/main.ts",
+    "seed:room": "tsx --env-file-if-exists=.env bench/seed-room.ts"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.62",

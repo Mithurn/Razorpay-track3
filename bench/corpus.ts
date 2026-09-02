@@ -20,7 +20,7 @@ export type GroundTruth = {
 export type CorpusCase = NewCase & { id: string; groundTruth: GroundTruth };
 
 export type CorpusOptions = {
-  runId: string;
+  runId: string | null;
   size?: number;
   seed?: number;
   downFraction?: number;

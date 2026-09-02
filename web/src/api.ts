@@ -1,4 +1,4 @@
-import type { CaseDetail, RecoveryCase, StreamEvent } from "./types.js";
+import type { CaseDetail, RecoveryCase, RunSummary, StreamEvent } from "./types.js";
 
 const BASE = "/api";
 
@@ -11,6 +11,11 @@ async function get<T>(path: string): Promise<T> {
 export const listCases = () => get<{ cases: RecoveryCase[] }>("/cases").then((r) => r.cases);
 export const queue = () => get<{ cases: RecoveryCase[] }>("/queue").then((r) => r.cases);
 export const caseDetail = (id: string) => get<CaseDetail>(`/cases/${id}`);
+export const scoreboard = () =>
+  get<Record<string, { summary: RunSummary }>>("/scoreboard").then((r) => ({
+    agent: r.agent?.summary,
+    fixed: r.fixed?.summary,
+  }));
 
 export async function recover(id: string): Promise<void> {
   await fetch(`${BASE}/cases/${id}/recover`, { method: "POST" });

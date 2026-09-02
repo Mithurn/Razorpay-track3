@@ -32,6 +32,8 @@ export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Pro
 
   app.get("/model-health", async () => deps.modelHealth());
 
+  app.get("/scoreboard", async () => deps.runs.latestByArm());
+
   app.get("/cases/:id", async (req, reply) => {
     const { id } = req.params as { id: string };
     const kase = await deps.cases.byId(id);

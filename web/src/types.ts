@@ -57,8 +57,11 @@ export type RunSummary = {
   recovered: number;
   recoveryRate: number;
   recoveredPaise: number;
+  recoverablePaise: number;
   meanAttemptsPerRecovery: number;
   meanHoursToRecovery: number;
+  escalations: number;
   escalationRate: number;
+  overNudges: number;
   overNudgeRate: number;
 };
