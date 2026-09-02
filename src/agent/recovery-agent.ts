@@ -26,6 +26,7 @@ export type AgentConfig = {
 export type AgentEvents = {
   onReasoningDelta?: (text: string) => void;
   onToolCall?: (name: string) => void;
+  onConcluded?: (proposal: AgentProposal) => void;
 };
 
 const SAFE_FALLBACK: RecoveryAction = { kind: "RETRY_SCHEDULED", atHoursFromNow: 48 };
@@ -101,7 +102,7 @@ export async function runRecoveryAgent(
     const action = toAction(input.data);
     if (!action) return degrade("invalid action", toolCalls);
 
-    return {
+    const proposal: AgentProposal = {
       action,
       diagnosisRootCause: input.data.rootCause,
       confidence: input.data.confidence,
@@ -109,8 +110,12 @@ export async function runRecoveryAgent(
       toolCalls,
       degraded: false,
     };
+    events.onConcluded?.(proposal);
+    return proposal;
   } catch (err) {
     const reason = err instanceof Error && err.name === "TimeoutError" ? "deadline" : "error";
-    return degrade(reason, toolCalls);
+    const fallback = degrade(reason, toolCalls);
+    events.onConcluded?.(fallback);
+    return fallback;
   }
 }

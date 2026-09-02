@@ -7,14 +7,15 @@
     "node": ">=20"
   },
   "scripts": {
-    "dev": "tsx watch --env-file-if-exists=.env src/main.ts",
+    "dev": "concurrently -k -n api,web -c blue,magenta \"npm:api\" \"npm:web\"",
     "web": "vite --config web/vite.config.ts",
     "bench": "tsx --env-file-if-exists=.env bench/run.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run --exclude '**/*.integration.test.ts'",
-    "db:schema": "psql \"$ADMIN_DATABASE_URL\" -f db/schema.sql",
-    "web:build": "vite build --config web/vite.config.ts"
+    "db:schema": "psql \"${ADMIN_DATABASE_URL:-postgres://recovery:recovery_dev@localhost:5434/recovery}\" -f db/schema.sql",
+    "web:build": "vite build --config web/vite.config.ts",
+    "api": "tsx watch --env-file-if-exists=.env src/main.ts"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.62",
@@ -32,6 +33,7 @@
     "@types/react": "^19.0.4",
     "@types/react-dom": "^19.0.2",
     "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^10.0.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tsx": "^4.19.2",

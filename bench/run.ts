@@ -8,6 +8,7 @@ import { PostgresEventLog } from "../src/persistence/event-log.js";
 import { RunRepository } from "../src/persistence/run-repository.js";
 import { RecoveryPipeline, agentRunnerFor, type AgentRunner } from "../src/worker/pipeline.js";
 import { resolveModel } from "../src/agent/model.js";
+import { createBudget, guardModel } from "../src/agent/budget.js";
 import { RazorpayClient } from "../src/execution/razorpay-client.js";
 import { generateCorpus, type CorpusCase, type GroundTruth } from "./corpus.js";
 import { GroundTruthResolver } from "./ground-truth-resolver.js";
@@ -25,6 +26,7 @@ const { values } = parseArgs({
     size: { type: "string", default: "120" },
     seed: { type: "string", default: "42" },
     arm: { type: "string" },
+    "cap-usd": { type: "string", default: "0.30" },
   },
 });
 
@@ -49,6 +51,7 @@ async function main(): Promise<void> {
   console.error(`loaded ${downtimes.length} live downtimes from Razorpay`);
 
   const armsToRun = values.arm ? [values.arm as "agent" | "fixed"] : (["agent", "fixed"] as const);
+  const budget = createBudget(Number(values["cap-usd"]));
 
   const agentRunner: AgentRunner = !armsToRun.includes("agent")
     ? fixedScheduleRunner
@@ -56,10 +59,13 @@ async function main(): Promise<void> {
       ? replayRunner(cachePath)
       : recordingRunner(
           agentRunnerFor({
-            model: resolveModel(config.AGENT_MODEL, {
-              openRouterApiKey: config.OPENROUTER_API_KEY,
-              googleApiKey: config.GOOGLE_GENERATIVE_AI_API_KEY,
-            }),
+            model: guardModel(
+              resolveModel(config.AGENT_MODEL, {
+                openRouterApiKey: config.OPENROUTER_API_KEY,
+                googleApiKey: config.GOOGLE_GENERATIVE_AI_API_KEY,
+              }),
+              budget,
+            ),
             stepBudget: config.AGENT_STEP_BUDGET,
             deadlineMs: config.AGENT_TIMEOUT_MS,
           }),
@@ -80,7 +86,10 @@ async function main(): Promise<void> {
 
     const timing = await runArm(corpus, { cases, attempts, events, runner, downtimes, truth });
     const records = await collect(corpus, cases, attempts, truth, timing);
-    console.error(`${arm}: ${corpus.length} cases in ${((Date.now() - started) / 1000).toFixed(1)}s`);
+    console.error(
+      `${arm}: ${corpus.length} cases in ${((Date.now() - started) / 1000).toFixed(1)}s` +
+        (arm === "agent" && !values.mock ? ` · ${budget.calls} model calls, ~$${budget.estUsd.toFixed(3)} est` : ""),
+    );
     results[arm] = records;
     await runs.finish(runId, { ...scoreArm(arm, records) });
   }

@@ -8,8 +8,10 @@ const schema = z.object({
   // agent paths fail loudly at model construction if the one they need is missing.
   OPENROUTER_API_KEY: z.string().min(1).optional(),
   GOOGLE_GENERATIVE_AI_API_KEY: z.string().min(1).optional(),
-  AGENT_MODEL: z.string().default("openai/gpt-5.6-luna"),
-  AGENT_MODEL_CHEAP: z.string().default("qwen/qwen3-32b"),
+  // Default is a $0 free-tier model so an accidental run cannot spend. Override to
+  // google/gemini-2.5-flash for the headline eval (still free-tier; guard with --cap-usd).
+  AGENT_MODEL: z.string().default("minimax/minimax-m3:free"),
+  AGENT_MODEL_CHEAP: z.string().default("minimax/minimax-m3:free"),
   RAZORPAY_KEY_ID: z.string().min(1),
   RAZORPAY_KEY_SECRET: z.string().min(1),
   RAZORPAY_WEBHOOK_SECRET: z.string().min(1),
