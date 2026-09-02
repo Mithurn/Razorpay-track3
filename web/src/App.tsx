@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./styles/room.css";
 import "./loop/loop.css";
 import { AttemptTimeline } from "./loop/AttemptTimeline.js";
+import { LoopGraph } from "./loop/LoopGraph.js";
+import { deriveLoopState } from "./loop/useCaseLoopState.js";
 import type { CaseDetail, Lane, RecoveryCase, RunSummary, StreamEvent } from "./types.js";
 import { caseDetail, decide, listCases, queue, recover, scoreboard, simulateCapture, streamCase } from "./api.js";
 
@@ -184,6 +186,8 @@ function CasePane({
   const [reasoning, setReasoning] = useState("");
   const [tools, setTools] = useState<string[]>([]);
   const [findings, setFindings] = useState<string[]>([]);
+  const [liveProposal, setLiveProposal] = useState<{ action: string; degraded: boolean } | null>(null);
+  const [doneLane, setDoneLane] = useState<string | null>(null);
   const [live, setLive] = useState(false);
   const seq = useRef(0);
 
@@ -195,6 +199,8 @@ function CasePane({
     setReasoning("");
     setTools([]);
     setFindings([]);
+    setLiveProposal(null);
+    setDoneLane(null);
     seq.current += 1;
     const controller = new AbortController();
     const load = () => caseDetail(caseId).then(setDetail).catch(() => undefined);
@@ -203,7 +209,7 @@ function CasePane({
     (async () => {
       try {
         for await (const ev of streamCase(caseId, controller.signal))
-          applyStream(ev, { setReasoning, setTools, setFindings, setLive });
+          applyStream(ev, { setReasoning, setTools, setFindings, setLiveProposal, setDoneLane, setLive });
       } catch {
         /* aborted */
       }
@@ -236,6 +242,15 @@ function CasePane({
   const gate = events.find((e) => e.type === "GATE_APPLIED");
   const attempt = detail?.attempts.at(-1);
   const reasoningText = reasoning || String((proposal?.payload as { reasoning?: string })?.reasoning ?? "");
+  const loopState = deriveLoopState(events, {
+    open: live,
+    reasoning,
+    tools,
+    findings,
+    proposalKind: liveProposal?.action ?? null,
+    degraded: liveProposal?.degraded ?? false,
+    doneLane,
+  });
 
   return (
     <section className="panel">
@@ -276,6 +291,8 @@ function CasePane({
         </button>
       )}
 
+      <LoopGraph state={loopState} />
+
       {findings.length > 0 && (
         <div className="findings">
           {findings.map((f, i) => (
@@ -287,17 +304,9 @@ function CasePane({
         </div>
       )}
 
-      <div className="stream">
-        <Fading text={reasoningText} seq={seq.current} />
-      </div>
-
-      {tools.length > 0 && (
-        <div className="chips">
-          {tools.map((t, i) => (
-            <span key={i} className="chip">
-              {t}
-            </span>
-          ))}
+      {reasoningText && (
+        <div className="stream">
+          <Fading text={reasoningText} seq={seq.current} />
         </div>
       )}
 
@@ -427,12 +436,18 @@ function applyStream(
     setReasoning: React.Dispatch<React.SetStateAction<string>>;
     setTools: React.Dispatch<React.SetStateAction<string[]>>;
     setFindings: React.Dispatch<React.SetStateAction<string[]>>;
+    setLiveProposal: React.Dispatch<React.SetStateAction<{ action: string; degraded: boolean } | null>>;
+    setDoneLane: React.Dispatch<React.SetStateAction<string | null>>;
     setLive: React.Dispatch<React.SetStateAction<boolean>>;
   },
 ): void {
   if (ev.type === "reasoning") s.setReasoning((r) => r + ev.text);
   else if (ev.type === "tool") s.setTools((t) => (t.includes(ev.name) ? t : [...t, ev.name]));
   else if (ev.type === "finding") s.setFindings((f) => (f.includes(ev.text) ? f : [...f, ev.text]));
+  else if (ev.type === "proposal") s.setLiveProposal({ action: ev.action, degraded: ev.degraded });
   else if (ev.type === "open") s.setLive(true);
-  else if (ev.type === "done") s.setLive(false);
+  else if (ev.type === "done") {
+    s.setLive(false);
+    s.setDoneLane(ev.lane);
+  }
 }

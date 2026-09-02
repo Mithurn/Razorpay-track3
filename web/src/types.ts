@@ -51,6 +51,8 @@ export type StreamEvent =
   | { type: "reasoning"; text: string }
   | { type: "tool"; name: string }
   | { type: "finding"; text: string }
+  | { type: "proposal"; rootCause: string | null; action: string; degraded: boolean }
+  | { type: "attempt"; status: string; recoveredPaise: number }
   | { type: "lane"; lane: string }
   | { type: "done"; lane: string };
 
