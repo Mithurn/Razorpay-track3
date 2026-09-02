@@ -110,7 +110,31 @@ async function main(): Promise<void> {
     ],
   });
 
-  console.log("room seeded — cust_live_demo is fresh and ready to run live");
+  // A second fresh case, deliberately over the ₹5,000 exposure cap: the agent will read a clean
+  // 4/4 customer and propose a retry, and the deterministic gate will clamp that to ESCALATE.
+  // This is the safety interlock made visible on camera.
+  await cases.create({
+    id: randomUUID(),
+    runId: null,
+    merchantRef: "acme_subscriptions",
+    customerRef: "cust_over_cap",
+    originalPaymentId: null,
+    amountPaise: 649900,
+    currency: "INR",
+    failureCode: "BAD_REQUEST_ERROR",
+    failureReason: "card_declined",
+    failedAt: new Date(Date.now() - 40 * 60_000).toISOString(),
+    method: "card",
+    instrument: { issuer: "HDFC" },
+    customerHistory: [
+      { paidAt: "2026-05-04T10:00:00.000Z", amountPaise: 649900, method: "card", status: "captured" },
+      { paidAt: "2026-06-04T10:00:00.000Z", amountPaise: 649900, method: "card", status: "captured" },
+      { paidAt: "2026-07-04T10:00:00.000Z", amountPaise: 649900, method: "card", status: "captured" },
+      { paidAt: "2026-08-04T10:00:00.000Z", amountPaise: 649900, method: "card", status: "captured" },
+    ],
+  });
+
+  console.log("room seeded — cust_live_demo and cust_over_cap are fresh and ready to run live");
   await pool.end();
 }
 
