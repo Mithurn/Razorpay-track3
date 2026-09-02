@@ -14,5 +14,3 @@ context/
 coverage/
 test-results/
 
-# bench replay cache
-bench/.cache/

@@ -6,8 +6,9 @@ import type { LanguageModel } from "ai";
 
 export type BudgetState = { calls: number; estUsd: number; capUsd: number; costPerCallUsd: number };
 
-// ~2k input + ~250 output tokens per model call on gemini-2.5-flash-lite ($0.10 / $0.40 per M).
-export function createBudget(capUsd: number, costPerCallUsd = 0.0004): BudgetState {
+// Conservative: ~4k input + ~500 output per call on gemini-2.5-flash ($0.30 / $2.50 per M).
+// Deliberately rounded up so the cap trips early rather than late.
+export function createBudget(capUsd: number, costPerCallUsd = 0.0025): BudgetState {
   return { calls: 0, estUsd: 0, capUsd, costPerCallUsd };
 }
 

@@ -1,0 +1,1509 @@
+{
+  "cust_1004#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "Customer has a good payment history. The payment failed due to active bank downtime for SBIN card, indicating a temporary issue with the bank. Scheduling a retry for 24 hours later to allow the downtime to clear.",
+    "toolCalls": 2,
+    "degraded": false
+  },
+  "cust_1009#1": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.9,
+    "reasoning": "The customer has a good payment history, but the current payment failed due to an expired card. A retry is pointless as the card is expired. Nudging the customer to update their payment method is the most appropriate action.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1003#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "The payment failed with an issuer_technical_error and there is an active high-severity downtime for the issuing bank (BKID) for card payments. A scheduled retry is appropriate after the downtime window.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1005#1": {
+    "action": {
+      "kind": "ESCALATE",
+      "reason": "agent did not give a reason"
+    },
+    "diagnosisRootCause": "risk_hold",
+    "confidence": 0.8,
+    "reasoning": "The payment failed due to a risk check. Despite a good payment history, there is a long gap since the last successful payment. No similar resolved cases were found. Escalation is appropriate for risk-flagged payments.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1008#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 18
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "The card was declined due to high-severity downtime at the issuing bank (KKBK). The customer has a good payment history, so a scheduled retry after the downtime window is appropriate.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1007#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "The payment failed with \"insufficient_funds\", but the customer's HDFC card issuer is currently experiencing high severity downtime. It is likely that the \"insufficient_funds\" error was a generic decline due to the bank's technical issues. Scheduling a retry for 24 hours to allow the bank downtime to clear.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1002#1": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.9,
+    "reasoning": "The payment failed due to an expired card, as indicated by the error reason \"card_expired\". The customer has a good payment history, suggesting this is an isolated incident requiring them to update their payment method. A customer nudge via email is the most appropriate action to prompt them to do so. While bank downtime was detected, the explicit \"card_expired\" error points to the card itself being the root cause.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1001#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.8,
+    "reasoning": "The payment failed with card_declined and there is active high-severity downtime for the issuing bank (KKBK). While the customer's last successful payment was 130 days ago, suggesting a potential customer-side issue, the immediate cause of this specific failure is likely the bank downtime. Scheduling a retry after 24 hours gives sufficient time for the downtime to clear.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1000#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 18
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.8,
+    "reasoning": "Payment failed with insufficient_funds, but HDFC card payments are experiencing downtime. The customer has a good payment history, suggesting the downtime is the primary cause. Scheduling a retry allows the bank systems to recover.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1006#1": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.8,
+    "reasoning": "Customer's first payment failed due to insufficient funds. While bank downtime was detected, the specific error indicates a customer-side issue with funding. A nudge allows the customer to update their payment method.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1004#2": {
+    "action": {
+      "kind": "PAYMENT_LINK",
+      "rail": "netbanking"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.9,
+    "reasoning": "The previous scheduled retry on the original card rail failed with a clear message that the \"original rail stuck, another rail works\". This, combined with the bank downtime for a card issuer and the long period since the customer's last successful payment, indicates that the card payment is unlikely to succeed. Proposing a payment link on an alternative rail (netbanking) is the most suitable action.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1009#2": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.9,
+    "reasoning": "The customer has a good payment history. The card expired, leading to a hard decline. A previous nudge was sent but the customer has not yet updated their card. Another nudge via email is appropriate to prompt the customer to update their payment method.",
+    "toolCalls": 2,
+    "degraded": false
+  },
+  "cust_1003#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "Payment failed due to issuer_technical_error. Prior retry attempt failed as \"too early\", indicating the issue needed more time. Active high-severity bank downtime for the issuing bank (BKID) is confirmed, aligning with the error. Scheduling a retry for 24 hours from now to allow the downtime to potentially resolve.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1007#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 72
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.8,
+    "reasoning": "Customer has a good payment history. Although bank downtime was active, the explicit error was insufficient_funds, and a previous scheduled retry was too early. Scheduling another retry in 72 hours allows for both bank downtime to clear and potential funds to become available.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1006#2": {
+    "action": {
+      "kind": "WRITE_OFF",
+      "reason": "agent did not give a reason"
+    },
+    "diagnosisRootCause": "unrecoverable",
+    "confidence": 0.9,
+    "reasoning": "Customer has no successful payment history and the previous CUSTOMER_NUDGE attempt indicated the account genuinely never funds. Further attempts are unlikely to succeed.",
+    "toolCalls": 2,
+    "degraded": false
+  },
+  "cust_1008#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 18
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "The payment failed due to an active high-severity downtime at the issuing bank (KKBK). A previous scheduled retry was \"too early\". Scheduling a new retry with a longer delay of 18 hours will allow the bank to resolve its issues.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1002#2": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.9,
+    "reasoning": "The payment failed due to an expired card. The customer has a good payment history. A previous customer nudge attempt failed because it was \"too early\", implying the customer needs more time to update their details. Sending another nudge is the appropriate next step.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1001#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 12
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "The payment failed due to active bank downtime for the issuing bank (KKBK) for card payments. A previous scheduled retry failed because it was too early, likely still within the downtime window. Scheduling a retry for 12 hours later should allow sufficient time for the bank to recover.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1000#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 72
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "The payment failed with insufficient_funds, but there is an active high-severity bank downtime for HDFC, which matches the payment instrument. The customer has a good payment history, suggesting the insufficient_funds error is a generic decline due to bank downtime. A prior scheduled retry failed with \"too early (recovers at +72h)\", indicating a longer delay is needed for the downtime to clear.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1007#3": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.9,
+    "reasoning": "Two prior scheduled retries for insufficient_funds failed, indicating \"too early (recovers at +72h)\". Customer's last successful payment was 70 days ago, significantly longer than their median payment interval of 27 days. These factors suggest that the customer needs to update their payment method or ensure funds are available, making a customer nudge more effective than another retry.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1009#3": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.9,
+    "reasoning": "The payment failed due to an expired card (hard_decline). Customer has a good payment history, suggesting they will update the card. Previous nudges failed because the customer had not yet acted. A fresh nudge is needed to prompt the customer to update their payment method.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1000#3": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 72
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.8,
+    "reasoning": "Customer has a good payment history. Despite the error reason being insufficient_funds, there is an active high-severity downtime for HDFC bank (the instrument issuer). Previous scheduled retries failed with \"too early (recovers at +72h)\", indicating a longer recovery window is needed, aligning with a bank downtime scenario. Retrying after 72 hours to allow for bank systems to recover.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1007#4": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 72
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.9,
+    "reasoning": "Customer history shows regular payments, and prior attempts indicate funds are usually available after 72 hours. The previous scheduled retries were likely too early. A customer nudge is not appropriate as it is an insufficient funds issue, not a card issue. Bank downtime for HDFC was matched but given the explicit \"recovers at +72h\" on prior attempts, insufficient funds is the more specific and actionable root cause.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1002#3": {
+    "action": {
+      "kind": "PAYMENT_LINK",
+      "rail": "card"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.9,
+    "reasoning": "Customer's card is expired, leading to a hard decline. Two prior customer nudges to update the payment method have failed. Providing a payment link empowers the customer to make the payment using an updated card or an alternative card method, bypassing the need for another nudge.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1002#4": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.9,
+    "reasoning": "The customer's card has expired, as indicated by the error reason \"card_expired\". A customer nudge is required to prompt them to update their payment method. Prior CUSTOMER_NUDGE attempts were marked as \"too early\", which is unusual for an expired card but doesn't change the core problem. The PAYMENT_LINK attempt failed because a new card is explicitly needed.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1015#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 18
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "HDFC card payments are currently experiencing high severity downtime, which is the likely cause of the card_declined error. A scheduled retry will allow time for the bank issue to resolve.",
+    "toolCalls": 2,
+    "degraded": false
+  },
+  "cust_1011#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "The payment failed with a generic 'payment_failed' error. Customer has a good payment history (3 successful payments, 0 failed). Bank downtime feed indicates high severity downtime for HDFC card payments, which matches the payment instrument. Scheduling a retry for 24 hours later to allow the bank downtime to resolve.",
+    "toolCalls": 2,
+    "degraded": false
+  },
+  "cust_1010#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 18
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "Customer has good payment history. Payment failed with issuer_technical_error during an active high-severity bank downtime for the issuing bank (BKID) and card method. Scheduling a retry to allow bank downtime to clear.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1014#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.8,
+    "reasoning": "Customer has a good payment history. Although the error reason is insufficient_funds, there is an active high-severity bank downtime for the HDFC card. This suggests the decline might be due to the bank downtime. Scheduling a retry for 24 hours to allow the downtime to clear.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1016#1": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.9,
+    "reasoning": "The card associated with the payment has expired. Customer has a good payment history, indicating this is likely a genuine card expiry rather than an attempt to avoid payment. A customer nudge is required to update the payment method.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1017#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "The payment failed due to an issuer technical error, and there is a high-severity, long-running downtime reported for the issuing bank (BKID) for card payments. Scheduling a retry for 24 hours later to allow for the downtime to potentially clear.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1013#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 12
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "Despite the insufficient_funds error reason, active high-severity downtime was detected for the issuing bank (AXIS) and payment method (card). This suggests the payment failure is likely due to the bank's operational issues rather than a true lack of funds. A scheduled retry is appropriate after allowing time for the bank's services to recover. The customer's payment history, with one successful payment, does not strongly contradict this.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1019#1": {
+    "action": {
+      "kind": "ESCALATE",
+      "reason": "agent did not give a reason"
+    },
+    "diagnosisRootCause": "risk_hold",
+    "confidence": 0.9,
+    "reasoning": "The payment failed due to a risk check, indicated by the error reason \"payment_risk_check_failed\". While there is an active bank downtime, the primary cause points to a risk flag. The customer has a good payment history but a significantly long gap since the last successful payment, which could have triggered the risk check. There are no similar resolved cases to suggest an alternative automated recovery move.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1012#1": {
+    "action": {
+      "kind": "ESCALATE",
+      "reason": "agent did not give a reason"
+    },
+    "diagnosisRootCause": "risk_hold",
+    "confidence": 0.9,
+    "reasoning": "The payment failed due to a `payment_risk_check_failed` error, indicating a risk hold. The customer has a limited payment history with only one successful payment 187 days ago, which could contribute to the risk flagging. Although there is active bank downtime for the card instrument, the explicit risk check failure suggests escalation is the appropriate action rather than a retry.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1018#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "The payment failed due to active bank downtime for the issuing bank (SBIN) as confirmed by the `check_bank_downtime` tool. The customer has a good payment history, indicating the issue is not with the customer. Scheduling a retry for 24 hours to allow the bank downtime to clear.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1015#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "Customer has good payment history. The card was declined due to active HDFC bank downtime. A previous scheduled retry failed because it was too early. Scheduling a new retry 24 hours out to allow the downtime to clear.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1011#2": {
+    "action": {
+      "kind": "PAYMENT_LINK",
+      "rail": "netbanking"
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "HDFC card payments are experiencing high severity downtime, and the previous retry attempt failed with a note suggesting another rail would work. Customer has a good payment history, so sending a payment link on the Netbanking rail is appropriate.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1010#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "The payment failed with an 'issuer_technical_error' and 'GATEWAY_ERROR'. The bank downtime check confirmed an active high-severity downtime for the issuing bank (BKID). A previous scheduled retry at +12 hours failed because it was \"too early\". Therefore, scheduling another retry further out to allow more time for the bank issue to resolve is the correct approach.",
+    "toolCalls": 2,
+    "degraded": false
+  },
+  "cust_1013#2": {
+    "action": {
+      "kind": "WRITE_OFF",
+      "reason": "agent did not give a reason"
+    },
+    "diagnosisRootCause": "unrecoverable",
+    "confidence": 0.9,
+    "reasoning": "The prior scheduled retry failed with \"account never funds, genuinely lost\". The customer has only one successful payment record 182 days ago, indicating a very sparse and old payment history. This suggests the account is not actively used or funded, making recovery unlikely.",
+    "toolCalls": 2,
+    "degraded": false
+  },
+  "cust_1014#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 72
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.9,
+    "reasoning": "Customer has good payment history. Previous scheduled retry failed because it was 'too early', indicating the customer needed more time to fund their account. Scheduling another retry after 72 hours to allow sufficient time for funds to be available.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1017#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "The payment failed due to an issuer technical error, which aligns with the active high-severity downtime reported for Bank of India (BKID) cards. A previous scheduled retry failed because it was too early. Rescheduling for 24 hours later to allow ample time for the bank downtime to resolve.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1018#2": {
+    "action": {
+      "kind": "PAYMENT_LINK",
+      "rail": "netbanking"
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "The original card rail (SBIN) is currently experiencing high severity downtime, as confirmed by check_bank_downtime. A previous scheduled retry on the same rail failed. The customer has a good payment history, suggesting the issue is with the rail and not the customer. Providing a payment link on a different rail (netbanking) is the most appropriate action to allow the customer to complete the payment.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1016#2": {
+    "action": {
+      "kind": "PAYMENT_LINK",
+      "rail": "netbanking"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.9,
+    "reasoning": "The customer's card is expired (hard_decline). While a customer nudge was previously attempted, it \"failed\" as \"too early,\" which suggests the customer needs more time or an alternative method to pay. To avoid repeating the same move, a payment link on a different rail (netbanking) offers an immediate alternative for the customer to complete the payment.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1014#3": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 72
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "Customer has a good payment history (5 successful, 0 failed). Although the error reason was insufficient_funds, there is an active high-severity bank downtime for HDFC card, which was the instrument used. Prior scheduled retries failed with \"too early (recovers at +72h)\". Scheduling a new retry 72 hours from now will allow for the bank downtime to clear and provide ample time for the customer to fund their account, aligning with the previous retry failure details.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1016#3": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.9,
+    "reasoning": "The payment failed due to an expired card. The customer has a good payment history and previous attempts indicate that a nudge is the correct action to prompt the customer to update their payment method.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1029#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "The card was declined due to identified bank downtime for the issuing bank (KKBK). A scheduled retry after 24 hours should allow the bank to resolve the issue.",
+    "toolCalls": 2,
+    "degraded": false
+  },
+  "cust_1026#1": {
+    "action": {
+      "kind": "ESCALATE",
+      "reason": "agent did not give a reason"
+    },
+    "diagnosisRootCause": "risk_hold",
+    "confidence": 0.9,
+    "reasoning": "The payment failed due to a risk check, indicated by \"payment_risk_check_failed\". While there is an active bank downtime for the card instrument, the primary reason for failure is the risk flag. This is the customer's first failed payment, and no similar resolved cases were found for this error reason, making human investigation necessary to understand the risk flagging.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1023#1": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "sms"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.9,
+    "reasoning": "The payment failed because the customer's card has expired. Despite bank downtime being active, the explicit \"card_expired\" error indicates the customer needs to update their payment method. The customer has a good payment history, making a nudge appropriate.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1024#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "The payment failed with an issuer_technical_error. The bank downtime check shows an active high-severity downtime for the issuing bank (BKID) for card payments, which matches the customer's payment method. The customer generally has a good payment history. Therefore, a scheduled retry after 24 hours is proposed to allow the bank downtime to potentially clear.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1022#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "Customer has a good payment history. The card decline is likely due to an active high-severity bank downtime for the AXIS card instrument. Scheduling a retry in 24 hours to allow the bank downtime to clear.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1025#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "The payment failed due to active downtime detected for the issuing bank (AXIS). The customer has a good payment history, making a customer-related issue less likely. Scheduling a retry for 24 hours later to allow the bank downtime to clear.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1021#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.9,
+    "reasoning": "Customer has a good payment history with only one prior failure. The insufficient_funds error likely indicates a temporary cash flow issue. A scheduled retry in 48 hours allows the customer time to add funds to their account.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1027#1": {
+    "action": {
+      "kind": "WRITE_OFF",
+      "reason": "agent did not give a reason"
+    },
+    "diagnosisRootCause": "unrecoverable",
+    "confidence": 0.8,
+    "reasoning": "Customer has a very thin payment history (1 successful payment 183 days ago) and the current failure is due to insufficient funds. Given the long gap since the last payment and the specific error, it is unlikely this payment is recoverable. There are no similar resolved cases to suggest a successful retry strategy.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1020#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.8,
+    "reasoning": "Although the error reason is \"insufficient_funds\", there is active high-severity bank downtime for the AXIS card used in the payment. This suggests the decline might be a side effect of the bank's technical issue rather than an actual lack of funds. Scheduling a retry after 24 hours should allow sufficient time for the downtime to clear.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1028#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 72
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.8,
+    "reasoning": "The payment failed due to insufficient funds. The customer has a history of successful payments, although the last success was 92 days ago, which is longer than their median payment interval of 67 days. A scheduled retry in 72 hours allows time for the customer to replenish funds.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1029#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 12
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "The card was declined due to active bank downtime for KKBK. A previous scheduled retry failed because it was too early. Rescheduling the retry for 12 hours later to allow the bank downtime to clear.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1022#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 12
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "Customer has a good payment history. Bank downtime for AXIS card detected. Previous retry failed due to being too early. Scheduling a retry for 12 hours from now to allow bank downtime to clear.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1024#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "The payment failed with an issuer technical error (GATEWAY_ERROR) which matches an active, high-severity downtime for the issuing bank (BKID). A previous scheduled retry attempt failed because it was \"too early (recovers at +12h)\", indicating a transient issue. Scheduling another retry with a longer delay of 24 hours to allow for the downtime to clear.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1021#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 72
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.9,
+    "reasoning": "Previous retry failed due to \"too early (recovers at +72h)\" for insufficient funds. Customer generally has good payment history. Scheduling a retry for 72 hours from now to allow sufficient time for funds to be available.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1025#2": {
+    "action": {
+      "kind": "PAYMENT_LINK",
+      "rail": "netbanking"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.9,
+    "reasoning": "The customer has not made a successful payment in 129 days, suggesting their card on file may be expired or invalid. A previous scheduled retry on the original card rail failed with the indication that the \"original rail is stuck, another rail works\". Providing a payment link on the netbanking rail offers an alternative for the customer to complete the payment.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1028#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 96
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.9,
+    "reasoning": "The initial failure was due to insufficient funds. The previous scheduled retry failed because it was \"too early (recovers at +72h)\", indicating that more time is needed for the customer to fund their account. Scheduling another retry at 96 hours from the original failure time allows sufficient time, aligning with the \"48-72h\" guidance for insufficient funds.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1023#2": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.9,
+    "reasoning": "The customer's card has expired, leading to a hard decline. The most effective way to recover this payment and ensure future payments is to ask the customer to update their payment method. A previous nudge was attempted but failed due to being \"too early\", suggesting the customer needs more time to act. Assuming the previous nudge attempt is no longer active, a fresh nudge is required to prompt the customer to update their expired card details.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1020#2": {
+    "action": {
+      "kind": "WRITE_OFF",
+      "reason": "agent did not give a reason"
+    },
+    "diagnosisRootCause": "unrecoverable",
+    "confidence": 0.9,
+    "reasoning": "Prior attempt failed with \"account never funds, genuinely lost\", and customer history shows only one successful payment ever, 181 days ago. This indicates the account is genuinely unrecoverable despite the initial \"insufficient_funds\" error and current bank downtime.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1021#3": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 72
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.9,
+    "reasoning": "Previous scheduled retries for insufficient_funds failed as \"too early (recovers at +72h)\". Proposing a 72-hour delay to allow the customer sufficient time to fund their account.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1023#3": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.9,
+    "reasoning": "The card is expired, requiring the customer to update their payment method. Previous nudge attempts failed internally with \"too early\", indicating the customer has likely not been notified yet.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1036#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "The card was declined due to active bank downtime for Kotak Mahindra Bank (KKBK). Scheduling a retry after 24 hours to allow the downtime to clear.",
+    "toolCalls": 2,
+    "degraded": false
+  },
+  "cust_1031#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "The customer has a clean payment history. The payment failed with an issuer_technical_error, and there is an active high-severity bank downtime for the issuing bank (BKID) for card payments, which matches the payment instrument and error. Scheduling a retry for 24 hours from now, assuming the downtime might clear by then.",
+    "toolCalls": 2,
+    "degraded": false
+  },
+  "cust_1039#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 18
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "The customer has a good payment history with no prior failures. Bank downtime check shows that the issuing bank (ICIC) is currently experiencing high severity downtime for card payments, which is the likely cause of the \"payment_failed\" error. Scheduling a retry after the downtime window is appropriate.",
+    "toolCalls": 2,
+    "degraded": false
+  },
+  "cust_1033#1": {
+    "action": {
+      "kind": "ESCALATE",
+      "reason": "agent did not give a reason"
+    },
+    "diagnosisRootCause": "risk_hold",
+    "confidence": 0.9,
+    "reasoning": "The payment failed due to a risk check. This indicates a potential fraud or suspicious activity, which requires human investigation. Automated retries or nudges are not suitable for this type of error.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1037#1": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.9,
+    "reasoning": "The customer has a good payment history, with 6 successful payments and no prior failures. The specific error reason for this payment failure is 'card_expired'. While there is an active downtime reported for the ICIC bank, the explicit 'card_expired' error indicates the issue is with the card itself, not a temporary bank-related problem. A retry would be ineffective. Therefore, the most appropriate action is to nudge the customer to update their payment method via email.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1030#1": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.9,
+    "reasoning": "The payment failed because the card expired. The customer needs to update their payment method. The customer payment history indicates a potential lapse in payments aligning with a card expiration. No similar past cases were found to suggest an alternative approach.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1038#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "Payment failed due to issuer technical error. Active, high-severity downtime is reported for the issuing bank (BKID) for card payments. A scheduled retry in 24 hours allows for the bank to resolve the issue.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1035#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.8,
+    "reasoning": "Customer has a good payment history (5 successful, 0 failed). The \"insufficient_funds\" error, combined with active bank downtime for HDFC, suggests a temporary issue that can be resolved with a scheduled retry. Scheduling for 48 hours allows for potential fund availability and resolution of bank downtime.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1034#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 72
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.7,
+    "reasoning": "The payment failed due to insufficient funds. Although the customer has a sparse payment history (only one successful payment 186 days ago), a scheduled retry is the default recommendation for this error code, allowing the customer time to fund their account. There is no active bank downtime for the specific card issuer.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1032#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 12
+    },
+    "diagnosisRootCause": "soft_decline",
+    "confidence": 0.8,
+    "reasoning": "Customer has a good payment history. The generic \"payment_failed\" error with no specific decline reason, combined with a potential but unconfirmed bank downtime, suggests a soft decline or a temporary issue. A scheduled retry allows for the issue to clear.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1036#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "Previous scheduled retry was too early. High severity bank downtime detected for the issuing bank (KKBK) and card method, indicating the card decline is due to a transient bank issue. Customer has a good payment history.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1038#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "The payment failed with an issuer_technical_error, which correlates with an active high-severity bank downtime for the issuing bank (BKID) and card method. A previous scheduled retry failed because it was too early. Scheduling another retry for 24 hours later to allow sufficient time for the downtime to resolve.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1039#2": {
+    "action": {
+      "kind": "PAYMENT_LINK",
+      "rail": "netbanking"
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "The previous retry failed because the original payment rail (card) is experiencing high-severity downtime for ICICI bank. The customer has a good payment history, so offering an alternative payment method via a payment link on the netbanking rail is appropriate.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1031#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "The payment failed due to an issuer technical error, and there is an active high-severity downtime for the issuing bank (BKID). A previous scheduled retry failed because it was too early, indicating a transient issue that requires more time to resolve. The customer has a good payment history. Therefore, a scheduled retry after a suitable delay is the most appropriate action to allow the bank downtime to clear.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1035#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 72
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.9,
+    "reasoning": "Customer has good payment history, previous retry for insufficient_funds was too early. Scheduling a retry for 72 hours out to allow time for funds to be available. Although there is bank downtime, the explicit insufficient_funds error reason indicates a customer-side issue, and the previous retry failure reason supports a timing issue for funds availability.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1032#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "Payment failed due to active bank downtime with high severity for the customer's card issuer (BKID). A previous scheduled retry also failed because it was too early. Scheduling another retry with a longer delay to account for the ongoing downtime.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1034#2": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.8,
+    "reasoning": "Customer has one successful payment in the past, but the current payment failed due to insufficient funds. A prior scheduled retry also failed. A nudge will prompt the customer to update their payment method or add funds to their account, giving them control to resolve the issue.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1037#2": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.9,
+    "reasoning": "The customer's card has expired, leading to a hard decline. A previous customer nudge attempt failed, likely due to the customer needing more time to update their details. Sending another nudge via email to prompt them to update their payment method.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1030#2": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.9,
+    "reasoning": "The customer's card is expired, requiring them to update their payment method. A previous nudge was sent, but it was deemed \"too early,\" indicating the customer needs more time to act. A new nudge will directly address the expired card issue.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1035#3": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 74
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.9,
+    "reasoning": "Customer has a good payment history but previous retries for insufficient funds were \"too early\". Scheduling a retry after 72 hours from the original failure to allow time for funds to be available. Although there is active downtime for HDFC card, the primary reason for failure and previous failed retries points to insufficient funds timing.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1032#3": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 72
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "High severity bank downtime for the issuing bank (BKID) has been ongoing since 2026-07-03, and this is the likely cause of the BAD_REQUEST_ERROR and payment_failed. Previous RETRY_SCHEDULED attempts failed because they were \"too early\", indicating the downtime was still active. A longer scheduled retry is needed.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1034#3": {
+    "action": {
+      "kind": "WRITE_OFF",
+      "reason": "agent did not give a reason"
+    },
+    "diagnosisRootCause": "unrecoverable",
+    "confidence": 0.9,
+    "reasoning": "Prior attempts (RETRY_SCHEDULED and CUSTOMER_NUDGE) both failed with the detail \"account never funds, genuinely lost,\" indicating the payment is not recoverable. Customer has only 1 successful payment, 189 days ago.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1037#3": {
+    "action": {
+      "kind": "PAYMENT_LINK",
+      "rail": "netbanking"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.9,
+    "reasoning": "Payment failed due to an expired card (hard decline). Customer has a good payment history. Two previous CUSTOMER_NUDGE attempts failed as \"too early\". To recover the payment without a third identical nudge, a payment link on the netbanking rail is proposed to allow the customer to complete the payment.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1030#3": {
+    "action": {
+      "kind": "PAYMENT_LINK",
+      "rail": "card"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.9,
+    "reasoning": "The card is expired, and two previous customer nudges have failed. A payment link will allow the customer to directly update their card details.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1037#4": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.9,
+    "reasoning": "The card is expired and previous nudges were too early. The customer needs to update their payment method.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1030#4": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.9,
+    "reasoning": "The payment failed because the card is expired. Previous attempts to nudge failed with \"too early\", and a payment link was deemed the wrong action as a new card is needed. The customer needs to update their payment method.",
+    "toolCalls": 2,
+    "degraded": false
+  },
+  "cust_1045#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 18
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "The payment failed due to an issuer technical error, and the bank (BKID) is currently experiencing high severity downtime for card payments. The customer has a good payment history. A scheduled retry in 18 hours should allow the bank downtime to clear and the payment to go through.",
+    "toolCalls": 2,
+    "degraded": false
+  },
+  "cust_1043#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "The card was declined, and there is active high-severity downtime reported for the issuing bank (ICIC) and payment method (card). This suggests the failure is due to a bank-side issue rather than the customer or card itself. A scheduled retry after the downtime window is appropriate.",
+    "toolCalls": 2,
+    "degraded": false
+  },
+  "cust_1044#1": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.95,
+    "reasoning": "Customer has a good payment history but the card is expired. Nudging the customer to update their payment method is the most appropriate action.",
+    "toolCalls": 2,
+    "degraded": false
+  },
+  "cust_1047#1": {
+    "action": {
+      "kind": "ESCALATE",
+      "reason": "agent did not give a reason"
+    },
+    "diagnosisRootCause": "risk_hold",
+    "confidence": 0.9,
+    "reasoning": "The payment failed due to a risk check. The customer has a long gap since their last successful payment (158 days vs. median 29 days), which may have triggered the risk flag. Escalation is appropriate for risk-flagged payments as they require human review.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1040#1": {
+    "action": {
+      "kind": "ESCALATE",
+      "reason": "agent did not give a reason"
+    },
+    "diagnosisRootCause": "risk_hold",
+    "confidence": 0.9,
+    "reasoning": "The payment failed due to a risk check (`payment_risk_check_failed`). Automated retries are not recommended for risk-related failures, so escalating for human review.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1041#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.7,
+    "reasoning": "Customer has insufficient funds. A scheduled retry allows time for the customer to add funds. This is the first attempt, and the default for insufficient_funds is RETRY_SCHEDULED.",
+    "toolCalls": 2,
+    "degraded": false
+  },
+  "cust_1048#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "The payment failed with insufficient_funds, but there is an active high severity bank downtime for AXIS cards, which was the instrument used. This suggests the failure could be due to the bank downtime, not actual insufficient funds. Scheduling a retry for 24 hours to allow the bank to resolve the issue.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1042#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.7,
+    "reasoning": "The payment failed with insufficient_funds, but there is an active high-severity bank downtime for HDFC card (matched: True). This suggests the decline might be due to the bank downtime rather than actual insufficient funds. A retry is scheduled for 24 hours to see if the situation clears, assuming the downtime is the primary cause. Customer history is poor, but bank downtime overrides it for a first attempt.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1046#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 18
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "The payment failed due to a generic payment_failed error. Bank downtime was detected for the AXIS card, which was the payment instrument used. Scheduling a retry after 18 hours should allow the bank to recover from the downtime.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1049#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.9,
+    "reasoning": "Customer has a strong payment history with 0 prior failed payments, indicating the 'insufficient_funds' is likely a temporary issue. A scheduled retry will allow the customer time to replenish funds and account for any transient bank issues.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1045#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "The payment failed due to an issuer technical error, and there is active, high-severity downtime reported for the issuing bank (BKID). The previous scheduled retry failed because it was too early, indicating the downtime was still active. Rescheduling for 24 hours from now should allow sufficient time for the downtime to clear.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1043#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "The card was declined due to an active, high-severity downtime with the issuing bank (ICIC card). The previous scheduled retry failed because it was too early; scheduling a retry with a longer delay to allow the bank to recover.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1044#2": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.9,
+    "reasoning": "The payment failed due to an expired card. The customer has a good payment history, indicating they are generally reliable. A previous customer nudge failed as it was considered \"too early\", but the card remains expired and requires customer action to update the payment method.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1048#2": {
+    "action": {
+      "kind": "WRITE_OFF",
+      "reason": "agent did not give a reason"
+    },
+    "diagnosisRootCause": "unrecoverable",
+    "confidence": 0.9,
+    "reasoning": "Customer has only one successful payment 185 days ago. The initial failure was due to insufficient_funds. A prior scheduled retry also failed with the detail \"account never funds, genuinely lost\", indicating this payment is unrecoverable and the account is likely not being funded.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1041#2": {
+    "action": {
+      "kind": "WRITE_OFF",
+      "reason": "agent did not give a reason"
+    },
+    "diagnosisRootCause": "unrecoverable",
+    "confidence": 0.9,
+    "reasoning": "The prior scheduled retry attempt failed with the detail \"account never funds, genuinely lost\". This, combined with the customer's very thin payment history (only one successful payment 184 days ago), strongly indicates that the payment is unrecoverable. Further retries or nudges are unlikely to be successful.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1046#2": {
+    "action": {
+      "kind": "PAYMENT_LINK",
+      "rail": "netbanking"
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "The previous attempt failed with an indication that the original card rail is stuck and another rail might work. Bank downtime is currently active for card payments, corroborating the issue with the card rail. The customer has a good payment history but has not paid in 126 days. Sending a payment link on the netbanking rail will allow the customer to complete the payment using an alternative method, bypassing the current card rail issues.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1049#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 72
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.9,
+    "reasoning": "Customer has a good payment history, indicating a temporary insufficient funds issue. A prior scheduled retry failed because it was too early; the error message suggests a 72-hour recovery window.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1044#3": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.8,
+    "reasoning": "The card is expired. Two prior nudges failed because it was \"too early\", suggesting the customer has not yet updated their payment method. Sending another nudge via email to prompt customer action.",
+    "toolCalls": 1,
+    "degraded": false
+  },
+  "cust_1042#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 96
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.9,
+    "reasoning": "The explicit error was insufficient_funds, and the prior 72-hour scheduled retry failed as \"too early\". The customer has an inconsistent payment history. Additionally, there is active bank downtime for the payment instrument. A 96-hour retry delay accounts for both potential funding issues and ongoing bank downtime.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1049#3": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "sms"
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.9,
+    "reasoning": "The customer has a good payment history, but two prior scheduled retries for `insufficient_funds` failed because they were \"too early.\" This indicates the customer needs to act. As per instructions, after two failed retries, a different recovery move is required. A customer nudge via SMS will prompt them to update their payment method or ensure sufficient funds are available.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1042#3": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.8,
+    "reasoning": "Customer has a history of more failed payments than successful ones, and the last successful payment was 70 days ago. Two prior scheduled retries for insufficient funds failed because they were \"too early\", indicating the customer needs to fund their account or update their payment method.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1049#4": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 72
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.9,
+    "reasoning": "Customer typically has funds by 72 hours, as indicated by prior failed retries being \"too early\" and a nudge being \"wrong action for this case (funds arrive by day 3)\". The customer has a good payment history. This suggests a retry at 72 hours is optimal.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1042#4": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 72
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.9,
+    "reasoning": "Customer has a history of failed payments. Previous attempts for this case indicate that funds become available after 72 hours, as earlier retries failed with \"too early (recovers at +72h)\". A customer nudge was explicitly stated as the wrong action. No active bank downtime detected for the issuing bank (HDFC).",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1057#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "The payment failed during an active high-severity downtime for AXIS bank (card method). A scheduled retry is appropriate after the downtime has had a chance to clear.",
+    "toolCalls": 2,
+    "degraded": false
+  },
+  "cust_1050#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "Payment failed with card_declined, and active downtime was detected for the issuing bank (KKBK) for card payments. Scheduling a retry to allow the bank downtime to clear.",
+    "toolCalls": 2,
+    "degraded": false
+  },
+  "cust_1053#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "Customer has good payment history. Active bank downtime detected for HDFC card, which is the payment instrument. A scheduled retry in 24 hours should allow the bank to resolve the issue.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1059#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "The payment failed due to an issuer technical error, and a high-severity downtime for the issuing bank (BKID) is currently active for card payments. Scheduling a retry for 24 hours to allow the bank to resolve the issue.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1058#1": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.9,
+    "reasoning": "The customer has a good payment history. The payment failed because their card expired. A direct nudge to update their payment method is the most appropriate action. Although there is bank downtime, the explicit \"card_expired\" reason indicates the card is the primary issue.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1052#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "The payment failed due to an issuer_technical_error and there is an active, high-severity downtime reported for the issuing bank (BKID). The customer has a clean payment history. A scheduled retry in 24 hours will allow time for the issuer's technical issues to resolve.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1056#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 72
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.9,
+    "reasoning": "Customer has a history of both successful and failed payments. The explicit error is insufficient_funds. A scheduled retry in 72 hours allows time for the customer to fund their account. No similar cases found and bank downtime is not clearly confirmed for HDFC, making insufficient funds the most direct cause.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1054#1": {
+    "action": {
+      "kind": "ESCALATE",
+      "reason": "agent did not give a reason"
+    },
+    "diagnosisRootCause": "risk_hold",
+    "confidence": 0.9,
+    "reasoning": "The payment failed due to a risk check. Customer has a long gap since last successful payment (156 days). No clear automated recovery path for `payment_risk_check_failed` in similar cases. Escalation is appropriate for risk-flagged payments.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1055#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.8,
+    "reasoning": "Customer has a history of only one payment and no prior failures. The explicit error reason is insufficient_funds. A scheduled retry in 48 hours will give the customer time to fund their account. While there is bank downtime for AXIS cards, the specific error code points to insufficient funds.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1051#1": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.9,
+    "reasoning": "The payment failed due to an expired card. The customer has a good payment history, but a long gap since the last successful payment. A nudge is required to prompt them to update their payment method.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1057#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "The card was declined due to active bank downtime for the issuing bank (AXIS). A previous scheduled retry failed because it was too early. Rescheduling further out to allow for bank systems to recover.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1059#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "The payment failed due to an issuer technical error. There is an active high-severity downtime for the issuing bank (BKID) that has been ongoing since July. A previous scheduled retry at +12h failed, indicating the downtime was still active. Given the persistent downtime, another scheduled retry with a longer delay (24 hours) is appropriate. The customer has a good payment history, confirming the issue is not customer-related.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1058#2": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.9,
+    "reasoning": "The card is expired, and a prior customer nudge was sent but marked as \"too early.\" The customer has a good payment history, suggesting they will update their card with another reminder. Bank downtime is present but not the direct cause of the card_expired error.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1050#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "The payment failed with a 'card_declined' error, and the instrument (KKBK card) is currently experiencing high-severity downtime. A previous scheduled retry also failed as 'too early', indicating a persistent but transient issue. Scheduling another retry for 24 hours from now allows ample time for the bank's services to recover.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1052#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "The payment failed due to `issuer_technical_error` and `GATEWAY_ERROR`. Bank downtime check confirmed high-severity, long-standing downtime for the issuing bank (BKID). A previous scheduled retry failed because it was \"too early\". Scheduling a retry 24 hours out provides sufficient time for the bank to resolve its technical issues.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1051#2": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.9,
+    "reasoning": "The card is expired. A previous customer nudge failed because it was \"too early\", suggesting a timing issue rather than an incorrect diagnosis. The customer needs to update their payment method.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1053#2": {
+    "action": {
+      "kind": "PAYMENT_LINK",
+      "rail": "netbanking"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.9,
+    "reasoning": "Although bank downtime was observed, a prior retry attempt failed with the specific reason 'original rail stuck, another rail works'. This indicates that the current payment method is not viable. Therefore, proposing a payment link on an alternative rail (netbanking) to allow the customer to complete the payment.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1056#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 96
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.8,
+    "reasoning": "The previous scheduled retry for insufficient funds failed because it was \"too early\", indicating the customer did not have funds at that time. Given the \"insufficient_funds\" error and the customer's somewhat infrequent payment history (median 93 days), a longer delay is needed. Additionally, there is active high-severity downtime for HDFC bank, which further justifies a delayed retry to ensure better chances of success. A 96-hour delay is proposed to allow the customer more time to arrange funds and account for the bank downtime.",
+    "toolCalls": 4,
+    "degraded": false
+  },
+  "cust_1055#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.8,
+    "reasoning": "The payment failed due to detected bank downtime for AXIS bank. The previous scheduled retry likely failed for the same reason, and the \"account never funds\" detail was misleading. Rescheduling a retry after a reasonable delay should allow the bank downtime to clear, leading to a successful payment.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1051#3": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.9,
+    "reasoning": "The card is expired. Previous nudges failed due to being \"too early\", suggesting the customer needs more time to update. A nudge is the appropriate action to prompt the customer to update their payment method.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1055#3": {
+    "action": {
+      "kind": "WRITE_OFF",
+      "reason": "agent did not give a reason"
+    },
+    "diagnosisRootCause": "unrecoverable",
+    "confidence": 0.9,
+    "reasoning": "Two prior scheduled retries for this case have failed with the detail \"account never funds, genuinely lost\", indicating the payment is unrecoverable.",
+    "toolCalls": 1,
+    "degraded": false
+  },
+  "cust_1058#3": {
+    "action": {
+      "kind": "PAYMENT_LINK",
+      "rail": "netbanking"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.9,
+    "reasoning": "The customer's card has expired, and two prior customer nudges failed with \"too early (recovers at +24h)\". This suggests the customer needs time to update their card. Providing a payment link on an alternative rail (netbanking) allows them to make this payment while they resolve their expired card issue for future payments.",
+    "toolCalls": 3,
+    "degraded": false
+  },
+  "cust_1058#4": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.9,
+    "reasoning": "Customer's card is expired, requiring them to update their payment method. Previous nudges might have been too early, but this remains the correct action. The prior PAYMENT_LINK attempt explicitly stated 'needs a new card'.",
+    "toolCalls": 4,
+    "degraded": false
+  }
+}
