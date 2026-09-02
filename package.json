@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run --exclude '**/*.integration.test.ts'",
-    "db:schema": "psql \"$ADMIN_DATABASE_URL\" -f db/schema.sql"
+    "db:schema": "psql \"$ADMIN_DATABASE_URL\" -f db/schema.sql",
+    "web:build": "vite build --config web/vite.config.ts"
   },
   "dependencies": {
     "@openrouter/ai-sdk-provider": "^3.0.0",
