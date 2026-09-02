@@ -36,8 +36,8 @@ export class PostgresCaseRepository implements CaseRepository {
     const { rows } = await this.db.query(
       `INSERT INTO recovery_cases
          (id, run_id, merchant_ref, customer_ref, original_payment_id, amount_paise, currency,
-          failure_code, failure_reason, failed_at, method, instrument, customer_history)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+          failure_code, failure_reason, failed_at, method, instrument, customer_history, ground_truth)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
        RETURNING ${COLUMNS}`,
       [
         newCase.id,
@@ -53,6 +53,7 @@ export class PostgresCaseRepository implements CaseRepository {
         newCase.method ?? null,
         newCase.instrument ? JSON.stringify(newCase.instrument) : null,
         JSON.stringify(newCase.customerHistory),
+        newCase.groundTruth ? JSON.stringify(newCase.groundTruth) : null,
       ],
     );
     return toCase(rows[0] as Row);

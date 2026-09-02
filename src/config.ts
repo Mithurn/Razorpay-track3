@@ -4,7 +4,9 @@ const schema = z.object({
   DATABASE_URL: z.string().url(),
   ADMIN_DATABASE_URL: z.string().url().optional(),
   REDIS_URL: z.string().url(),
-  OPENROUTER_API_KEY: z.string().min(1),
+  // Optional so the fixed-schedule bench arm and offline tooling run without it; the agent
+  // paths fail loudly at model construction if it is missing.
+  OPENROUTER_API_KEY: z.string().min(1).optional(),
   AGENT_MODEL: z.string().default("openai/gpt-5.6-luna"),
   AGENT_MODEL_CHEAP: z.string().default("qwen/qwen3-32b"),
   RAZORPAY_KEY_ID: z.string().min(1),

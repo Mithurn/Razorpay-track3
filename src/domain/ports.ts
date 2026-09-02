@@ -57,6 +57,7 @@ export type OutcomeVerdict =
 export type NewCase = Omit<RecoveryCase, "lane" | "recoveredPaise" | "method" | "instrument"> & {
   method?: string | null;
   instrument?: Record<string, string> | null;
+  groundTruth?: Record<string, unknown> | null;
 };
 
 export interface CaseRepository {

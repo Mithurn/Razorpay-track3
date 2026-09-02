@@ -13,3 +13,6 @@ context/
 # test + build artifacts
 coverage/
 test-results/
+
+# bench replay cache
+bench/.cache/
