@@ -43,12 +43,24 @@ export function App() {
     return map;
   }, [cases]);
 
+  const freshCase = cases.find((c) => c.lane === "INCOMING");
+  const watchLive = useCallback(async () => {
+    if (!freshCase) return;
+    setSelected(freshCase.id);
+    await recover(freshCase.id);
+  }, [freshCase]);
+
   return (
     <div className="room" data-surface="room">
       <header className="room__header">
         <div className="brand">
           <span className="brand__name">Recovery Room</span>
           <span className="brand__sub">a bounded agent working a queue of failed payments</span>
+          {freshCase && (
+            <button className="btn btn--primary brand__watch" onClick={watchLive}>
+              ▶ watch a live recovery
+            </button>
+          )}
         </div>
         <Scoreboard board={board} liveCases={cases} />
       </header>
