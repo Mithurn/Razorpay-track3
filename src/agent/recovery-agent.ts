@@ -5,6 +5,7 @@ import type { AgentProposal, RecoveryAction } from "../domain/recovery-action.js
 import { recoveryAction } from "../domain/recovery-action.js";
 import { buildTools, type AgentDeps } from "./tools.js";
 import { SYSTEM_PROMPT, caseBrief } from "./prompt.js";
+import { summariseFinding } from "./findings.js";
 
 export const proposalInput = z.object({
   rootCause: rootCauseEnum,
@@ -26,6 +27,7 @@ export type AgentConfig = {
 export type AgentEvents = {
   onReasoningDelta?: (text: string) => void;
   onToolCall?: (name: string) => void;
+  onFinding?: (text: string) => void;
   onConcluded?: (proposal: AgentProposal) => void;
 };
 
@@ -88,10 +90,21 @@ export async function runRecoveryAgent(
             events.onToolCall?.(call.toolName);
           }
         }
+        for (const res of step.toolResults) {
+          if (res.toolName !== "submit_proposal") {
+            events.onFinding?.(summariseFinding(res.toolName, res.output));
+          }
+        }
       },
     });
 
-    for await (const delta of result.textStream) events.onReasoningDelta?.(delta);
+    for await (const part of result.fullStream) {
+      if (part.type === "text-delta" || part.type === "reasoning-delta") {
+        events.onReasoningDelta?.(part.text);
+      } else if (part.type === "error") {
+        throw part.error;
+      }
+    }
 
     const calls = await result.toolCalls;
     const conclusion = calls.find((c) => c.toolName === "submit_proposal");

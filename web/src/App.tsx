@@ -181,6 +181,7 @@ function CasePane({
   const [detail, setDetail] = useState<CaseDetail | null>(null);
   const [reasoning, setReasoning] = useState("");
   const [tools, setTools] = useState<string[]>([]);
+  const [findings, setFindings] = useState<string[]>([]);
   const [live, setLive] = useState(false);
   const seq = useRef(0);
 
@@ -191,6 +192,7 @@ function CasePane({
     }
     setReasoning("");
     setTools([]);
+    setFindings([]);
     seq.current += 1;
     const controller = new AbortController();
     const load = () => caseDetail(caseId).then(setDetail).catch(() => undefined);
@@ -198,7 +200,8 @@ function CasePane({
 
     (async () => {
       try {
-        for await (const ev of streamCase(caseId, controller.signal)) applyStream(ev, { setReasoning, setTools, setLive });
+        for await (const ev of streamCase(caseId, controller.signal))
+          applyStream(ev, { setReasoning, setTools, setFindings, setLive });
       } catch {
         /* aborted */
       }
@@ -250,6 +253,16 @@ function CasePane({
         </div>
       )}
 
+      {kase && (
+        <div className="fence">
+          <span>attempt {attempt?.attemptNo ?? 0}/4</span>
+          <span className={kase.amountPaise > 500000 ? "fence--over" : ""}>
+            exposure {rupees(kase.amountPaise)} / ₹5,000 cap
+          </span>
+          <span>cooldown 6h</span>
+        </div>
+      )}
+
       {kase?.lane === "INCOMING" && (
         <button className="btn btn--primary" onClick={() => onRecover(caseId)}>
           work this case now
@@ -259,6 +272,17 @@ function CasePane({
         <button className="btn btn--primary" onClick={() => onSimulateCapture(caseId)}>
           customer completes payment →
         </button>
+      )}
+
+      {findings.length > 0 && (
+        <div className="findings">
+          {findings.map((f, i) => (
+            <div className="findings__row" key={i}>
+              <span className="findings__dot" />
+              {f}
+            </div>
+          ))}
+        </div>
       )}
 
       <div className="stream">
@@ -293,22 +317,36 @@ function CasePane({
         </div>
       )}
 
-      {gate && (
-        <div className="verdict">
-          <div className="verdict__line">
-            <span className="verdict__k">safety gate</span>
-            <span className="verdict__v">
-              {String((gate.payload as { outcome?: string }).outcome)} →{" "}
-              <span className="verdict__v--action">
-                {String((gate.payload as { applied?: string }).applied ?? "skip")}
+      {gate && (() => {
+        const g = gate.payload as { outcome?: string; proposed?: string; applied?: string; reason?: string };
+        const clamped = g.outcome === "clamp" || g.outcome === "skip";
+        return (
+          <div className="verdict">
+            <div className="verdict__line">
+              <span className="verdict__k">safety gate</span>
+              <span className="verdict__v">
+                {clamped ? (
+                  <>
+                    proposed <span className="verdict__v--action">{g.proposed}</span> →{" "}
+                    <span className="verdict__v--deny">
+                      {g.outcome === "skip" ? "SKIP" : `clamped to ${g.applied}`}
+                    </span>
+                    {g.reason ? ` · ${g.reason}` : ""}
+                  </>
+                ) : (
+                  <>
+                    passed <span className="verdict__v--action">{g.applied}</span> unchanged
+                  </>
+                )}
               </span>
-              {(gate.payload as { reason?: string }).reason
-                ? ` (${(gate.payload as { reason?: string }).reason})`
-                : ""}
-            </span>
+            </div>
+            <div className="verdict__line">
+              <span className="verdict__k" />
+              <span className="verdict__note">deterministic · pure function · can only add caution, never remove it</span>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {attempt && (
         <div className="verdict">
@@ -328,17 +366,32 @@ function CasePane({
               {attempt.recoveredPaise > 0 ? ` · ${rupees(attempt.recoveredPaise)} captured` : ""}
             </span>
           </div>
+          <div className="verdict__line">
+            <span className="verdict__k">idem key</span>
+            <span className="verdict__v verdict__v--mono">{attempt.idempotencyKey}</span>
+          </div>
           {attempt.razorpayRef && (
             <div className="verdict__line">
-              <span className="verdict__k">razorpay</span>
-              <span className="verdict__v">{attempt.razorpayRef}</span>
+              <span className="verdict__k">{attempt.razorpayRef.startsWith("plink_") ? "rzp link" : "rzp order"}</span>
+              <span className="verdict__v verdict__v--mono">{attempt.razorpayRef}</span>
             </div>
           )}
+          {attempt.settledPaymentId && (
+            <div className="verdict__line">
+              <span className="verdict__k">rzp payment</span>
+              <span className="verdict__v verdict__v--mono">{attempt.settledPaymentId}</span>
+            </div>
+          )}
+          <div className="verdict__line">
+            <span className="verdict__k" />
+            <span className="verdict__note">exactly-once · one key = one order · 5xx re-checks GET /payments/:id before concluding</span>
+          </div>
         </div>
       )}
 
       {events.length > 0 && (
         <div className="audit">
+          <div className="audit__head">audit trail · append-only, enforced by database grant</div>
           {events.map((e) => (
             <div className="audit__row" key={e.id}>
               <span className="audit__t">{new Date(e.createdAt).toLocaleTimeString()}</span>
@@ -400,11 +453,13 @@ function applyStream(
   s: {
     setReasoning: React.Dispatch<React.SetStateAction<string>>;
     setTools: React.Dispatch<React.SetStateAction<string[]>>;
+    setFindings: React.Dispatch<React.SetStateAction<string[]>>;
     setLive: React.Dispatch<React.SetStateAction<boolean>>;
   },
 ): void {
   if (ev.type === "reasoning") s.setReasoning((r) => r + ev.text);
-  else if (ev.type === "tool") s.setTools((t) => [...t, ev.name]);
+  else if (ev.type === "tool") s.setTools((t) => (t.includes(ev.name) ? t : [...t, ev.name]));
+  else if (ev.type === "finding") s.setFindings((f) => (f.includes(ev.text) ? f : [...f, ev.text]));
   else if (ev.type === "open") s.setLive(true);
   else if (ev.type === "done") s.setLive(false);
 }

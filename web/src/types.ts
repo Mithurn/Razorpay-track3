@@ -40,6 +40,8 @@ export type Attempt = {
   detail: string | null;
   recoveredPaise: number;
   razorpayRef: string | null;
+  idempotencyKey: string;
+  settledPaymentId: string | null;
 };
 
 export type CaseDetail = { case: RecoveryCase; attempts: Attempt[]; events: StoredEvent[] };
@@ -48,6 +50,7 @@ export type StreamEvent =
   | { type: "open"; caseId: string }
   | { type: "reasoning"; text: string }
   | { type: "tool"; name: string }
+  | { type: "finding"; text: string }
   | { type: "lane"; lane: string }
   | { type: "done"; lane: string };
 

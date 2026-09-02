@@ -13,6 +13,7 @@ export function makeProcessor(pipeline: RecoveryPipeline, queue: Queue<RecoveryJ
     const outcome = await pipeline.advance(caseId, {
       onReasoningDelta: (text) => bus.publish(caseId, { type: "reasoning", text }),
       onToolCall: (name) => bus.publish(caseId, { type: "tool", name }),
+      onFinding: (text) => bus.publish(caseId, { type: "finding", text }),
       onConcluded: (p) => {
         // The model may stream little prose between tool calls; always surface the final rationale.
         bus.publish(caseId, { type: "reasoning", text: `\n\n${p.reasoning}` });

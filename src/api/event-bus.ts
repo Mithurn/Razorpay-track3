@@ -6,6 +6,7 @@ import { EventEmitter } from "node:events";
 export type CaseStreamEvent =
   | { type: "reasoning"; text: string }
   | { type: "tool"; name: string }
+  | { type: "finding"; text: string }
   | { type: "lane"; lane: string }
   | { type: "proposal"; rootCause: string | null; action: string; degraded: boolean }
   | { type: "attempt"; status: string; recoveredPaise: number }

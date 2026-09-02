@@ -337,3 +337,58 @@
   color: var(--text-muted);
   min-width: 132px;
 }
+.audit__head {
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding-bottom: 2px;
+}
+
+/* Findings — the investigation landing signal by signal */
+.findings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+.findings__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  animation: trail-in var(--dur) var(--ease-out);
+  font-variant-numeric: tabular-nums;
+}
+.findings__dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--clear);
+  flex: none;
+}
+
+.verdict__note {
+  color: var(--text-faint);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  line-height: var(--leading-body);
+}
+.verdict__v--mono {
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.fence {
+  display: flex;
+  gap: var(--space-md);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
+}
+.fence--over {
+  color: var(--deny);
+}
