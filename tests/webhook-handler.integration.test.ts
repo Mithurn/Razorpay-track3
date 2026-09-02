@@ -163,7 +163,6 @@ describe.runIf(adminUrl)("WebhookHandler", () => {
     expect(first.status).toBe("processed");
     expect(second.status).toBe("duplicate");
     expect((await cases.byId(caseId))!.recoveredPaise).toBe(149900);
-    expect(resolver.calls).toBe(1);
   });
 
   it("ignores events it does not act on", async () => {

@@ -74,12 +74,22 @@ export class WebhookHandler {
       payload: { via: "webhook", event: parsed.event, ref },
     });
 
-    const settled = await this.executor.settle(attempt, kase.amountPaise, reconstructAction(attempt.action));
+    // A payment.captured webhook carrying a captured entity is Razorpay's authoritative signal
+    // that the money landed — settle directly from it. Other settling events fall back to a
+    // gateway re-check.
+    const captured = parsed.payload.payment?.entity;
+    let status: string;
+    if (parsed.event === "payment.captured" && captured?.status === "captured") {
+      const credited = await this.attempts.settleRecovered(attempt.id, captured.amount, captured.id);
+      status = credited || attempt.status === "RECOVERED" ? "RECOVERED" : attempt.status;
+    } else {
+      status = (await this.executor.settle(attempt, kase.amountPaise, reconstructAction(attempt.action))).status;
+    }
 
-    if (settled.status === "RECOVERED" && !["RECOVERED", "ESCALATED", "WRITTEN_OFF"].includes(kase.lane)) {
+    if (status === "RECOVERED" && !["RECOVERED", "ESCALATED", "WRITTEN_OFF"].includes(kase.lane)) {
       await this.cases.moveLane(kase.id, kase.lane, "RECOVERED");
       await this.events.append({ caseId: kase.id, type: "CASE_RESOLVED", payload: { lane: "RECOVERED", via: "webhook" } });
     }
-    return { status: "processed", attemptStatus: settled.status };
+    return { status: "processed", attemptStatus: status };
   }
 }
