@@ -3,7 +3,7 @@ import type { Db } from "./pool.js";
 export type RecoveryRun = {
   id: string;
   label: string | null;
-  arm: "fixed" | "agent";
+  arm: "fixed" | "agent" | "rules";
   config: Record<string, unknown>;
   summary: Record<string, unknown> | null;
   startedAt: string;
@@ -13,7 +13,7 @@ export type RecoveryRun = {
 export class RunRepository {
   constructor(private readonly db: Db) {}
 
-  async create(id: string, arm: "fixed" | "agent", label: string, config: Record<string, unknown>): Promise<void> {
+  async create(id: string, arm: "fixed" | "agent" | "rules", label: string, config: Record<string, unknown>): Promise<void> {
     await this.db.query("INSERT INTO recovery_runs (id, label, arm, config) VALUES ($1, $2, $3, $4)", [
       id,
       label,

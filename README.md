@@ -37,36 +37,64 @@ schedule.
 ## The number
 
 One synthetic batch of 60 failed payments, using only Razorpay's own `error_reason` values and
-ground-truth recoverability, run through two arms — a **fixed retry schedule** (day 1/3/5/7) and
-**the agent** — on the same gate, executor and ledger with only the brain swapped:
+ground-truth recoverability (44 of 60 recoverable by construction — 16 are lost accounts and
+risk holds, unrecoverable by any arm), run through three arms on the same gate, executor and
+ledger with only the brain swapped:
 
-|                    | agent    | fixed    |
-|--------------------|----------|----------|
-| recovery rate      | 73.3%    | 46.7%    |
-| ₹ recovered        | ₹65,956  | ₹42,972  |
-| escalation rate    | 13.3%    | 53.3%    |
-| mean attempts/rec  | 2.55     | 2.32     |
+|                    | agent    | fixed    | rules table |
+|--------------------|----------|----------|-------------|
+| recovered          | 41 / 60  | 28 / 60  | 43 / 60     |
+| recovery rate      | 68.3%    | 46.7%    | 71.7%       |
+| ₹ recovered        | ₹62,459  | ₹42,972  | ₹64,457     |
+| escalation rate    | 28.3%    | 53.3%    | 28.3%       |
+| mean attempts/rec  | 1.49     | 1.32     | 1.00        |
+| mean hours to rec  | 36.7     | 41.1     | 28.6        |
 
-All 16 of the agent's exceptions are genuinely unrecoverable (risk holds → escalated to a human,
-accounts that never fund → written off). Reproduce it for free, no API key:
-`npm run bench -- --size 60 --seed 42 --mock`.
+Reproduce it for free, no API key: `npm run bench -- --size 60 --seed 42 --mock`.
 
-The batch includes **matched pairs**: a generic decline whose issuer is in a live downtime
-window, next to an identical case whose issuer is not — the fixed schedule cannot tell them
-apart and gets one wrong.
+**The third column is the finding.** `bench/rules-arm.ts` is the agent's own system-prompt
+playbook — "card_expired → nudge the customer," "payment_risk_check_failed → escalate," and so
+on — transcribed into a 6-line `switch` on `error_reason`. No model, no tools, no re-planning,
+₹0. It beats the LLM. On a 7-template corpus, a table built from the same 7 lines the agent's
+prompt already contains wins, because there's nothing left for judgment to add.
+
+The one case in sixty that separates them: a `payment_failed` decline whose issuer is, this
+time, actually in a live downtime window — the same code, a different cause. The table can't
+see that; it only reads the code, and loses the case (escalates). The agent recovers it, but not
+on the first move: its own `get_similar_resolved_cases` retrieval, trained on a corpus where
+every other `payment_failed` case recovers via a payment link, twice talked it out of the live
+downtime signal it had already found, before a third failed attempt forced it back. The
+transcript is in `bench/.cache/agent-turns-seed42-n60.json` under `cust_1032`. n=1 is an
+existence proof, not a result — it's the honest size of the evidence a bounded corpus and a
+₹100 budget buy, and it's also evidence our own retrieval tool can mislead the agent on a
+templated eval, which is worth knowing regardless of the scoreboard.
+
+Of the 19 cases neither the agent nor the rules table recovers, 16 are unrecoverable by
+construction (risk holds, dead accounts). The other 3 (`insufficient_funds`, "funds arrive by
+day 3") are recoverable and both arms miss the timing and escalate — a real gap, not hidden here.
 
 ## Honest caveat
 
 Razorpay test mode does not decline a card on demand, so the **incoming failure stream is
 synthetic** (modeled from real error codes). The **recovery actions are real**: real Orders,
-real Payment Links, real payment IDs. `recovered_paise` on the scoreboard is summed from two
+real Payment Links, real payment IDs. `recovered_paise` on the scoreboard is summed from three
 clearly separated sources, never blended:
 
-- **live** — real Razorpay captures, `status == "captured"` on a real payment id.
-- **bench** — ground-truth resolution (the order is still created for real; only the
-  authorization result is simulated).
+- **live** — a real Razorpay capture, `status == "captured"` on a real payment id.
+- **bench** — ground-truth resolution for the evaluation (the order is still created for real;
+  only the authorization result is simulated).
+- **sim** — the demo's own "customer completes payment →" button
+  (`POST /cases/:id/simulate-capture`). It builds a real HMAC-signed `payment.captured` webhook
+  and runs it through the exact same handler a live Razorpay delivery hits — the signature
+  verification, dedupe, settle and ledger code is genuinely exercised — but the event itself is
+  self-signed, not sent by Razorpay. Its payment id is always prefixed `pay_sim_`, so it's never
+  mistaken for a live capture in the ledger. This exists because Razorpay test mode has no
+  on-demand way to complete a real capture headlessly; a real hosted-Checkout capture would need
+  a public webhook endpoint, which a local buildathon demo doesn't have. The recovery engine is
+  production-grade; this one button is honest theater standing in for a real customer's browser.
 
-The agent's judgment and its execution are real; the failures are simulated.
+The agent's judgment and its execution are real; the incoming failures and the demo's own
+capture button are simulated.
 
 ## Architecture
 
@@ -86,7 +114,7 @@ api / worker / bench   →   agent · safety · execution · persistence   →  
   `razorpay_webhooks` are append-only **by database grant**, verified by a test that connects as
   the app role and expects `permission denied`.
 - `src/worker/` — BullMQ: case → agent → gate → executor → record → schedule next.
-- `bench/` — the two-arm evaluation.
+- `bench/` — the three-arm evaluation (agent, fixed schedule, rules table).
 
 ## Run it
 
@@ -95,11 +123,11 @@ cp .env.example .env      # OPENROUTER_API_KEY + Razorpay test keys
 docker compose up -d      # postgres :5434, redis :6381
 npm install
 ./start.sh                # infra + schema + seed + API (:3000) and web (:5173)
-npm test                  # 105 tests (needs docker compose up)
+npm test                  # 112 tests (needs docker compose up)
 
-# the evaluation
-npx tsx --env-file=.env bench/run.ts --size 120        # records agent turns to bench/.cache
-npx tsx --env-file=.env bench/run.ts --size 120 --mock # replays them in seconds
+# the evaluation — agent, fixed schedule, and the rules table, on one batch
+npx tsx --env-file=.env bench/run.ts --size 60        # records agent turns to bench/.cache
+npx tsx --env-file=.env bench/run.ts --size 60 --mock # replays them in seconds, free
 
 # seed the live demo queue
 npx tsx --env-file=.env bench/seed-demo.ts
@@ -114,11 +142,16 @@ boundary · Razorpay test-mode APIs · React + Vite · Docker Compose · Vitest.
 
 ## What broke, and how we got out
 
-The submission form's last question, kept as a live log rather than reconstructed at the end.
-The short version: an earlier version of this project was an authorization layer for agentic
-payments; we measured its AI component performing worse than plain deterministic rules and
-pivoted to recovery, where reading intent and timing from messy history is exactly what a rule
-cannot do. Along the way the model named in the plan turned out to be retired, the API key was
-quota-capped, the safety gate had a compliance gap the property test caught on its first run,
-and the anti-double-charge design rested on two false assumptions about Razorpay's API that only
-surfaced by probing it live.
+The submission form's last question, kept as a live log rather than reconstructed at the end —
+the full log is `context/BREAKS.md`. The short version: an earlier version of this project was
+an authorization layer for agentic payments; we measured its AI component performing worse than
+plain deterministic rules and pivoted to recovery. The bench went through two rounds of self-
+audit before shipping: it was first found handing the agent its own ground truth through a
+too-informative failure detail (fixed; the honest number dropped to 45.0% agent vs 46.7% fixed,
+the agent *losing*), then found grading every action at the instant it was decided rather than
+the hour it would settle, which punished the agent specifically for acting early and switching
+rails (fixed; recovery rate rose to 65–68% on the same recorded turns, no re-run needed). A
+follow-on tuning experiment then hit 100% of the corpus's own recoverable ceiling — a pre-declared
+red flag — and was reverted in full rather than shipped. The rules-table arm above is the same
+discipline applied one more time: run the honest deterministic baseline against the agent instead
+of only against a strawman, and report what it actually shows.

@@ -15,11 +15,15 @@ import { generateCorpus, type CorpusCase, type GroundTruth } from "./corpus.js";
 import { GroundTruthResolver } from "./ground-truth-resolver.js";
 import { BenchGateway } from "./bench-gateway.js";
 import { fixedScheduleRunner } from "./fixed-arm.js";
+import { rulesRunner } from "./rules-arm.js";
 import { recordingRunner, replayRunner } from "./mock-agent.js";
 import { scoreArm, exceptionList, formatReport, type CaseRecord } from "./metrics.js";
 
 const MAX_TURNS = 12;
 const CONCURRENCY = 10;
+
+type Arm = "agent" | "fixed" | "rules";
+const ALL_ARMS: Arm[] = ["agent", "fixed", "rules"];
 
 const { values } = parseArgs({
   options: {
@@ -51,7 +55,7 @@ async function main(): Promise<void> {
   const downtimes = await razorpay.listDowntimes().catch(() => []);
   console.error(`loaded ${downtimes.length} live downtimes from Razorpay`);
 
-  const armsToRun = values.arm ? [values.arm as "agent" | "fixed"] : (["agent", "fixed"] as const);
+  const armsToRun: Arm[] = values.arm ? [values.arm as Arm] : ALL_ARMS;
   const budget = createBudget(Number(values["cap-usd"]));
 
   const agentRunner: AgentRunner = !armsToRun.includes("agent")
@@ -82,7 +86,7 @@ async function main(): Promise<void> {
 
     for (const c of corpus) await cases.create(c);
 
-    const runner = arm === "fixed" ? fixedScheduleRunner : agentRunner;
+    const runner = arm === "fixed" ? fixedScheduleRunner : arm === "rules" ? rulesRunner : agentRunner;
     const started = Date.now();
 
     const timing = await runArm(corpus, { cases, attempts, events, runner, downtimes, truth });
@@ -97,8 +101,9 @@ async function main(): Promise<void> {
 
   const agentM = results.agent ? scoreArm("agent", results.agent) : blank("agent");
   const fixedM = results.fixed ? scoreArm("fixed", results.fixed) : blank("fixed");
+  const rulesM = results.rules ? scoreArm("rules", results.rules) : undefined;
   const exceptions = exceptionList(results.agent ?? results.fixed ?? []);
-  console.log(formatReport(agentM, fixedM, exceptions));
+  console.log(formatReport(agentM, fixedM, exceptions, rulesM));
 
   await pool.end();
 }

@@ -10,7 +10,7 @@
 CREATE TABLE IF NOT EXISTS recovery_runs (
   id          UUID PRIMARY KEY,
   label       TEXT,
-  arm         TEXT NOT NULL CHECK (arm IN ('fixed', 'agent')),
+  arm         TEXT NOT NULL CHECK (arm IN ('fixed', 'agent', 'rules')),
   config      JSONB NOT NULL DEFAULT '{}',
   summary     JSONB,
   started_at  TIMESTAMPTZ NOT NULL DEFAULT now(),

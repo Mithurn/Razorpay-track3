@@ -84,21 +84,25 @@ export function exceptionList(records: CaseRecord[]): ExceptionRow[] {
     }));
 }
 
-export function formatReport(agent: ArmMetrics, fixed: ArmMetrics, exceptions: ExceptionRow[]): string {
+export function formatReport(agent: ArmMetrics, fixed: ArmMetrics, exceptions: ExceptionRow[], rules?: ArmMetrics): string {
   const rupees = (p: number) => `₹${(p / 100).toLocaleString("en-IN")}`;
   const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
+  const arms = [agent, fixed, ...(rules ? [rules] : [])];
+  const col = (n: number | string) => String(n).padStart(12);
+  const row = (label: string, get: (m: ArmMetrics) => string) => `${label.padEnd(26)}${arms.map((m) => col(get(m))).join("")}`;
+
   const lines = [
-    "Recovery Room — two-arm evaluation",
+    rules ? "Recovery Room — three-arm evaluation" : "Recovery Room — two-arm evaluation",
     "",
-    `                          ${"agent".padStart(12)}${"fixed".padStart(12)}`,
-    `cases                     ${String(agent.cases).padStart(12)}${String(fixed.cases).padStart(12)}`,
-    `recovered                 ${String(agent.recovered).padStart(12)}${String(fixed.recovered).padStart(12)}`,
-    `recovery rate             ${pct(agent.recoveryRate).padStart(12)}${pct(fixed.recoveryRate).padStart(12)}`,
-    `₹ recovered (bench)        ${rupees(agent.recoveredPaise).padStart(12)}${rupees(fixed.recoveredPaise).padStart(12)}`,
-    `mean attempts / recovery  ${agent.meanAttemptsPerRecovery.toFixed(2).padStart(12)}${fixed.meanAttemptsPerRecovery.toFixed(2).padStart(12)}`,
-    `mean hours to recovery    ${agent.meanHoursToRecovery.toFixed(1).padStart(12)}${fixed.meanHoursToRecovery.toFixed(1).padStart(12)}`,
-    `escalation rate           ${pct(agent.escalationRate).padStart(12)}${pct(fixed.escalationRate).padStart(12)}`,
-    `over-nudge rate           ${pct(agent.overNudgeRate).padStart(12)}${pct(fixed.overNudgeRate).padStart(12)}`,
+    row("", (m) => m.arm),
+    row("cases", (m) => String(m.cases)),
+    row("recovered", (m) => String(m.recovered)),
+    row("recovery rate", (m) => pct(m.recoveryRate)),
+    row("₹ recovered (bench)", (m) => rupees(m.recoveredPaise)),
+    row("mean attempts / recovery", (m) => m.meanAttemptsPerRecovery.toFixed(2)),
+    row("mean hours to recovery", (m) => m.meanHoursToRecovery.toFixed(1)),
+    row("escalation rate", (m) => pct(m.escalationRate)),
+    row("over-nudge rate", (m) => pct(m.overNudgeRate)),
     "",
     `exceptions (${exceptions.length}):`,
     ...exceptions.slice(0, 40).map((e) => `  ${e.customerRef}  ${e.failureReason}  ${e.lane}  — ${e.groundTruthNote}`),
