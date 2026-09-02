@@ -51,7 +51,7 @@ export type LiveSignals = {
   open?: boolean;
   reasoning?: string;
   tools?: string[];
-  findings?: string[];
+  toolResultCount?: number;
   proposalKind?: string | null;
   degraded?: boolean;
   doneLane?: string | null;
@@ -131,7 +131,7 @@ export function deriveLoopState(events: LoopEvent[], live: LiveSignals = {}): Lo
     return { name, label: TOOL_LABELS[name]!, status };
   });
 
-  s.findingCount = (live.findings ?? []).length || (liveTools.length ? 0 : recordedToolCount);
+  s.findingCount = live.toolResultCount ?? (liveTools.length ? 0 : recordedToolCount);
   s.reasoningHead = head(live.reasoning || str(proposedEvent?.payload?.reasoning) || "");
 
   // PROPOSE

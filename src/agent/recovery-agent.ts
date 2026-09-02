@@ -5,7 +5,13 @@ import type { AgentProposal, RecoveryAction } from "../domain/recovery-action.js
 import { recoveryAction } from "../domain/recovery-action.js";
 import { buildTools, type AgentDeps } from "./tools.js";
 import { SYSTEM_PROMPT, caseBrief } from "./prompt.js";
-import { summariseFinding } from "./findings.js";
+
+export type ToolSource = "local" | "razorpay-live";
+export type ToolResult = { name: string; source: ToolSource; raw: unknown; ms: number };
+
+// check_bank_downtime hits the live Razorpay downtime feed; everything else is a local read.
+const LIVE_TOOLS = new Set(["check_bank_downtime"]);
+const sourceOf = (name: string): ToolSource => (LIVE_TOOLS.has(name) ? "razorpay-live" : "local");
 
 export const proposalInput = z.object({
   rootCause: rootCauseEnum,
@@ -27,7 +33,7 @@ export type AgentConfig = {
 export type AgentEvents = {
   onReasoningDelta?: (text: string) => void;
   onToolCall?: (name: string) => void;
-  onFinding?: (text: string) => void;
+  onToolResult?: (result: ToolResult) => void;
   onConcluded?: (proposal: AgentProposal) => void;
 };
 
@@ -67,7 +73,22 @@ export async function runRecoveryAgent(
     execute: async () => ({ received: true }),
   });
 
-  const tools = { ...buildTools(deps), submit_proposal: submit };
+  // Wrap each investigation tool so its raw output and wall-clock timing reach the stream.
+  const investigationTools = Object.fromEntries(
+    Object.entries(buildTools(deps)).map(([name, t]) => [
+      name,
+      {
+        ...t,
+        execute: async (args: unknown, opts: unknown) => {
+          const start = performance.now();
+          const raw = await (t.execute as (a: unknown, o: unknown) => Promise<unknown>)(args, opts);
+          events.onToolResult?.({ name, source: sourceOf(name), raw, ms: Math.round(performance.now() - start) });
+          return raw;
+        },
+      },
+    ]),
+  );
+  const tools = { ...investigationTools, submit_proposal: submit };
   let toolCalls = 0;
 
   try {
@@ -88,11 +109,6 @@ export async function runRecoveryAgent(
           if (call.toolName !== "submit_proposal") {
             toolCalls++;
             events.onToolCall?.(call.toolName);
-          }
-        }
-        for (const res of step.toolResults) {
-          if (res.toolName !== "submit_proposal") {
-            events.onFinding?.(summariseFinding(res.toolName, res.output));
           }
         }
       },

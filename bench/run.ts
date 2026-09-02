@@ -7,6 +7,7 @@ import { PostgresAttemptRepository } from "../src/persistence/attempt-repository
 import { PostgresEventLog } from "../src/persistence/event-log.js";
 import { RunRepository } from "../src/persistence/run-repository.js";
 import { RecoveryPipeline, agentRunnerFor, type AgentRunner } from "../src/worker/pipeline.js";
+import { isRiskHold } from "../src/domain/case.js";
 import { resolveModel } from "../src/agent/model.js";
 import { createBudget, guardModel } from "../src/agent/budget.js";
 import { RazorpayClient } from "../src/execution/razorpay-client.js";
@@ -131,6 +132,7 @@ async function driveCase(c: CorpusCase, deps: ArmDeps): Promise<number | null> {
     gateway: new BenchGateway(deps.downtimes),
     outcomeResolver: new GroundTruthResolver(deps.truth, { now: () => clock.current }, epoch),
     clock: { now: () => clock.current },
+    riskHoldForCase: isRiskHold,
     runAgent: deps.runner,
   });
 
@@ -139,6 +141,7 @@ async function driveCase(c: CorpusCase, deps: ArmDeps): Promise<number | null> {
     if (outcome.kind === "resolved") {
       return outcome.lane === "RECOVERED" ? (clock.current.getTime() - epoch) / 3_600_000 : null;
     }
+    if (outcome.kind === "not_claimed") return null;
     clock.current = new Date(clock.current.getTime() + outcome.delayMs);
   }
   return null;

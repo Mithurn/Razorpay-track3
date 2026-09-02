@@ -2,6 +2,15 @@ import type { CaseDetail, RecoveryCase, RunSummary, StreamEvent } from "./types.
 
 const BASE = "/api";
 
+export type RuntimeConfig = {
+  model: string;
+  deadlineMs: number;
+  stepBudget: number;
+  limits: { maxAttempts: number; maxExposurePaise: number; cooldownHours: number };
+};
+
+export type AuditVerify = { enforced: boolean; role: string; error?: string };
+
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`);
   if (!res.ok) throw new Error(`${path}: ${res.status}`);
@@ -16,6 +25,9 @@ export const scoreboard = () =>
     agent: r.agent?.summary,
     fixed: r.fixed?.summary,
   }));
+
+export const runtimeConfig = () => get<RuntimeConfig>("/config");
+export const verifyAudit = (id: string) => get<AuditVerify>(`/cases/${id}/audit/verify`);
 
 export async function recover(id: string): Promise<void> {
   await fetch(`${BASE}/cases/${id}/recover`, { method: "POST" });

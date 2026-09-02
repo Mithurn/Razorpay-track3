@@ -28,7 +28,9 @@ const SETTLEMENT_RECHECK_HOURS = 2;
 export type StepOutcome =
   | { kind: "resolved"; lane: Extract<Lane, "RECOVERED" | "ESCALATED" | "WRITTEN_OFF"> }
   | { kind: "reschedule"; delayMs: number; reason: string }
-  | { kind: "awaiting_settlement"; delayMs: number };
+  | { kind: "awaiting_settlement"; delayMs: number }
+  // Another worker already claimed this case's turn (concurrent queue jobs); this one bows out.
+  | { kind: "not_claimed" };
 
 export type PipelineDeps = BuildDeps & {
   cases: CaseRepository;
@@ -52,8 +54,13 @@ export class RecoveryPipeline {
   }
 
   // The worker's single entry point: settle anything parked from a prior turn, and only run a
-  // fresh diagnosis if the case still needs one.
-  async advance(caseId: string, agentEvents: AgentEvents = {}): Promise<StepOutcome> {
+  // fresh diagnosis if the case still needs one. `reclaim` is set when the caller is a retry of
+  // its own crashed job, which is allowed to re-run a case still sitting in DIAGNOSING.
+  async advance(
+    caseId: string,
+    agentEvents: AgentEvents = {},
+    opts: { reclaim?: boolean } = {},
+  ): Promise<StepOutcome> {
     const kase = await this.deps.cases.byId(caseId);
     if (!kase) throw new Error(`pipeline: no case ${caseId}`);
     if (TERMINAL_LANES.includes(kase.lane)) return { kind: "resolved", lane: terminalLane(kase.lane) };
@@ -69,17 +76,25 @@ export class RecoveryPipeline {
       }
     }
 
-    return this.step(caseId, agentEvents);
+    return this.step(caseId, agentEvents, opts.reclaim ?? false);
   }
 
-  async step(caseId: string, agentEvents: AgentEvents = {}): Promise<StepOutcome> {
+  async step(caseId: string, agentEvents: AgentEvents = {}, reclaim = false): Promise<StepOutcome> {
     const kase = await this.deps.cases.byId(caseId);
     if (!kase) throw new Error(`pipeline: no case ${caseId}`);
+
+    // Claim the case for this turn. Moving it to DIAGNOSING is a compare-and-set against the lane
+    // this job just read; a concurrent job that already advanced it makes the move fail. A case
+    // already in DIAGNOSING is owned by another job unless this call is a retry reclaiming it.
+    if (kase.lane === "DIAGNOSING") {
+      if (!reclaim) return { kind: "not_claimed" };
+    } else if (!(await this.enter(kase, "DIAGNOSING"))) {
+      return { kind: "not_claimed" };
+    }
 
     const priorAttempts = await this.deps.attempts.listByCase(caseId);
     const attemptNo = priorAttempts.filter((a) => a.status !== "SKIPPED").length + 1;
 
-    await this.enter(kase, "DIAGNOSING");
     await this.deps.events.append({ caseId, type: "INVESTIGATION_STARTED", payload: { attemptNo } });
 
     const agentDeps = await buildAgentDeps(kase, priorAttempts, this.deps);
@@ -187,9 +202,13 @@ export class RecoveryPipeline {
     return { kind: "resolved", lane };
   }
 
-  private async enter(kase: RecoveryCase, lane: Lane): Promise<void> {
-    if (kase.lane === lane) return;
-    if (await this.deps.cases.moveLane(kase.id, kase.lane, lane)) kase.lane = lane;
+  // Returns whether the case is now in `lane`: true if it already was or this call moved it,
+  // false if the compare-and-set lost to a concurrent writer.
+  private async enter(kase: RecoveryCase, lane: Lane): Promise<boolean> {
+    if (kase.lane === lane) return true;
+    const moved = await this.deps.cases.moveLane(kase.id, kase.lane, lane);
+    if (moved) kase.lane = lane;
+    return moved;
   }
 }
 

@@ -13,6 +13,7 @@ import { fixedScheduleRunner } from "./fixed-arm.js";
 import { replayRunner } from "./mock-agent.js";
 import { scoreArm, type CaseRecord } from "./metrics.js";
 import { randomUUID } from "node:crypto";
+import { isRiskHold } from "../src/domain/case.js";
 
 // Populates the live Recovery Room from recorded agent turns (free, no model calls). Leaves ~60
 // real cases in their final lanes with full event tapes so the UI opens onto a working room,
@@ -64,6 +65,7 @@ async function main(): Promise<void> {
         gateway: new BenchGateway(downtimes),
         outcomeResolver: new GroundTruthResolver(truth, { now: () => clock.current }, epoch),
         clock: { now: () => clock.current },
+        riskHoldForCase: isRiskHold,
         runAgent: runner,
       });
       let simHours: number | null = null;
@@ -73,6 +75,7 @@ async function main(): Promise<void> {
           simHours = outcome.lane === "RECOVERED" ? (clock.current.getTime() - epoch) / 3_600_000 : null;
           break;
         }
+        if (outcome.kind === "not_claimed") break;
         clock.current = new Date(clock.current.getTime() + outcome.delayMs);
       }
       records.push({

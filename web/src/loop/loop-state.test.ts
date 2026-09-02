@@ -21,7 +21,7 @@ describe("deriveLoopState", () => {
     const s = deriveLoopState([investigationStarted], {
       open: true,
       tools: ["get_customer_payment_history", "check_bank_downtime"],
-      findings: ["history → 4/4 clean"],
+      toolResultCount: 1,
       reasoning: "checking history and downtime",
     });
     expect(s.stages.INCOMING).toBe("done");

@@ -72,6 +72,7 @@ export function buildTools(deps: AgentDeps) {
           method: deps.method,
           instrument: deps.instrumentHint,
           activeDowntimes: relevant.map((d) => ({
+            id: d.id,
             method: d.method,
             severity: d.severity,
             instrument: d.instrument,

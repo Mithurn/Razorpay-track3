@@ -40,3 +40,11 @@ export const recoveryCase = z.object({
   recoveredPaise: z.number().int().nonnegative(),
 });
 export type RecoveryCase = z.infer<typeof recoveryCase>;
+
+// Razorpay surfaces risk-blocked payments with this failure reason. The gate's risk_hold veto
+// reads it directly from the case so it never depends on the agent's own diagnosis.
+export const RISK_CHECK_FAILURE_REASON = "payment_risk_check_failed";
+
+export function isRiskHold(kase: RecoveryCase): boolean {
+  return kase.failureReason === RISK_CHECK_FAILURE_REASON;
+}

@@ -3,9 +3,25 @@ import "./styles/room.css";
 import "./loop/loop.css";
 import { AttemptTimeline } from "./loop/AttemptTimeline.js";
 import { LoopGraph } from "./loop/LoopGraph.js";
-import { deriveLoopState } from "./loop/useCaseLoopState.js";
-import type { CaseDetail, Lane, RecoveryCase, RunSummary, StreamEvent } from "./types.js";
-import { caseDetail, decide, listCases, queue, recover, scoreboard, simulateCapture, streamCase } from "./api.js";
+import { deriveLoopState, type StageId } from "./loop/useCaseLoopState.js";
+import { useLiveRun } from "./loop/useLiveRun.js";
+import { Commentary } from "./loop/Commentary.js";
+import { ConclusionCard, type Conclusion } from "./loop/ConclusionCard.js";
+import { AuditTrail } from "./loop/AuditTrail.js";
+import type { AuditRow } from "./loop/auditText.js";
+import type { CaseDetail, Lane, RecoveryCase, RunSummary } from "./types.js";
+import type { RuntimeConfig } from "./api.js";
+import {
+  caseDetail,
+  decide,
+  listCases,
+  queue,
+  recover,
+  runtimeConfig,
+  scoreboard,
+  simulateCapture,
+  verifyAudit,
+} from "./api.js";
 
 const LANE_ORDER: Lane[] = [
   "INCOMING",
@@ -27,6 +43,11 @@ export function App() {
   const [board, setBoard] = useState<{ agent?: RunSummary; fixed?: RunSummary }>({});
   const [selected, setSelected] = useState<string | null>(null);
   const [tab, setTab] = useState<"flow" | "waiting">("flow");
+  const [cfg, setCfg] = useState<RuntimeConfig | null>(null);
+
+  useEffect(() => {
+    runtimeConfig().then(setCfg).catch(() => undefined);
+  }, []);
 
   const refresh = useCallback(async () => {
     const [all, esc, sb] = await Promise.all([listCases(), queue(), scoreboard().catch(() => ({}))]);
@@ -136,7 +157,13 @@ export function App() {
         </div>
       </aside>
 
-      <Stage caseId={selected} freshCase={freshCase?.id ?? null} onRecover={recover} onSimulateCapture={simulateCapture} />
+      <Stage
+        caseId={selected}
+        freshCase={freshCase?.id ?? null}
+        cfg={cfg}
+        onRecover={recover}
+        onSimulateCapture={simulateCapture}
+      />
     </div>
   );
 }
@@ -180,56 +207,51 @@ function Scoreboard({ board, liveCases }: { board: { agent?: RunSummary; fixed?:
   );
 }
 
+const DEFAULT_LIMITS = { maxAttempts: 4, maxExposurePaise: 500000, cooldownHours: 6 };
+const STAGE_LABEL: Record<StageId, string> = {
+  INCOMING: "queued",
+  INVESTIGATE: "investigating",
+  PROPOSE: "proposing",
+  GATE: "at the safety gate",
+  EXECUTE: "executing",
+  OUTCOME: "wrapping up",
+};
+
 function Stage({
   caseId,
   freshCase,
+  cfg,
   onRecover,
   onSimulateCapture,
 }: {
   caseId: string | null;
   freshCase: string | null;
+  cfg: RuntimeConfig | null;
   onRecover: (id: string) => Promise<void>;
   onSimulateCapture: (id: string) => Promise<void>;
 }) {
   const [detail, setDetail] = useState<CaseDetail | null>(null);
-  const [reasoning, setReasoning] = useState("");
-  const [tools, setTools] = useState<string[]>([]);
-  const [findings, setFindings] = useState<string[]>([]);
-  const [liveProposal, setLiveProposal] = useState<{ action: string; degraded: boolean } | null>(null);
-  const [doneLane, setDoneLane] = useState<string | null>(null);
-  const [live, setLive] = useState(false);
-  const seq = useRef(0);
+  const [tick, setTick] = useState(0);
+  const run = useLiveRun(caseId);
+  const limits = cfg?.limits ?? DEFAULT_LIMITS;
 
   useEffect(() => {
     if (!caseId) {
       setDetail(null);
       return;
     }
-    setReasoning("");
-    setTools([]);
-    setFindings([]);
-    setLiveProposal(null);
-    setDoneLane(null);
-    seq.current += 1;
-    const controller = new AbortController();
     const load = () => caseDetail(caseId).then(setDetail).catch(() => undefined);
     load();
-
-    (async () => {
-      try {
-        for await (const ev of streamCase(caseId, controller.signal))
-          applyStream(ev, { setReasoning, setTools, setFindings, setLiveProposal, setDoneLane, setLive });
-      } catch {
-        /* aborted */
-      }
-    })();
-
     const poll = setInterval(load, 1500);
-    return () => {
-      controller.abort();
-      clearInterval(poll);
-    };
+    return () => clearInterval(poll);
   }, [caseId]);
+
+  useEffect(() => {
+    if (!run.live) return;
+    const t = setInterval(() => setTick((n) => n + 1), 400);
+    return () => clearInterval(t);
+  }, [run.live]);
+  void tick;
 
   if (!caseId) {
     return (
@@ -252,26 +274,30 @@ function Stage({
 
   const kase = detail?.case;
   const events = detail?.events ?? [];
-  const proposal = events.find((e) => e.type === "AGENT_PROPOSED" || e.type === "AGENT_DEGRADED");
-  const gate = events.find((e) => e.type === "GATE_APPLIED");
+  const proposedEvent = [...events].reverse().find((e) => e.type === "AGENT_PROPOSED" || e.type === "AGENT_DEGRADED");
   const attempt = detail?.attempts.at(-1);
-  const reasoningText = reasoning || String((proposal?.payload as { reasoning?: string })?.reasoning ?? "");
+
   const loopState = deriveLoopState(events, {
-    open: live,
-    reasoning,
-    tools,
-    findings,
-    proposalKind: liveProposal?.action ?? null,
-    degraded: liveProposal?.degraded ?? false,
-    doneLane,
+    open: run.open,
+    reasoning: run.reasoning,
+    tools: run.tools,
+    toolResultCount: run.toolResults.length,
+    proposalKind: run.proposal?.action ?? null,
+    degraded: run.proposal?.degraded ?? false,
+    doneLane: run.doneLane,
   });
+
+  const conclusion = deriveConclusion(run.proposal, proposedEvent);
+  const elapsedMs = runElapsedMs(run, events);
+  const auditRows = mergeAudit(events, run.audit);
+  const activeStage = (Object.entries(loopState.stages).find(([, st]) => st === "active")?.[0] ?? "INVESTIGATE") as StageId;
 
   return (
     <section className="stage">
       <div className="stage__topbar">
         <div className="stage__id">
           <span className="case__cust">
-            {live && <span className="dot" />}
+            {run.live && <span className="dot" />}
             {kase?.customerRef ?? "…"}
           </span>
           <span className="case__facts">
@@ -287,11 +313,13 @@ function Stage({
         </div>
         {kase && (
           <div className="fence">
-            <span>attempt {attempt?.attemptNo ?? 0}/4</span>
-            <span className={kase.amountPaise > 500000 ? "fence--over" : ""}>
-              exposure {rupees(kase.amountPaise)} / ₹5,000 cap
+            <span>
+              attempt {attempt?.attemptNo ?? 0}/{limits.maxAttempts}
             </span>
-            <span>cooldown 6h</span>
+            <span className={kase.amountPaise > limits.maxExposurePaise ? "fence--over" : ""}>
+              exposure {rupees(kase.amountPaise)} / {rupees(limits.maxExposurePaise)} cap
+            </span>
+            <span>cooldown {limits.cooldownHours}h</span>
             <span className="stage__lane">{kase.lane.replace(/_/g, " ")}</span>
           </div>
         )}
@@ -313,86 +341,33 @@ function Stage({
         </div>
 
         <div className="stage__side">
-          {findings.length > 0 && (
-            <div className="findings">
-              {findings.map((f, i) => (
-                <div className="findings__row" key={i}>
-                  <span className="findings__dot" />
-                  {f}
-                </div>
-              ))}
-            </div>
+          {(run.commentary.length > 0 || run.live) && (
+            <Commentary
+              lines={run.commentary}
+              status={
+                run.live
+                  ? {
+                      stage: STAGE_LABEL[activeStage],
+                      step: run.tools.length + (run.proposal ? 1 : 0),
+                      budget: cfg?.stepBudget ?? 6,
+                      toolCalls: run.tools.length,
+                      elapsedMs: run.startedAt ? Date.now() - run.startedAt : 0,
+                    }
+                  : null
+              }
+            />
           )}
 
-          {reasoningText && (
-            <div className="stream">
-              <Fading text={reasoningText} seq={seq.current} />
-            </div>
+          {conclusion && (
+            <ConclusionCard
+              conclusion={conclusion}
+              model={cfg?.model ?? "agent"}
+              elapsedMs={elapsedMs}
+              deadlineMs={cfg?.deadlineMs ?? 90_000}
+            />
           )}
 
-          {proposal && (
-            <div className="verdict">
-              <div className="verdict__line">
-                <span className="verdict__k">root cause</span>
-                <span className="verdict__v">
-                  {String((proposal.payload as { rootCause?: string }).rootCause ?? "undiagnosed")}
-                  {proposal.type === "AGENT_DEGRADED" ? " · degraded to safe fallback" : ""}
-                </span>
-              </div>
-              <div className="verdict__line">
-                <span className="verdict__k">proposed</span>
-                <span className="verdict__v verdict__v--action">
-                  {String((proposal.payload as { action?: { kind?: string } }).action?.kind ?? "")}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {gate &&
-            (() => {
-              const g = gate.payload as { outcome?: string; proposed?: string; applied?: string; reason?: string };
-              const clamped = g.outcome === "clamp" || g.outcome === "skip";
-              return (
-                <div className="verdict">
-                  <div className="verdict__line">
-                    <span className="verdict__k">safety gate</span>
-                    <span className="verdict__v">
-                      {clamped ? (
-                        <>
-                          proposed <span className="verdict__v--action">{g.proposed}</span> →{" "}
-                          <span className="verdict__v--deny">
-                            {g.outcome === "skip" ? "SKIP" : `clamped to ${g.applied}`}
-                          </span>
-                          {g.reason ? ` · ${g.reason}` : ""}
-                        </>
-                      ) : (
-                        <>
-                          passed <span className="verdict__v--action">{g.applied}</span> unchanged
-                        </>
-                      )}
-                    </span>
-                  </div>
-                  <div className="verdict__line">
-                    <span className="verdict__k" />
-                    <span className="verdict__note">
-                      deterministic · pure function · can only add caution, never remove it
-                    </span>
-                  </div>
-                </div>
-              );
-            })()}
-
-          {events.length > 0 && (
-            <div className="audit">
-              <div className="audit__head">audit trail · append-only, enforced by database grant</div>
-              {events.map((e) => (
-                <div className="audit__row" key={e.id}>
-                  <span className="audit__t">{new Date(e.createdAt).toLocaleTimeString()}</span>
-                  <span>{e.type}</span>
-                </div>
-              ))}
-            </div>
-          )}
+          <AuditTrail rows={auditRows} limits={limits} onVerify={() => verifyAudit(caseId)} />
         </div>
       </div>
 
@@ -403,21 +378,50 @@ function Stage({
   );
 }
 
-function Fading({ text, seq }: { text: string; seq: number }) {
-  const parts = text.split(/(\s+)/);
-  return (
-    <>
-      {parts.map((w, i) =>
-        /^\s+$/.test(w) ? (
-          w
-        ) : (
-          <span key={`${seq}-${i}`} className="sk-word">
-            {w}
-          </span>
-        ),
-      )}
-    </>
-  );
+function deriveConclusion(
+  live: ReturnType<typeof useLiveRun>["proposal"],
+  stored: CaseDetail["events"][number] | undefined,
+): Conclusion | null {
+  if (live) {
+    return {
+      rootCause: live.rootCause,
+      action: live.action,
+      confidence: live.confidence,
+      reasoning: live.reasoning,
+      toolCalls: live.toolCalls,
+      degraded: live.degraded,
+    };
+  }
+  if (!stored) return null;
+  const p = stored.payload as {
+    rootCause?: string | null;
+    action?: { kind?: string };
+    confidence?: number;
+    reasoning?: string;
+    toolCalls?: number;
+  };
+  return {
+    rootCause: p.rootCause ?? null,
+    action: p.action?.kind ?? "?",
+    confidence: p.confidence ?? 0,
+    reasoning: p.reasoning ?? "",
+    toolCalls: p.toolCalls ?? 0,
+    degraded: stored.type === "AGENT_DEGRADED",
+  };
+}
+
+function runElapsedMs(run: ReturnType<typeof useLiveRun>, events: CaseDetail["events"]): number | null {
+  if (run.startedAt && run.concludedAt) return run.concludedAt - run.startedAt;
+  const started = [...events].reverse().find((e) => e.type === "INVESTIGATION_STARTED");
+  const proposed = [...events].reverse().find((e) => e.type === "AGENT_PROPOSED" || e.type === "AGENT_DEGRADED");
+  if (started && proposed) return Date.parse(proposed.createdAt) - Date.parse(started.createdAt);
+  return null;
+}
+
+function mergeAudit(events: CaseDetail["events"], live: ReturnType<typeof useLiveRun>["audit"]): AuditRow[] {
+  const fromEvents: AuditRow[] = events.map((e) => ({ eventType: e.type, payload: e.payload, at: e.createdAt }));
+  const fromLive: AuditRow[] = live.map((e) => ({ eventType: e.eventType, payload: e.payload, at: e.at }));
+  return fromLive.length > fromEvents.length ? fromLive : fromEvents;
 }
 
 function EscalationRow({ kase, onDone, onOpen }: { kase: RecoveryCase; onDone: () => void; onOpen: () => void }) {
@@ -445,26 +449,4 @@ function EscalationRow({ kase, onDone, onOpen }: { kase: RecoveryCase; onDone: (
       </div>
     </div>
   );
-}
-
-function applyStream(
-  ev: StreamEvent,
-  s: {
-    setReasoning: React.Dispatch<React.SetStateAction<string>>;
-    setTools: React.Dispatch<React.SetStateAction<string[]>>;
-    setFindings: React.Dispatch<React.SetStateAction<string[]>>;
-    setLiveProposal: React.Dispatch<React.SetStateAction<{ action: string; degraded: boolean } | null>>;
-    setDoneLane: React.Dispatch<React.SetStateAction<string | null>>;
-    setLive: React.Dispatch<React.SetStateAction<boolean>>;
-  },
-): void {
-  if (ev.type === "reasoning") s.setReasoning((r) => r + ev.text);
-  else if (ev.type === "tool") s.setTools((t) => (t.includes(ev.name) ? t : [...t, ev.name]));
-  else if (ev.type === "finding") s.setFindings((f) => (f.includes(ev.text) ? f : [...f, ev.text]));
-  else if (ev.type === "proposal") s.setLiveProposal({ action: ev.action, degraded: ev.degraded });
-  else if (ev.type === "open") s.setLive(true);
-  else if (ev.type === "done") {
-    s.setLive(false);
-    s.setDoneLane(ev.lane);
-  }
 }

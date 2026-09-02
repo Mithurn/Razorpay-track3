@@ -8,6 +8,7 @@ import { RecoveryPipeline, type PipelineDeps } from "../src/worker/pipeline.js";
 import type { AgentProposal } from "../src/domain/recovery-action.js";
 import type { OutcomeResolver, OutcomeVerdict } from "../src/domain/ports.js";
 import type { GatewayOrder, GatewayPayment, GatewayPaymentLink, PaymentGateway } from "../src/domain/gateway.js";
+import { isRiskHold } from "../src/domain/case.js";
 
 const adminUrl = process.env.ADMIN_DATABASE_URL;
 
@@ -69,6 +70,7 @@ describe.runIf(adminUrl)("RecoveryPipeline", () => {
     gateway: new FakeGateway(),
     outcomeResolver: new ScriptedResolver([{ kind: "pending" }]),
     clock: { now: () => now },
+    riskHoldForCase: isRiskHold,
     runAgent: async () => proposal({}),
     ...over,
   });
@@ -154,6 +156,30 @@ describe.runIf(adminUrl)("RecoveryPipeline", () => {
     expect(gateEvent!.payload).toMatchObject({ outcome: "clamp", proposed: "RETRY_NOW", applied: "ESCALATE" });
   });
 
+  it("escalates a risk-hold case even when the agent misdiagnoses it", async () => {
+    await seed({ failureReason: "payment_risk_check_failed" });
+    const gw = new FakeGateway();
+    const pipeline = new RecoveryPipeline(
+      baseDeps({
+        gateway: gw,
+        runAgent: async () =>
+          proposal({ diagnosisRootCause: "soft_decline", action: { kind: "RETRY_NOW" } }),
+      }),
+    );
+
+    const outcome = await pipeline.step(caseId);
+    expect(outcome).toEqual({ kind: "resolved", lane: "ESCALATED" });
+    expect(gw.orders).toBe(0);
+
+    const gateEvent = (await new PostgresEventLog(db).forCase(caseId)).find((e) => e.type === "GATE_APPLIED");
+    expect(gateEvent!.payload).toMatchObject({
+      outcome: "clamp",
+      proposed: "RETRY_NOW",
+      applied: "ESCALATE",
+      reason: "risk_hold",
+    });
+  });
+
   it("reschedules a failed attempt, then escalates once the cap is reached", async () => {
     await seed();
     const gw = new FakeGateway();
@@ -187,6 +213,29 @@ describe.runIf(adminUrl)("RecoveryPipeline", () => {
     );
     const outcome = await pipeline.step(caseId);
     expect(outcome.kind).toBe("awaiting_settlement");
+  });
+
+  it("runs exactly one cycle when two workers pick up the same case at once", async () => {
+    await seed();
+    let agentRuns = 0;
+    const pipeline = new RecoveryPipeline(
+      baseDeps({
+        outcomeResolver: new ScriptedResolver([{ kind: "pending" }]),
+        runAgent: async () => {
+          agentRuns++;
+          await new Promise((r) => setTimeout(r, 50));
+          return proposal({ action: { kind: "ESCALATE", reason: "manual review" } });
+        },
+      }),
+    );
+
+    const [a, b] = await Promise.all([pipeline.advance(caseId), pipeline.advance(caseId)]);
+    expect([a.kind, b.kind].sort()).toEqual(["not_claimed", "resolved"]);
+    expect(agentRuns).toBe(1);
+
+    const types = (await new PostgresEventLog(db).forCase(caseId)).map((e) => e.type);
+    expect(types.filter((t) => t === "INVESTIGATION_STARTED")).toHaveLength(1);
+    expect(types.filter((t) => t === "CASE_RESOLVED")).toHaveLength(1);
   });
 
   it("degraded proposal still passes through the gate and is recorded as degraded", async () => {

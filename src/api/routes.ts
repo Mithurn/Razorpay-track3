@@ -7,7 +7,16 @@ import type { RunRepository } from "../persistence/run-repository.js";
 import type { WebhookHandler } from "../execution/webhook-handler.js";
 import type { CaseEventBus } from "./event-bus.js";
 import type { RecoveryJob } from "../worker/queue.js";
-import { RECOVERY_QUEUE } from "../worker/queue.js";
+import { enqueueRecovery } from "../worker/queue.js";
+import type { AuditVerifyResult } from "../persistence/audit-verify.js";
+import type { SafetyLimits } from "../safety/safety-gate.js";
+
+export type RuntimeInfo = {
+  model: string;
+  deadlineMs: number;
+  stepBudget: number;
+  limits: SafetyLimits;
+};
 
 export type RouteDeps = {
   cases: CaseRepository;
@@ -18,6 +27,8 @@ export type RouteDeps = {
   webhookHandler: WebhookHandler;
   bus: CaseEventBus;
   modelHealth: () => Promise<{ model: string; reachable: boolean; detail?: string }>;
+  verifyAppendOnly: () => Promise<AuditVerifyResult>;
+  runtimeInfo: RuntimeInfo;
   razorpayWebhookSecret: string;
 };
 
@@ -33,6 +44,8 @@ export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Pro
   app.get("/queue", async () => ({ cases: await deps.cases.listByLane("ESCALATED") }));
 
   app.get("/model-health", async () => deps.modelHealth());
+
+  app.get("/config", async () => deps.runtimeInfo);
 
   app.get("/scoreboard", async () => deps.runs.latestByArm());
 
@@ -65,9 +78,13 @@ export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Pro
   app.post("/cases/:id/recover", async (req, reply) => {
     const { id } = req.params as { id: string };
     if (!(await deps.cases.byId(id))) return reply.code(404).send({ error: "not found" });
-    await deps.queue.add(RECOVERY_QUEUE, { caseId: id });
+    await enqueueRecovery(deps.queue, id);
     return reply.code(202).send({ queued: true });
   });
+
+  // Proves the append-only guarantee rather than asserting it: connects as the app DB role and
+  // tries to UPDATE recovery_events, expecting the database to refuse.
+  app.get("/cases/:id/audit/verify", async () => deps.verifyAppendOnly());
 
   app.post("/cases/:id/decision", async (req, reply) => {
     const { id } = req.params as { id: string };
@@ -86,7 +103,7 @@ export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Pro
       await deps.cases.moveLane(id, "ESCALATED", "WRITTEN_OFF");
     } else {
       await deps.cases.moveLane(id, "ESCALATED", "RETRY_SCHEDULED");
-      await deps.queue.add(RECOVERY_QUEUE, { caseId: id });
+      await enqueueRecovery(deps.queue, id);
     }
     return { applied: body.data.decision };
   });

@@ -1,7 +1,7 @@
 import type { AttemptRepository, CaseRepository } from "../domain/ports.js";
 import type { Queue } from "bullmq";
 import type { RecoveryJob } from "./queue.js";
-import { RECOVERY_QUEUE } from "./queue.js";
+import { enqueueRecovery } from "./queue.js";
 import { TERMINAL_LANES } from "../domain/case.js";
 
 // A safety net for attempts left PENDING or AWAITING_RECONCILIATION when their scheduled job
@@ -20,7 +20,8 @@ export function startReconcileSweep(
     for (const caseId of caseIds) {
       const kase = await cases.byId(caseId);
       if (!kase || TERMINAL_LANES.includes(kase.lane)) continue;
-      await queue.add(RECOVERY_QUEUE, { caseId }, { jobId: `sweep:${caseId}:${Date.now()}` });
+      // jobId is the case id, so this is a no-op if a turn for the case is already queued.
+      await enqueueRecovery(queue, caseId);
     }
   };
 

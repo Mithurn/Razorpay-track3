@@ -4,6 +4,8 @@ import { createPool } from "./persistence/pool.js";
 import { PostgresCaseRepository } from "./persistence/case-repository.js";
 import { PostgresAttemptRepository } from "./persistence/attempt-repository.js";
 import { PostgresEventLog } from "./persistence/event-log.js";
+import { PublishingEventLog } from "./persistence/publishing-event-log.js";
+import { verifyAppendOnly } from "./persistence/audit-verify.js";
 import { PostgresWebhookInbox } from "./persistence/webhook-inbox.js";
 import { RunRepository } from "./persistence/run-repository.js";
 import { RazorpayClient } from "./execution/razorpay-client.js";
@@ -11,6 +13,7 @@ import { RazorpayOutcomeResolver } from "./execution/razorpay-outcome-resolver.j
 import { AttemptExecutor } from "./execution/attempt-executor.js";
 import { WebhookHandler } from "./execution/webhook-handler.js";
 import { RecoveryPipeline, agentRunnerFor } from "./worker/pipeline.js";
+import { DEFAULT_LIMITS } from "./safety/safety-gate.js";
 import { resolveModel } from "./agent/model.js";
 import { checkModelHealth } from "./agent/model-health.js";
 import { createBudget, guardModel } from "./agent/budget.js";
@@ -18,6 +21,7 @@ import { redisConnection, recoveryQueue, recoveryWorker } from "./worker/queue.j
 import { makeProcessor } from "./worker/recovery-worker.js";
 import { startReconcileSweep } from "./worker/reconcile-sweep.js";
 import { systemClock } from "./domain/attempt.js";
+import { isRiskHold } from "./domain/case.js";
 import { CaseEventBus } from "./api/event-bus.js";
 import { registerRoutes } from "./api/routes.js";
 
@@ -28,10 +32,11 @@ const config = loadConfig();
 const pool = createPool(config.DATABASE_URL);
 const cases = new PostgresCaseRepository(pool);
 const attempts = new PostgresAttemptRepository(pool);
-const events = new PostgresEventLog(pool);
 const webhooks = new PostgresWebhookInbox(pool);
 const runs = new RunRepository(pool);
 const bus = new CaseEventBus();
+// Every appended event is mirrored to the live stream as an `audit` event.
+const events = new PublishingEventLog(new PostgresEventLog(pool), bus);
 
 const razorpay = new RazorpayClient({
   keyId: config.RAZORPAY_KEY_ID,
@@ -48,6 +53,7 @@ const pipeline = new RecoveryPipeline({
   gateway: razorpay,
   outcomeResolver,
   clock: systemClock,
+  riskHoldForCase: isRiskHold,
   runAgent: agentRunnerFor({
     model: guardModel(
       resolveModel(config.AGENT_MODEL, {
@@ -89,6 +95,13 @@ await registerRoutes(app, {
   webhookHandler,
   bus,
   modelHealth: () => checkModelHealth(config.OPENROUTER_API_KEY, config.AGENT_MODEL),
+  verifyAppendOnly: () => verifyAppendOnly(pool),
+  runtimeInfo: {
+    model: config.AGENT_MODEL,
+    deadlineMs: config.AGENT_TIMEOUT_MS,
+    stepBudget: config.AGENT_STEP_BUDGET,
+    limits: DEFAULT_LIMITS,
+  },
   razorpayWebhookSecret: config.RAZORPAY_WEBHOOK_SECRET,
 });
 

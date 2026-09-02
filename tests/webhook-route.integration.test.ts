@@ -132,6 +132,13 @@ describe.runIf(adminUrl)("POST /webhooks/razorpay", () => {
       webhookHandler: handler,
       bus: new CaseEventBus(),
       modelHealth: async () => ({ model: "test", reachable: true }),
+      verifyAppendOnly: async () => ({ enforced: true, role: "recovery_app" }),
+      runtimeInfo: {
+        model: "test",
+        deadlineMs: 90_000,
+        stepBudget: 6,
+        limits: { maxAttempts: 4, maxExposurePaise: 500000, cooldownHours: 6 },
+      },
       razorpayWebhookSecret: SECRET,
     });
   }
