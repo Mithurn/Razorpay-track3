@@ -4,9 +4,10 @@ const schema = z.object({
   DATABASE_URL: z.string().url(),
   ADMIN_DATABASE_URL: z.string().url().optional(),
   REDIS_URL: z.string().url(),
-  // Optional so the fixed-schedule bench arm and offline tooling run without it; the agent
-  // paths fail loudly at model construction if it is missing.
+  // Optional so the fixed-schedule bench arm and offline tooling run without a model key; the
+  // agent paths fail loudly at model construction if the one they need is missing.
   OPENROUTER_API_KEY: z.string().min(1).optional(),
+  GOOGLE_GENERATIVE_AI_API_KEY: z.string().min(1).optional(),
   AGENT_MODEL: z.string().default("openai/gpt-5.6-luna"),
   AGENT_MODEL_CHEAP: z.string().default("qwen/qwen3-32b"),
   RAZORPAY_KEY_ID: z.string().min(1),

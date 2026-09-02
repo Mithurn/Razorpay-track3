@@ -1,5 +1,5 @@
 import { loadConfig } from "../src/config.js";
-import { openRouterModel } from "../src/agent/model.js";
+import { resolveModel } from "../src/agent/model.js";
 import { runRecoveryAgent } from "../src/agent/recovery-agent.js";
 import type { AgentDeps } from "../src/agent/tools.js";
 import type { RecoveryCase } from "../src/domain/case.js";
@@ -60,7 +60,14 @@ const deps: AgentDeps = {
 const started = Date.now();
 const proposal = await runRecoveryAgent(
   deps,
-  { model: openRouterModel(config.OPENROUTER_API_KEY, model), stepBudget: config.AGENT_STEP_BUDGET, deadlineMs: 90_000 },
+  {
+    model: resolveModel(model, {
+      openRouterApiKey: config.OPENROUTER_API_KEY,
+      googleApiKey: config.GOOGLE_GENERATIVE_AI_API_KEY,
+    }),
+    stepBudget: config.AGENT_STEP_BUDGET,
+    deadlineMs: 90_000,
+  },
   {
     onReasoningDelta: (t) => process.stdout.write(t),
     onToolCall: (n) => process.stderr.write(`\n[tool] ${n}\n`),

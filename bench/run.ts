@@ -7,7 +7,7 @@ import { PostgresAttemptRepository } from "../src/persistence/attempt-repository
 import { PostgresEventLog } from "../src/persistence/event-log.js";
 import { RunRepository } from "../src/persistence/run-repository.js";
 import { RecoveryPipeline, agentRunnerFor, type AgentRunner } from "../src/worker/pipeline.js";
-import { openRouterModel } from "../src/agent/model.js";
+import { resolveModel } from "../src/agent/model.js";
 import { RazorpayClient } from "../src/execution/razorpay-client.js";
 import { generateCorpus, type CorpusCase, type GroundTruth } from "./corpus.js";
 import { GroundTruthResolver } from "./ground-truth-resolver.js";
@@ -56,7 +56,10 @@ async function main(): Promise<void> {
       ? replayRunner(cachePath)
       : recordingRunner(
           agentRunnerFor({
-            model: openRouterModel(config.OPENROUTER_API_KEY, config.AGENT_MODEL),
+            model: resolveModel(config.AGENT_MODEL, {
+              openRouterApiKey: config.OPENROUTER_API_KEY,
+              googleApiKey: config.GOOGLE_GENERATIVE_AI_API_KEY,
+            }),
             stepBudget: config.AGENT_STEP_BUDGET,
             deadlineMs: config.AGENT_TIMEOUT_MS,
           }),

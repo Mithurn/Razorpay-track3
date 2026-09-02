@@ -11,7 +11,7 @@ import { RazorpayOutcomeResolver } from "./execution/razorpay-outcome-resolver.j
 import { AttemptExecutor } from "./execution/attempt-executor.js";
 import { WebhookHandler } from "./execution/webhook-handler.js";
 import { RecoveryPipeline, agentRunnerFor } from "./worker/pipeline.js";
-import { openRouterModel } from "./agent/model.js";
+import { resolveModel } from "./agent/model.js";
 import { checkModelHealth } from "./agent/model-health.js";
 import { redisConnection, recoveryQueue, recoveryWorker } from "./worker/queue.js";
 import { makeProcessor } from "./worker/recovery-worker.js";
@@ -48,7 +48,10 @@ const pipeline = new RecoveryPipeline({
   outcomeResolver,
   clock: systemClock,
   runAgent: agentRunnerFor({
-    model: openRouterModel(config.OPENROUTER_API_KEY, config.AGENT_MODEL),
+    model: resolveModel(config.AGENT_MODEL, {
+      openRouterApiKey: config.OPENROUTER_API_KEY,
+      googleApiKey: config.GOOGLE_GENERATIVE_AI_API_KEY,
+    }),
     stepBudget: config.AGENT_STEP_BUDGET,
     deadlineMs: config.AGENT_TIMEOUT_MS,
   }),
