@@ -4,7 +4,8 @@ import { recoveryCase } from "../domain/case.js";
 import type { Db } from "./pool.js";
 
 const COLUMNS = `id, run_id, merchant_ref, customer_ref, original_payment_id, amount_paise,
-  currency, failure_code, failure_reason, failed_at, customer_history, lane, recovered_paise`;
+  currency, failure_code, failure_reason, failed_at, method, instrument, customer_history, lane,
+  recovered_paise`;
 
 type Row = Record<string, unknown>;
 
@@ -20,6 +21,8 @@ function toCase(row: Row): RecoveryCase {
     failureCode: row.failure_code,
     failureReason: row.failure_reason,
     failedAt: (row.failed_at as Date).toISOString(),
+    method: (row.method as string | null) ?? null,
+    instrument: (row.instrument as Record<string, string> | null) ?? null,
     customerHistory: row.customer_history,
     lane: row.lane,
     recoveredPaise: row.recovered_paise,
@@ -33,8 +36,8 @@ export class PostgresCaseRepository implements CaseRepository {
     const { rows } = await this.db.query(
       `INSERT INTO recovery_cases
          (id, run_id, merchant_ref, customer_ref, original_payment_id, amount_paise, currency,
-          failure_code, failure_reason, failed_at, customer_history)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+          failure_code, failure_reason, failed_at, method, instrument, customer_history)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
        RETURNING ${COLUMNS}`,
       [
         newCase.id,
@@ -47,6 +50,8 @@ export class PostgresCaseRepository implements CaseRepository {
         newCase.failureCode,
         newCase.failureReason,
         newCase.failedAt,
+        newCase.method ?? null,
+        newCase.instrument ? JSON.stringify(newCase.instrument) : null,
         JSON.stringify(newCase.customerHistory),
       ],
     );

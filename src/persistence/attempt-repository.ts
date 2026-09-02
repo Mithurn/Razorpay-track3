@@ -5,7 +5,7 @@ import type { RecoveryAction } from "../domain/recovery-action.js";
 import type { Db } from "./pool.js";
 
 const COLUMNS = `id, case_id, attempt_no, action, idempotency_key, razorpay_ref,
-  settled_payment_id, outcome, outcome_detail, recovered_paise`;
+  settled_payment_id, outcome, outcome_detail, recovered_paise, created_at`;
 
 type Row = Record<string, unknown>;
 
@@ -21,6 +21,7 @@ function toAttempt(row: Row): Attempt {
     status: row.outcome as AttemptStatus,
     detail: (row.outcome_detail as string | null) ?? null,
     recoveredPaise: row.recovered_paise as number,
+    createdAt: (row.created_at as Date).toISOString(),
   };
 }
 

@@ -54,7 +54,10 @@ export type OutcomeVerdict =
   | { kind: "failed"; detail: string }
   | { kind: "pending" };
 
-export type NewCase = Omit<RecoveryCase, "lane" | "recoveredPaise">;
+export type NewCase = Omit<RecoveryCase, "lane" | "recoveredPaise" | "method" | "instrument"> & {
+  method?: string | null;
+  instrument?: Record<string, string> | null;
+};
 
 export interface CaseRepository {
   create(newCase: NewCase): Promise<RecoveryCase>;

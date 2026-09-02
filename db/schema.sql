@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS recovery_cases (
   failure_reason      TEXT NOT NULL,
   failure_source      TEXT,
   failed_at           TIMESTAMPTZ NOT NULL,
+  method              TEXT,                -- card / netbanking / upi, from the original payment
+  instrument          JSONB,               -- {issuer|bank|vpa_handle: ...}, to match downtime
   customer_history    JSONB NOT NULL DEFAULT '[]',
   ground_truth        JSONB,               -- eval only
   lane                TEXT NOT NULL DEFAULT 'INCOMING' CHECK (lane IN (

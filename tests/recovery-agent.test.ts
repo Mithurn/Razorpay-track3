@@ -88,6 +88,8 @@ function fakeCase(over: Partial<RecoveryCase> = {}): RecoveryCase {
     failureCode: "BAD_REQUEST_ERROR",
     failureReason: "card_declined",
     failedAt: "2026-09-01T10:00:00.000Z",
+    method: "card",
+    instrument: { issuer: "BKID" },
     customerHistory: [
       { paidAt: "2026-05-01T10:00:00.000Z", amountPaise: 149900, method: "card", status: "captured" },
       { paidAt: "2026-06-01T10:00:00.000Z", amountPaise: 149900, method: "card", status: "captured" },

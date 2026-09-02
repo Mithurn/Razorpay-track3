@@ -129,6 +129,11 @@ export class RazorpayClient implements PaymentGateway {
         .safeParse(body);
       const description = err.success ? (err.data.error.description ?? text) : text;
       const reason = err.success ? (err.data.error.reason ?? null) : null;
+      // Razorpay returns throttling as a 400 with this description, not a 429. It is a
+      // retry-later condition, not a verdict on the request.
+      if (/too many requests|rate limit/i.test(description)) {
+        throw new GatewayUnavailableError(`razorpay ${path}: ${description}`);
+      }
       throw new GatewayRejectedError(`razorpay ${path}: ${description}`, reason);
     }
 

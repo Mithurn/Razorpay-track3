@@ -30,6 +30,8 @@ function buildCase(amountPaise: number): RecoveryCase {
     failureCode: "BAD_REQUEST_ERROR",
     failureReason: "card_declined",
     failedAt: new Date().toISOString(),
+    method: "card",
+    instrument: null,
     customerHistory: [],
     lane: "DECIDING",
     recoveredPaise: 0,

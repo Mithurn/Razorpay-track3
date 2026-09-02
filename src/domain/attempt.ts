@@ -32,6 +32,7 @@ export type Attempt = {
   status: AttemptStatus;
   detail: string | null;
   recoveredPaise: number;
+  createdAt: string;
 };
 
 /** One attempt = one idempotency key. Stable across worker retries so a crash never doubles up. */

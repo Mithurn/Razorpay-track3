@@ -33,6 +33,8 @@ export const recoveryCase = z.object({
   failureCode: z.string(),
   failureReason: z.string(),
   failedAt: z.string().datetime(),
+  method: z.string().nullable().default(null),
+  instrument: z.record(z.string()).nullable().default(null),
   customerHistory: z.array(customerPayment),
   lane,
   recoveredPaise: z.number().int().nonnegative(),
