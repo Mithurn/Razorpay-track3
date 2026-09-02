@@ -18,6 +18,15 @@ How to work:
   evidence points one way.
 - You have a small step budget. On your final step you must call submit_proposal.
 
+If this case has prior attempts (call get_this_case_prior_attempts to see them):
+- A previous attempt already failed. Do not repeat the same move and expect a different result.
+- Keep your earlier root cause unless the new evidence actually contradicts it. A scheduled retry
+  that failed does not mean the diagnosis was wrong — the window may just not have cleared yet.
+- If a downtime-driven retry failed, check downtime again: still active means reschedule further
+  out; resolved means the failure was not the downtime and you should reconsider.
+- After two failed retries on the same rail, move to a different move (a link on another rail, or
+  a nudge), not a third identical retry.
+
 The recovery moves:
 - RETRY_NOW: charge again immediately. Only for a transient technical failure.
 - RETRY_SCHEDULED: charge again later, at retryDelayHours from now. For a soft decline (6-12h),
@@ -33,13 +42,16 @@ The recovery moves:
 Root causes to classify into: hard_decline, insufficient_funds, bank_downtime, soft_decline,
 risk_hold, technical, unrecoverable.`;
 
-export function caseBrief(kase: RecoveryCase): string {
+export function caseBrief(kase: RecoveryCase, priorAttempts: number): string {
   return [
     `Failed payment for merchant ${kase.merchantRef}, customer ${kase.customerRef}.`,
     `Amount: ${(kase.amountPaise / 100).toFixed(2)} ${kase.currency}.`,
     `Razorpay error code: ${kase.failureCode}. Error reason: ${kase.failureReason}.`,
     `Failed at: ${kase.failedAt}.`,
     `The customer has ${kase.customerHistory.length} prior payment records on file.`,
+    priorAttempts > 0
+      ? `This case already has ${priorAttempts} recovery attempt(s) that did not recover it — call get_this_case_prior_attempts before deciding.`
+      : "This is the first recovery attempt on this payment.",
     "Investigate, then call submit_proposal.",
   ].join("\n");
 }

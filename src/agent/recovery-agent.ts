@@ -71,7 +71,7 @@ export async function runRecoveryAgent(
     const result = streamText({
       model: config.model,
       system: SYSTEM_PROMPT,
-      prompt: caseBrief(deps.kase),
+      prompt: caseBrief(deps.kase, deps.priorAttempts.length),
       tools,
       abortSignal: AbortSignal.timeout(config.deadlineMs),
       stopWhen: [stepCountIs(config.stepBudget), hasToolCall("submit_proposal")],
