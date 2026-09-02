@@ -91,7 +91,7 @@ describe.runIf(adminUrl)("POST /webhooks/razorpay", () => {
       instrument: null,
       customerHistory: [],
     });
-    const attempt = await attempts.claim(
+    const { attempt } = await attempts.claim(
       {
         caseId,
         attemptNo: 1,
@@ -102,6 +102,7 @@ describe.runIf(adminUrl)("POST /webhooks/razorpay", () => {
         currency: "INR",
         scheduledFor: null,
         clamp: null,
+        createdAt: new Date().toISOString(),
       },
       `${caseId}:1`,
     );

@@ -16,9 +16,11 @@ class FakeGateway implements PaymentGateway {
   orderCreates = 0;
   linkCreates = 0;
   nextCreateThrows: Error | null = null;
+  createDelayMs = 0;
   payments: GatewayPayment[] = [];
 
   async createOrder(input: { amountPaise: number; idempotencyKey: string }): Promise<GatewayOrder> {
+    if (this.createDelayMs > 0) await new Promise((r) => setTimeout(r, this.createDelayMs));
     if (this.nextCreateThrows) {
       const e = this.nextCreateThrows;
       this.nextCreateThrows = null;
@@ -78,6 +80,7 @@ describe.runIf(adminUrl)("AttemptExecutor", () => {
     currency: "INR",
     scheduledFor: null,
     clamp: null,
+    createdAt: new Date().toISOString(),
     ...over,
   });
 
@@ -135,6 +138,23 @@ describe.runIf(adminUrl)("AttemptExecutor", () => {
     expect(kase!.recoveredPaise).toBe(149900);
   });
 
+  it("never creates two Razorpay orders for two concurrent calls on the same attempt", async () => {
+    await seedCase();
+    const gw = new FakeGateway();
+    // Widen the window between claim and the winner reaching a terminal state, so a genuinely
+    // concurrent second caller's re-read reliably lands while the row is still PENDING — the
+    // exact condition the old `attempt.status !== "PENDING"` guard got wrong.
+    gw.createDelayMs = 50;
+    const exec = build(gw, new ScriptedResolver([captured(149900)]));
+
+    await Promise.all([exec.execute(request()), exec.execute(request())]);
+
+    expect(gw.orderCreates).toBe(1);
+    // Only the caller that actually claimed the row performs the attempt; the loser must not.
+    const events = await new PostgresEventLog(db).forCase(caseId);
+    expect(events.filter((e) => e.type === "ATTEMPT_STARTED")).toHaveLength(1);
+  });
+
   it("is idempotent: executing the same attempt twice creates one order and one credit", async () => {
     await seedCase();
     const gw = new FakeGateway();
@@ -180,6 +200,28 @@ describe.runIf(adminUrl)("AttemptExecutor", () => {
 
     const again = await exec.settle(settled, 149900, { kind: "RETRY_NOW" });
     expect(again.status).toBe("RECOVERED");
+
+    const kase = await new PostgresCaseRepository(db).byId(caseId);
+    expect(kase!.recoveredPaise).toBe(149900);
+  });
+
+  it("never demotes a RECOVERED attempt, and never double-credits the case", async () => {
+    await seedCase();
+    const repo = new PostgresAttemptRepository(db);
+    const { attempt } = await repo.claim(request(), `${caseId}:1`);
+
+    const firstCredit = await repo.settleRecovered(attempt.id, 149900, "pay_first");
+    expect(firstCredit).toBe(true);
+
+    // A late-arriving ambiguous verdict must not demote the already-settled attempt.
+    await repo.resolve(attempt.id, { status: "AWAITING_RECONCILIATION", detail: "late 5xx" });
+    const afterResolve = await repo.byId(attempt.id);
+    expect(afterResolve!.status).toBe("RECOVERED");
+    expect(afterResolve!.recoveredPaise).toBe(149900);
+
+    // A re-settle on the same (now-guarded) row must not credit the case a second time.
+    const secondCredit = await repo.settleRecovered(attempt.id, 149900, "pay_second");
+    expect(secondCredit).toBe(false);
 
     const kase = await new PostgresCaseRepository(db).byId(caseId);
     expect(kase!.recoveredPaise).toBe(149900);

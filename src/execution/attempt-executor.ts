@@ -22,10 +22,12 @@ export class AttemptExecutor {
 
   async execute(request: AttemptRequest): Promise<Attempt> {
     const key = idempotencyKeyFor(request.caseId, request.attemptNo);
-    const attempt = await this.attempts.claim(request, key);
+    const { attempt, created } = await this.attempts.claim(request, key);
 
-    // A retry after a crash lands on a row that already reached a verdict — replay it, do nothing.
-    if (attempt.status !== "PENDING") return attempt;
+    // A concurrent caller that lost the claim does not own this attempt — it must not touch
+    // Razorpay. Whatever the row's current status is, settle() (via the pipeline's parked-
+    // attempt path) is what reconciles it, not a second perform().
+    if (!created) return attempt;
 
     await this.events.append({
       caseId: request.caseId,

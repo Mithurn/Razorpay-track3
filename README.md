@@ -69,9 +69,11 @@ existence proof, not a result — it's the honest size of the evidence a bounded
 ₹100 budget buy, and it's also evidence our own retrieval tool can mislead the agent on a
 templated eval, which is worth knowing regardless of the scoreboard.
 
-Of the 19 cases neither the agent nor the rules table recovers, 16 are unrecoverable by
-construction (risk holds, dead accounts). The other 3 (`insufficient_funds`, "funds arrive by
-day 3") are recoverable and both arms miss the timing and escalate — a real gap, not hidden here.
+The agent has 19 exceptions; 16 are unrecoverable by construction (risk holds, dead accounts) —
+the rules table shares exactly these 16 misses. The agent's other 3 exceptions
+(`insufficient_funds`, "funds arrive by day 3") are recoverable on timing alone: both the fixed
+schedule and the rules table get all three, and the agent escalates all three instead — a real
+gap, not hidden here.
 
 ## Honest caveat
 

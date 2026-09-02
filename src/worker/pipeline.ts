@@ -131,6 +131,7 @@ export class RecoveryPipeline {
       currency: kase.currency,
       scheduledFor: scheduledFor(gate.action, this.deps.clock),
       clamp: gate.clamp,
+      createdAt: this.deps.clock.now().toISOString(),
     });
 
     return this.afterAttempt(kase, gate.action, attempt, attemptNo);

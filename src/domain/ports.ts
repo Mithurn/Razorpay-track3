@@ -18,8 +18,12 @@ export interface WebhookInbox {
 export interface AttemptRepository {
   /** Find the attempt that created this Razorpay order or payment-link id. */
   byRazorpayRef(ref: string): Promise<Attempt | null>;
-  /** Insert-or-return: the idempotency key is unique, so a retry gets the existing row. */
-  claim(request: AttemptRequest, idempotencyKey: string): Promise<Attempt>;
+  /**
+   * Insert-or-return: the idempotency key is unique, so a concurrent claim gets the existing
+   * row. `created` is true only for the caller whose insert actually landed — the only caller
+   * allowed to perform the Razorpay call.
+   */
+  claim(request: AttemptRequest, idempotencyKey: string): Promise<{ attempt: Attempt; created: boolean }>;
   byId(id: string): Promise<Attempt | null>;
   byCaseAndNo(caseId: string, attemptNo: number): Promise<Attempt | null>;
   listByCase(caseId: string): Promise<Attempt[]>;

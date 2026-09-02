@@ -19,6 +19,8 @@ export type AttemptRequest = {
   currency: string;
   scheduledFor: string | null;
   clamp: { reason: string } | null;
+  /** The clock the caller is operating on — real wall time live, a simulated clock in bench. */
+  createdAt: string;
 };
 
 export type Attempt = {
