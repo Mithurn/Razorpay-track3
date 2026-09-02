@@ -20,9 +20,10 @@ payment link on a different rail, nudge the customer to update their method, esc
 human, or write it off.
 
 A deterministic **safety gate** (a pure function) can only make that proposal *more* cautious —
-it enforces an attempt cap, a rupee exposure limit, a cooldown, and a mandatory escalation on
-risk-flagged payments. The LLM has no path to move money past a cap, past the attempt limit, or
-twice.
+it enforces an attempt cap, a rupee exposure limit, a cooldown, a confidence floor, and a
+mandatory escalation on risk-flagged payments (read from the case data, not from the agent's own
+diagnosis). The LLM has no path to move money past a cap, past the attempt limit, through a risk
+hold, or twice.
 
 The **executor** performs the move against Razorpay test mode exactly once (one idempotency key
 per attempt), and on an ambiguous response (5xx / timeout) it re-checks before concluding — so
@@ -94,7 +95,7 @@ cp .env.example .env      # OPENROUTER_API_KEY + Razorpay test keys
 docker compose up -d      # postgres :5434, redis :6381
 npm install
 ./start.sh                # infra + schema + seed + API (:3000) and web (:5173)
-npm test                  # 82 tests (needs docker compose up)
+npm test                  # 105 tests (needs docker compose up)
 
 # the evaluation
 npx tsx --env-file=.env bench/run.ts --size 120        # records agent turns to bench/.cache
