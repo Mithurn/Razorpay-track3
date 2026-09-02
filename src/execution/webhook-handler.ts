@@ -51,9 +51,8 @@ export class WebhookHandler {
     }
 
     const fresh = await this.inbox.recordIfNew(input.eventId, parsed.event, JSON.parse(input.rawBody));
-    if (!fresh) return { status: "duplicate" };
 
-    if (!SETTLING_EVENTS.has(parsed.event)) return { status: "ignored", event: parsed.event };
+    if (!SETTLING_EVENTS.has(parsed.event)) return fresh ? { status: "ignored", event: parsed.event } : { status: "duplicate" };
 
     const ref =
       parsed.payload.payment?.entity.order_id ??
@@ -65,14 +64,22 @@ export class WebhookHandler {
     const attempt = await this.attempts.byRazorpayRef(ref);
     if (!attempt) return { status: "unmatched", ref };
 
+    // A redelivery of a recorded event id is a true no-op only once its attempt is settled — an
+    // unsettled one means the first delivery never finished, and this is the only signal left.
+    if (!fresh && attempt.status !== "PENDING" && attempt.status !== "AWAITING_RECONCILIATION") {
+      return { status: "duplicate" };
+    }
+
     const kase = await this.cases.byId(attempt.caseId);
     if (!kase) return { status: "unmatched", ref };
 
-    await this.events.append({
-      caseId: attempt.caseId,
-      type: "ATTEMPT_OUTCOME",
-      payload: { via: "webhook", event: parsed.event, ref },
-    });
+    if (fresh) {
+      await this.events.append({
+        caseId: attempt.caseId,
+        type: "ATTEMPT_OUTCOME",
+        payload: { via: "webhook", event: parsed.event, ref },
+      });
+    }
 
     // A payment.captured webhook carrying a captured entity is Razorpay's authoritative signal
     // that the money landed — settle directly from it. Other settling events fall back to a

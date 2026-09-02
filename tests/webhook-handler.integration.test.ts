@@ -165,6 +165,20 @@ describe.runIf(adminUrl)("WebhookHandler", () => {
     expect((await cases.byId(caseId))!.recoveredPaise).toBe(149900);
   });
 
+  it("settles a redelivered event whose first delivery never finished settling", async () => {
+    await seedPendingAttempt();
+    const { handler, cases } = build(new PaidOnceResolver());
+    const evt = signed(capturedEvent());
+
+    // Simulate a crash between recording the event id and settling the attempt: the inbox
+    // already has this event id, but the attempt is still PENDING.
+    await new PostgresWebhookInbox(db).recordIfNew(evt.eventId, "payment.captured", JSON.parse(evt.rawBody));
+
+    const redelivery = await handler.handle(evt);
+    expect(redelivery).toEqual({ status: "processed", attemptStatus: "RECOVERED" });
+    expect((await cases.byId(caseId))!.recoveredPaise).toBe(149900);
+  });
+
   it("ignores events it does not act on", async () => {
     await seedPendingAttempt();
     const { handler } = build(new PaidOnceResolver());
