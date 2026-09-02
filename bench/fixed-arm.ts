@@ -12,7 +12,8 @@ export const fixedScheduleRunner: AgentRunner = async (deps) => {
   return {
     action: { kind: "RETRY_SCHEDULED", atHoursFromNow },
     diagnosisRootCause: null,
-    confidence: 0,
+    // No model made this call, so the gate's confidence floor does not apply to it.
+    confidence: 1,
     reasoning: `fixed schedule: retry ${atHoursFromNow}h after the previous attempt`,
     toolCalls: 0,
     degraded: false,

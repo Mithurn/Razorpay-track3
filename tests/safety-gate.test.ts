@@ -43,7 +43,9 @@ for (const riskHold of [false, true]) {
   for (const attemptNo of [1, DEFAULT_LIMITS.maxAttempts, DEFAULT_LIMITS.maxAttempts + 1]) {
     for (const amountPaise of [DEFAULT_LIMITS.maxExposurePaise - 1, DEFAULT_LIMITS.maxExposurePaise + 1]) {
       for (const hoursSinceLastAttempt of [null, 0, DEFAULT_LIMITS.cooldownHours - 1, DEFAULT_LIMITS.cooldownHours + 1]) {
-        CONTEXTS.push({ case: buildCase(amountPaise), attemptNo, hoursSinceLastAttempt, riskHold });
+        for (const confidence of [DEFAULT_LIMITS.minConfidence - 0.1, 1]) {
+          CONTEXTS.push({ case: buildCase(amountPaise), attemptNo, hoursSinceLastAttempt, riskHold, confidence });
+        }
       }
     }
   }
@@ -51,7 +53,7 @@ for (const riskHold of [false, true]) {
 
 describe("safetyGate", () => {
   it("enumerates a meaningful space", () => {
-    expect(PROPOSALS.length * CONTEXTS.length).toBe(288);
+    expect(PROPOSALS.length * CONTEXTS.length).toBe(576);
   });
 
   it("never returns an outcome less cautious than the proposal", () => {
@@ -93,6 +95,7 @@ describe("safetyGate", () => {
       attemptNo: 1,
       hoursSinceLastAttempt: null,
       riskHold: true,
+      confidence: 1,
     };
     const result = safetyGate({ kind: "WRITE_OFF", reason: "looks fraudulent" }, ctx);
     expect(result.outcome).toBe("clamp");
@@ -104,11 +107,42 @@ describe("safetyGate", () => {
 
   it("forces ESCALATE past the attempt cap", () => {
     const ctx = CONTEXTS.find(
-      (c) => !c.riskHold && c.attemptNo === DEFAULT_LIMITS.maxAttempts + 1,
+      (c) => !c.riskHold && c.attemptNo === DEFAULT_LIMITS.maxAttempts + 1 && c.confidence === 1,
     )!;
     const result = safetyGate({ kind: "RETRY_NOW" }, ctx);
     expect(result.outcome).toBe("clamp");
     if (result.outcome === "clamp") expect(result.action.kind).toBe("ESCALATE");
+  });
+
+  it("clamps a money-moving proposal whose confidence is below the floor", () => {
+    const ctx: GateContext = {
+      case: buildCase(149900),
+      attemptNo: 1,
+      hoursSinceLastAttempt: null,
+      riskHold: false,
+      confidence: DEFAULT_LIMITS.minConfidence - 0.1,
+    };
+    for (const kind of MOVES_MONEY) {
+      const proposal = PROPOSALS.find((p) => p.kind === kind)!;
+      const result = safetyGate(proposal, ctx);
+      expect(result.outcome).toBe("clamp");
+      if (result.outcome === "clamp") {
+        expect(result.action.kind).toBe("ESCALATE");
+        expect(result.reason).toBe("low_confidence");
+      }
+    }
+  });
+
+  it("lets a low-confidence nudge through: caution can only rise, not fall", () => {
+    const ctx: GateContext = {
+      case: buildCase(149900),
+      attemptNo: 1,
+      hoursSinceLastAttempt: null,
+      riskHold: false,
+      confidence: DEFAULT_LIMITS.minConfidence - 0.1,
+    };
+    const result = safetyGate({ kind: "CUSTOMER_NUDGE", channel: "email" }, ctx);
+    expect(result.outcome).toBe("allow");
   });
 
   it("forces ESCALATE over the exposure cap, but only for money-moving proposals", () => {
@@ -117,13 +151,14 @@ describe("safetyGate", () => {
       attemptNo: 1,
       hoursSinceLastAttempt: null,
       riskHold: false,
+      confidence: 1,
     };
     expect(safetyGate({ kind: "RETRY_NOW" }, over).outcome).toBe("clamp");
     expect(safetyGate({ kind: "CUSTOMER_NUDGE", channel: "email" }, over).outcome).toBe("allow");
   });
 
   it("skips a money-moving proposal inside the cooldown, and lets it through outside", () => {
-    const base = { case: buildCase(1000), attemptNo: 2, riskHold: false };
+    const base = { case: buildCase(1000), attemptNo: 2, riskHold: false, confidence: 1 };
     const inside = safetyGate({ kind: "RETRY_NOW" }, { ...base, hoursSinceLastAttempt: 1 });
     const outside = safetyGate({ kind: "RETRY_NOW" }, { ...base, hoursSinceLastAttempt: 99 });
     expect(inside.outcome).toBe("skip");
@@ -136,6 +171,7 @@ describe("safetyGate", () => {
       attemptNo: 1,
       hoursSinceLastAttempt: null,
       riskHold: false,
+      confidence: 1,
     };
     const proposal: RecoveryAction = { kind: "RETRY_SCHEDULED", atHoursFromNow: 48 };
     const result = safetyGate(proposal, ctx);
@@ -149,6 +185,7 @@ describe("safetyGate", () => {
       attemptNo: 1,
       hoursSinceLastAttempt: null,
       riskHold: false,
+      confidence: 1,
     };
     const snapshot = JSON.stringify(ctx);
     const a = safetyGate({ kind: "RETRY_NOW" }, ctx);

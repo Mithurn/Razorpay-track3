@@ -8,12 +8,14 @@ export type SafetyLimits = {
   maxAttempts: number;
   maxExposurePaise: number;
   cooldownHours: number;
+  minConfidence: number;
 };
 
 export const DEFAULT_LIMITS: SafetyLimits = {
   maxAttempts: 4,
   maxExposurePaise: 5_000_00,
   cooldownHours: 6,
+  minConfidence: 0.6,
 };
 
 export type GateContext = {
@@ -21,6 +23,7 @@ export type GateContext = {
   attemptNo: number;
   hoursSinceLastAttempt: number | null;
   riskHold: boolean;
+  confidence: number;
 };
 
 export type GateResult =
@@ -59,6 +62,14 @@ export function safetyGate(
       outcome: "clamp",
       action: escalate(`amount ${ctx.case.amountPaise} exceeds auto-recovery cap ${limits.maxExposurePaise}`),
       reason: "exposure_cap",
+    };
+  }
+
+  if (movesMoney && ctx.confidence < limits.minConfidence) {
+    return {
+      outcome: "clamp",
+      action: escalate(`confidence ${ctx.confidence} below auto-recovery floor ${limits.minConfidence}`),
+      reason: "low_confidence",
     };
   }
 

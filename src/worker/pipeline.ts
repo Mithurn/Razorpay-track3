@@ -142,6 +142,9 @@ export class RecoveryPipeline {
       attemptNo,
       hoursSinceLastAttempt: hoursSinceLastAttempt(prior, this.deps.clock),
       riskHold: proposal.diagnosisRootCause === "risk_hold" || (this.deps.riskHoldForCase?.(kase) ?? false),
+      // A degraded loop already fell back to the safe action; its zero confidence is a missing
+      // diagnosis, not a weak one, and clamping it to ESCALATE would defeat degrade-to-safe.
+      confidence: proposal.degraded ? 1 : proposal.confidence,
     };
     const result = safetyGate(proposal.action, ctx, this.limits);
 
