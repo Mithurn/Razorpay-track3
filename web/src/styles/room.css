@@ -26,6 +26,41 @@
   white-space: nowrap;
 }
 
+.banner {
+  position: fixed;
+  top: var(--space-md);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-toast);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius);
+  font-family: var(--font-ui);
+  font-size: var(--text-sm);
+  max-width: 60ch;
+}
+
+.banner--error {
+  background: var(--deny-dim);
+  color: var(--text);
+  border: 1px solid var(--deny);
+}
+
+.banner__dismiss {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-family: var(--font-ui);
+  opacity: 0.7;
+}
+
+.banner__dismiss:hover {
+  opacity: 1;
+}
+
 /* Sidebar — Case flow / Waiting on you tabs */
 .sidebar {
   grid-column: 1;

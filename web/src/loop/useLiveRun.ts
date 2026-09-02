@@ -97,6 +97,10 @@ function reduce(state: Internal, ev: StreamEvent): Internal {
   }
 }
 
+const MAX_RECONNECT_ATTEMPTS = 5;
+const RECONNECT_BASE_MS = 1000;
+const RECONNECT_MAX_MS = 8000;
+
 export function useLiveRun(caseId: string | null): LiveRun {
   const [state, dispatch] = useReducer(
     (s: Internal, action: StreamEvent | { type: "__reset" }) =>
@@ -108,14 +112,34 @@ export function useLiveRun(caseId: string | null): LiveRun {
     dispatch({ type: "__reset" });
     if (!caseId) return;
     const controller = new AbortController();
+    let cancelled = false;
+    let done = false;
+
+    // Only a `done` event means the run is over; any other stream end gets a bounded reconnect.
     (async () => {
-      try {
-        for await (const ev of streamCase(caseId, controller.signal)) dispatch(ev);
-      } catch {
-        /* aborted */
+      for (let attempt = 0; !cancelled && !done && attempt <= MAX_RECONNECT_ATTEMPTS; attempt++) {
+        if (attempt > 0) {
+          const delay = Math.min(RECONNECT_BASE_MS * 2 ** (attempt - 1), RECONNECT_MAX_MS);
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          if (cancelled) return;
+        }
+        try {
+          for await (const ev of streamCase(caseId, controller.signal)) {
+            if (cancelled) return;
+            if (ev.type === "done") done = true;
+            attempt = 0;
+            dispatch(ev);
+          }
+        } catch {
+          /* dropped connection or abort; loop reconnects unless cancelled or done */
+        }
       }
     })();
-    return () => controller.abort();
+
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
   }, [caseId]);
 
   return state;

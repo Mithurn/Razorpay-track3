@@ -11,9 +11,25 @@ export type RuntimeConfig = {
 
 export type AuditVerify = { enforced: boolean; role: string; error?: string };
 
+async function readError(res: Response, path: string): Promise<Error> {
+  const body = await res.json().catch(() => null);
+  const detail = body && typeof body.error === "string" ? body.error : null;
+  return new Error(detail ?? `${path}: ${res.status}`);
+}
+
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`);
-  if (!res.ok) throw new Error(`${path}: ${res.status}`);
+  if (!res.ok) throw await readError(res, path);
+  return res.json() as Promise<T>;
+}
+
+async function post<T>(path: string, body?: unknown): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: "POST",
+    headers: body === undefined ? undefined : { "content-type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!res.ok) throw await readError(res, path);
   return res.json() as Promise<T>;
 }
 
@@ -30,22 +46,18 @@ export const runtimeConfig = () => get<RuntimeConfig>("/config");
 export const verifyAudit = (id: string) => get<AuditVerify>(`/cases/${id}/audit/verify`);
 
 export async function recover(id: string): Promise<void> {
-  await fetch(`${BASE}/cases/${id}/recover`, { method: "POST" });
+  await post(`/cases/${id}/recover`);
 }
 
 export async function simulateCapture(id: string): Promise<void> {
-  await fetch(`${BASE}/cases/${id}/simulate-capture`, { method: "POST" });
+  await post(`/cases/${id}/simulate-capture`);
 }
 
 export async function decide(
   id: string,
   body: { decision: "approve" | "redirect" | "write_off"; redirectTo?: string },
 ): Promise<void> {
-  await fetch(`${BASE}/cases/${id}/decision`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  await post(`/cases/${id}/decision`, body);
 }
 
 // SSE reader as an async generator: fetch -> reader -> split on \n\n -> JSON.parse the data line.

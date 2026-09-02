@@ -44,6 +44,9 @@ export function App() {
   const [selected, setSelected] = useState<string | null>(null);
   const [tab, setTab] = useState<"flow" | "waiting">("flow");
   const [cfg, setCfg] = useState<RuntimeConfig | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const describeError = (err: unknown) => (err instanceof Error ? err.message : "request failed");
 
   useEffect(() => {
     runtimeConfig().then(setCfg).catch(() => undefined);
@@ -69,12 +72,28 @@ export function App() {
     return map;
   }, [cases]);
 
+  const recoverGuarded = useCallback(async (id: string) => {
+    try {
+      await recover(id);
+    } catch (err) {
+      setError(describeError(err));
+    }
+  }, []);
+
+  const simulateCaptureGuarded = useCallback(async (id: string) => {
+    try {
+      await simulateCapture(id);
+    } catch (err) {
+      setError(describeError(err));
+    }
+  }, []);
+
   const freshCase = cases.find((c) => c.lane === "INCOMING");
   const watchLive = useCallback(async () => {
     if (!freshCase) return;
     setSelected(freshCase.id);
-    await recover(freshCase.id);
-  }, [freshCase]);
+    await recoverGuarded(freshCase.id);
+  }, [freshCase, recoverGuarded]);
 
   return (
     <div className="room" data-surface="room">
@@ -82,6 +101,15 @@ export function App() {
         <span className="brand__name">Recovery Room</span>
         <Scoreboard board={board} liveCases={cases} />
       </header>
+
+      {error && (
+        <div className="banner banner--error" role="alert">
+          <span>{error}</span>
+          <button className="banner__dismiss" onClick={() => setError(null)}>
+            ✕
+          </button>
+        </div>
+      )}
 
       <aside className="sidebar">
         <div className="sidebar__tabs">
@@ -152,7 +180,13 @@ export function App() {
                 </p>
               )
               : escalations.map((c) => (
-                  <EscalationRow key={c.id} kase={c} onDone={refresh} onOpen={() => setSelected(c.id)} />
+                  <EscalationRow
+                    key={c.id}
+                    kase={c}
+                    onDone={refresh}
+                    onOpen={() => setSelected(c.id)}
+                    onError={setError}
+                  />
                 ))}
         </div>
       </aside>
@@ -161,8 +195,8 @@ export function App() {
         caseId={selected}
         freshCase={freshCase?.id ?? null}
         cfg={cfg}
-        onRecover={recover}
-        onSimulateCapture={simulateCapture}
+        onRecover={recoverGuarded}
+        onSimulateCapture={simulateCaptureGuarded}
       />
     </div>
   );
@@ -428,10 +462,24 @@ function mergeAudit(events: CaseDetail["events"], live: ReturnType<typeof useLiv
   return fromLive.length > fromEvents.length ? fromLive : fromEvents;
 }
 
-function EscalationRow({ kase, onDone, onOpen }: { kase: RecoveryCase; onDone: () => void; onOpen: () => void }) {
+function EscalationRow({
+  kase,
+  onDone,
+  onOpen,
+  onError,
+}: {
+  kase: RecoveryCase;
+  onDone: () => void;
+  onOpen: () => void;
+  onError: (message: string) => void;
+}) {
   const act = async (decision: "approve" | "redirect" | "write_off", redirectTo?: string) => {
-    await decide(kase.id, { decision, redirectTo });
-    onDone();
+    try {
+      await decide(kase.id, { decision, redirectTo });
+      onDone();
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "request failed");
+    }
   };
   return (
     <div className="rail-item">
