@@ -51,6 +51,7 @@ describe("GroundTruthResolver", () => {
   const truth = new Map<string, GroundTruth>([
     ["c1", { recoverable: true, via: "RETRY", atHour: 12, selfRecovers: false, note: "downtime clears" }],
     ["c2", { recoverable: false, via: null, atHour: null, selfRecovers: false, note: "lost" }],
+    ["c3", { recoverable: true, via: "CUSTOMER_NUDGE", atHour: 24, selfRecovers: false, note: "needs a new card" }],
   ]);
 
   it("does not recover before the ground-truth hour", async () => {
@@ -85,6 +86,53 @@ describe("GroundTruthResolver", () => {
     const r = new GroundTruthResolver(truth, clock(999), epoch);
     const v = await r.resolve({ caseId: "c2", action: { kind: "RETRY_NOW" }, razorpayRef: "o", amountPaise: 1000 });
     expect(v.kind).toBe("failed");
+  });
+
+  it("grades a scheduled retry at the hour it is presented, not the hour it is decided", async () => {
+    const r = new GroundTruthResolver(truth, clock(0), epoch);
+    const v = await r.resolve({
+      caseId: "c1",
+      action: { kind: "RETRY_SCHEDULED", atHoursFromNow: 12 },
+      razorpayRef: "o",
+      amountPaise: 1000,
+    });
+    expect(v.kind).toBe("recovered");
+    expect(r.recoveredAtHour("c1")).toBe(12);
+  });
+
+  it("fails a scheduled retry that still lands short of the hour", async () => {
+    const r = new GroundTruthResolver(truth, clock(0), epoch);
+    const v = await r.resolve({
+      caseId: "c1",
+      action: { kind: "RETRY_SCHEDULED", atHoursFromNow: 8 },
+      razorpayRef: "o",
+      amountPaise: 1000,
+    });
+    expect(v.kind).toBe("failed");
+    expect(r.recoveredAtHour("c1")).toBeNull();
+  });
+
+  it("lets an outreach settle when the customer acts, not when it is sent", async () => {
+    const r = new GroundTruthResolver(truth, clock(0), epoch);
+    const v = await r.resolve({
+      caseId: "c3",
+      action: { kind: "CUSTOMER_NUDGE", channel: "email" },
+      razorpayRef: null,
+      amountPaise: 1000,
+    });
+    expect(v.kind).toBe("recovered");
+    expect(r.recoveredAtHour("c3")).toBe(24);
+  });
+
+  it("settles an outreach sent after the customer's hour immediately", async () => {
+    const r = new GroundTruthResolver(truth, clock(40), epoch);
+    await r.resolve({
+      caseId: "c3",
+      action: { kind: "CUSTOMER_NUDGE", channel: "email" },
+      razorpayRef: null,
+      amountPaise: 1000,
+    });
+    expect(r.recoveredAtHour("c3")).toBe(40);
   });
 
   it("never leaks the recovery hour, the correct action, or the corpus note into the failure detail", async () => {

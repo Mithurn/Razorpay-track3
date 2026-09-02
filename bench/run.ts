@@ -125,12 +125,13 @@ async function runArm(corpus: CorpusCase[], deps: ArmDeps): Promise<Map<string, 
 async function driveCase(c: CorpusCase, deps: ArmDeps): Promise<number | null> {
   const epoch = Date.parse(c.failedAt);
   const clock = { current: new Date(epoch) };
+  const resolver = new GroundTruthResolver(deps.truth, { now: () => clock.current }, epoch);
   const pipeline = new RecoveryPipeline({
     cases: deps.cases,
     attempts: deps.attempts,
     events: deps.events,
     gateway: new BenchGateway(deps.downtimes),
-    outcomeResolver: new GroundTruthResolver(deps.truth, { now: () => clock.current }, epoch),
+    outcomeResolver: resolver,
     clock: { now: () => clock.current },
     riskHoldForCase: isRiskHold,
     similarCases: (kase, query) =>
@@ -146,7 +147,7 @@ async function driveCase(c: CorpusCase, deps: ArmDeps): Promise<number | null> {
   for (let turn = 0; turn < MAX_TURNS; turn++) {
     const outcome = await pipeline.advance(c.id);
     if (outcome.kind === "resolved") {
-      return outcome.lane === "RECOVERED" ? (clock.current.getTime() - epoch) / 3_600_000 : null;
+      return outcome.lane === "RECOVERED" ? resolver.recoveredAtHour(c.id) : null;
     }
     if (outcome.kind === "not_claimed") return null;
     clock.current = new Date(clock.current.getTime() + outcome.delayMs);

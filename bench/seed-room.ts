@@ -58,12 +58,13 @@ async function main(): Promise<void> {
       await cases.create(c);
       const epoch = Date.parse(c.failedAt);
       const clock = { current: new Date(epoch) };
+      const resolver = new GroundTruthResolver(truth, { now: () => clock.current }, epoch);
       const pipeline = new RecoveryPipeline({
         cases,
         attempts,
         events,
         gateway: new BenchGateway(downtimes),
-        outcomeResolver: new GroundTruthResolver(truth, { now: () => clock.current }, epoch),
+        outcomeResolver: resolver,
         clock: { now: () => clock.current },
         riskHoldForCase: isRiskHold,
         similarCases: (kase, query) =>
@@ -79,7 +80,7 @@ async function main(): Promise<void> {
       for (let turn = 0; turn < 12; turn++) {
         const outcome = await pipeline.advance(c.id);
         if (outcome.kind === "resolved") {
-          simHours = outcome.lane === "RECOVERED" ? (clock.current.getTime() - epoch) / 3_600_000 : null;
+          simHours = outcome.lane === "RECOVERED" ? resolver.recoveredAtHour(c.id) : null;
           break;
         }
         if (outcome.kind === "not_claimed") break;
