@@ -63,6 +63,8 @@ export interface CaseRepository {
   create(newCase: NewCase): Promise<RecoveryCase>;
   byId(id: string): Promise<RecoveryCase | null>;
   listByRun(runId: string): Promise<RecoveryCase[]>;
+  listLive(): Promise<RecoveryCase[]>;
+  listByLane(lane: Lane): Promise<RecoveryCase[]>;
   /** Compare-and-set. Returns false if the row was not in `from` — the caller re-reads. */
   moveLane(id: string, from: Lane, to: Lane): Promise<boolean>;
 }

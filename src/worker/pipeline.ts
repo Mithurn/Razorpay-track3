@@ -7,6 +7,8 @@ import { AttemptExecutor } from "../execution/attempt-executor.js";
 import type { PaymentGateway } from "../domain/gateway.js";
 import { runRecoveryAgent, type AgentConfig, type AgentEvents } from "../agent/recovery-agent.js";
 import type { AgentDeps } from "../agent/tools.js";
+import { reconstructAction } from "../execution/action-codec.js";
+import { TERMINAL_LANES } from "../domain/case.js";
 import { buildAgentDeps, type BuildDeps } from "./agent-deps.js";
 
 export type AgentRunner = (deps: AgentDeps, events: AgentEvents) => Promise<AgentProposal>;
@@ -47,6 +49,27 @@ export class RecoveryPipeline {
   constructor(private readonly deps: PipelineDeps) {
     this.executor = new AttemptExecutor(deps.attempts, deps.events, deps.gateway, deps.outcomeResolver);
     this.limits = deps.limits ?? DEFAULT_LIMITS;
+  }
+
+  // The worker's single entry point: settle anything parked from a prior turn, and only run a
+  // fresh diagnosis if the case still needs one.
+  async advance(caseId: string, agentEvents: AgentEvents = {}): Promise<StepOutcome> {
+    const kase = await this.deps.cases.byId(caseId);
+    if (!kase) throw new Error(`pipeline: no case ${caseId}`);
+    if (TERMINAL_LANES.includes(kase.lane)) return { kind: "resolved", lane: terminalLane(kase.lane) };
+
+    const parked = (await this.deps.attempts.listByCase(caseId)).filter(
+      (a) => a.status === "PENDING" || a.status === "AWAITING_RECONCILIATION",
+    );
+    for (const attempt of parked) {
+      const settled = await this.executor.settle(attempt, kase.amountPaise, reconstructAction(attempt.action));
+      if (settled.status === "RECOVERED") return this.resolve(kase, "RECOVERED");
+      if (settled.status === "PENDING" || settled.status === "AWAITING_RECONCILIATION") {
+        return { kind: "awaiting_settlement", delayMs: SETTLEMENT_RECHECK_HOURS * HOUR_MS };
+      }
+    }
+
+    return this.step(caseId, agentEvents);
   }
 
   async step(caseId: string, agentEvents: AgentEvents = {}): Promise<StepOutcome> {
@@ -177,6 +200,10 @@ function scheduledFor(action: RecoveryAction, clock: Clock): string | null {
 
 function rescheduleDelay(action: RecoveryAction): number {
   return (action.kind === "RETRY_SCHEDULED" ? action.atHoursFromNow : DEFAULT_RESCHEDULE_HOURS) * HOUR_MS;
+}
+
+function terminalLane(lane: Lane): Extract<Lane, "RECOVERED" | "ESCALATED" | "WRITTEN_OFF"> {
+  return lane as Extract<Lane, "RECOVERED" | "ESCALATED" | "WRITTEN_OFF">;
 }
 
 function hoursSinceLastAttempt(prior: Attempt[], clock: Clock): number | null {
