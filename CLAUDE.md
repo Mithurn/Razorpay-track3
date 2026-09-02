@@ -72,9 +72,18 @@ never narrate, never leave a JSDoc block, never a `TODO`. When in doubt, delete 
 Working defaults, each picked for a reason:
 
 Node 20+ / TypeScript (ESM, `tsx` for dev) · Fastify · PostgreSQL 16 · Redis + BullMQ ·
-**Mastra** (`@mastra/core`) for the agent · `@ai-sdk/google` + a plain `GEMINI_API_KEY`
-(Gemini 2.5 Flash; no GCP/Vertex) · Zod at every external boundary · Razorpay test-mode APIs ·
-React + Vite (thin UI) · Docker Compose · Vitest · `pg` + hand-written SQL (no ORM).
+a **hand-rolled bounded agent loop** on the Vercel AI SDK (`ai` v7) — no agent framework ·
+`@openrouter/ai-sdk-provider` + a plain `OPENROUTER_API_KEY` · Zod at every external boundary ·
+Razorpay test-mode APIs · React + Vite (thin UI) · Docker Compose · Vitest · `pg` +
+hand-written SQL (no ORM).
+
+Two of these were changed on 2026-09-02 after probing the live APIs; see `context/BREAKS.md`.
+**Mastra was dropped** — the step budget, deadline, forced conclusion and degrade-to-safe are
+the thing we are judged on, so they must be legible code we own, not framework configuration.
+**Gemini was dropped** — the key in `.env` is capped at ~20 requests/day (proven by burst test),
+Google billing signup fails with `OR_BACR2_44`, the $300 trial credit explicitly cannot be spent
+on the Gemini API, and Tier 1 needs a $10 minimum prepay. OpenRouter has no minimum and needs no
+cloud billing account. The model id is **always** an env override, never a constant.
 
 These are not frozen. If you hit a wall, or find a genuinely better tool for a specific job:
 **say so, with the reason and the trade-off, and get the user's OK before switching.** Do not
@@ -92,9 +101,9 @@ src/
     failure.ts             RootCause enum, Diagnosis schema
     recovery-action.ts     RecoveryAction union, caution ordering
     case.ts                RecoveryCase, Lane state
-  agent/                 the Mastra recovery agent
+  agent/                 the bounded recovery agent loop
     recovery-agent.ts      the bounded investigation loop -> AgentProposal
-    tools.ts               investigation tools (local reads only)
+    tools.ts               investigation tools (local reads + the real Razorpay downtime read)
     prompt.ts
   safety/
     safety-gate.ts         pure: clamp / veto / dedupe a proposal (can only add caution)

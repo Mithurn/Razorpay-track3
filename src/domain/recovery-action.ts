@@ -4,7 +4,8 @@ import type { RootCause } from "./failure.js";
 export const recoveryAction = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("RETRY_NOW") }),
   z.object({ kind: z.literal("RETRY_SCHEDULED"), atHoursFromNow: z.number().positive().max(720) }),
-  z.object({ kind: z.literal("PAYMENT_LINK"), rail: z.enum(["upi", "card", "netbanking"]) }),
+  // No upi rail: Razorpay does not support UPI payment links in test mode.
+  z.object({ kind: z.literal("PAYMENT_LINK"), rail: z.enum(["card", "netbanking"]) }),
   z.object({ kind: z.literal("CUSTOMER_NUDGE"), channel: z.enum(["email", "sms"]) }),
   z.object({ kind: z.literal("ESCALATE"), reason: z.string().min(1) }),
   z.object({ kind: z.literal("WRITE_OFF"), reason: z.string().min(1) }),
