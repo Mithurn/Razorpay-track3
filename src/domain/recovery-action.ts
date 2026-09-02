@@ -15,9 +15,12 @@ export type RecoveryAction = z.infer<typeof recoveryAction>;
 
 export type AgentProposal = {
   action: RecoveryAction;
-  diagnosisRootCause: RootCause;
+  // null when the loop degraded to a safe fallback without reaching a diagnosis — never guessed.
+  diagnosisRootCause: RootCause | null;
+  confidence: number;
   reasoning: string;
   toolCalls: number;
+  degraded: boolean;
 };
 
 // The safety gate may move an action up this ladder, never down.
