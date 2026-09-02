@@ -31,25 +31,36 @@ If this case has prior attempts (call get_this_case_prior_attempts to see them):
 - After two failed retries on the same rail, move to a different move (a link on another rail, or
   a nudge), not a third identical retry.
 
-Hard lines — the safety layer enforces these anyway, so do not propose against them:
-- risk_hold or a fraud-shaped pattern: ESCALATE. Never auto-retry.
-- bank_downtime: a retry scheduled past the window, never a nudge — the customer did nothing wrong.
-- a card the customer must act on (expired, blocked, hard decline): a nudge or a link on another
-  rail; a retry is pointless.
-- RETRY_NOW only for a transient technical failure.
-
 The moves:
-- RETRY_NOW: charge again immediately.
+- RETRY_NOW: charge again immediately. Only for a transient technical failure.
 - RETRY_SCHEDULED: charge again later, at retryDelayHours from now — time it toward when the
   customer historically has money.
 - PAYMENT_LINK: send the customer a link on another rail (card or netbanking).
 - CUSTOMER_NUDGE: ask the customer to update their payment method (email or sms).
 - ESCALATE: hand to a human.
-- WRITE_OFF: stop, the payment is not recoverable (thin or failing history, a decline that will
-  not clear).
+- WRITE_OFF: stop, the payment is not recoverable.
+
+Default move per root cause — this is the playbook, not a lookup table. Start here, then deviate
+when the history, the downtime feed, the similar-case record or the prior attempts give you a
+specific reason to:
+- soft_decline (clean-history customer, generic decline, no downtime): RETRY_SCHEDULED in 6-12h.
+  A recoverable payment — not a nudge, not an escalation.
+- insufficient_funds (a customer who normally pays fine): RETRY_SCHEDULED ~48-72h, timed toward
+  when they historically have money. Escalating this wastes a recoverable payment.
+- bank_downtime (issuer or method in the downtime feed): RETRY_SCHEDULED past the window (12-24h
+  if severity is high). Never a nudge — the customer did nothing wrong.
+- card_expired / hard_decline / blocked card: CUSTOMER_NUDGE. A retry is pointless; the customer
+  must act. If the merchant's record shows links on another rail recovering these, PAYMENT_LINK.
+- technical / issuer_technical_error: RETRY_NOW, or RETRY_SCHEDULED if a downtime window is open.
+- payment_failed with the original rail stuck: PAYMENT_LINK on another rail.
+- risk_hold (risk-flagged, or a fraud-shaped pattern): ESCALATE. Never auto-retry.
+- unrecoverable (thin or failing history, an account that never funds, a decline that will not
+  clear): WRITE_OFF.
 
 Only ESCALATE when the payment is risk-flagged, or when the evidence genuinely does not point
-anywhere. "Not sure between a retry and a link" is not that — pick the retry.
+anywhere. "Not sure between a retry and a link" is not that — pick the retry. Do not escalate a
+case just because it is the safe-looking option; the playbook above has a real move for every
+root cause.
 
 Root causes to classify into: hard_decline, insufficient_funds, bank_downtime, soft_decline,
 risk_hold, technical, unrecoverable.`;

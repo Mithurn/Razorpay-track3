@@ -86,6 +86,25 @@ describe("GroundTruthResolver", () => {
     const v = await r.resolve({ caseId: "c2", action: { kind: "RETRY_NOW" }, razorpayRef: "o", amountPaise: 1000 });
     expect(v.kind).toBe("failed");
   });
+
+  it("never leaks the recovery hour, the correct action, or the corpus note into the failure detail", async () => {
+    type Probe = { hours: number; caseId: string; action: Parameters<GroundTruthResolver["resolve"]>[0]["action"] };
+    const probes: Probe[] = [
+      { hours: 6, caseId: "c1", action: { kind: "RETRY_NOW" } }, // too early
+      { hours: 99, caseId: "c1", action: { kind: "CUSTOMER_NUDGE", channel: "email" } }, // wrong family
+      { hours: 999, caseId: "c2", action: { kind: "RETRY_NOW" } }, // unrecoverable
+      { hours: 999, caseId: "unknown", action: { kind: "RETRY_NOW" } }, // no ground truth
+    ];
+    for (const p of probes) {
+      const r = new GroundTruthResolver(truth, clock(p.hours), epoch);
+      const v = await r.resolve({ caseId: p.caseId, action: p.action, razorpayRef: "o", amountPaise: 1000 });
+      expect(v.kind).toBe("failed");
+      if (v.kind === "failed") {
+        expect(v.detail).toBe("payment declined");
+        expect(v.detail).not.toMatch(/\+\d+h|recovers at|wrong action|downtime clears|lost|ground truth/i);
+      }
+    }
+  });
 });
 
 describe("fixed schedule runner", () => {
