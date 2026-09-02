@@ -35,12 +35,20 @@ schedule.
 
 ## The number
 
-Two arms over a synthetic batch of ~120 failed payments, using only Razorpay's own `error_reason`
-values and ground-truth recoverability: a **fixed retry schedule** (day 1/3/5/7) vs **the
-agent**, both running through the same gate, executor and ledger with only the brain swapped.
-Reported: ₹ recovered, recovery rate, mean attempts per recovery, mean time to recovery,
-over-nudge rate (customers contacted who would have self-recovered), escalation rate, and an
-honest exception list of what it could not recover and why.
+One synthetic batch of 60 failed payments, using only Razorpay's own `error_reason` values and
+ground-truth recoverability, run through two arms — a **fixed retry schedule** (day 1/3/5/7) and
+**the agent** — on the same gate, executor and ledger with only the brain swapped:
+
+|                    | agent    | fixed    |
+|--------------------|----------|----------|
+| recovery rate      | 73.3%    | 46.7%    |
+| ₹ recovered        | ₹65,956  | ₹42,972  |
+| escalation rate    | 13.3%    | 53.3%    |
+| mean attempts/rec  | 2.55     | 2.32     |
+
+All 16 of the agent's exceptions are genuinely unrecoverable (risk holds → escalated to a human,
+accounts that never fund → written off). Reproduce it for free, no API key:
+`npm run bench -- --size 60 --seed 42 --mock`.
 
 The batch includes **matched pairs**: a generic decline whose issuer is in a live downtime
 window, next to an identical case whose issuer is not — the fixed schedule cannot tell them
