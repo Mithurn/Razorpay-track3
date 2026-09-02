@@ -1,0 +1,91 @@
+/* Attempt timeline — the receipts: one row per attempt, real ids, retry badges */
+.tl {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-sm);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);
+}
+.tl__head {
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding-bottom: 2px;
+}
+.tl__row {
+  display: flex;
+  gap: var(--space-xs);
+  padding: var(--space-2xs) 0;
+  border-left: 2px solid var(--line-strong);
+  padding-left: var(--space-xs);
+  animation: trail-in var(--dur) var(--ease-out);
+}
+.tl__no {
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}
+.tl__body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.tl__line1 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+}
+.tl__action {
+  color: var(--accent);
+}
+.tl__status {
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+  padding: 0 var(--space-2xs);
+  border: 1px solid currentColor;
+  border-radius: var(--radius);
+}
+.tl__status--clear {
+  color: var(--clear);
+}
+.tl__status--deny {
+  color: var(--deny);
+}
+.tl__status--wait {
+  color: var(--accent);
+}
+.tl__status--muted {
+  color: var(--text-faint);
+}
+.tl__badge {
+  color: var(--text-faint);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius);
+  padding: 0 var(--space-2xs);
+  font-size: 0.6875rem;
+}
+.tl__captured {
+  color: var(--clear);
+  font-variant-numeric: tabular-nums;
+}
+.tl__refs {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  color: var(--text-muted);
+}
+.tl__ref {
+  overflow-wrap: anywhere;
+}
+.tl__reflabel {
+  display: inline-block;
+  min-width: 52px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-right: var(--space-xs);
+}

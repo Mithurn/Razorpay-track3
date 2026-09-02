@@ -13,4 +13,7 @@ context/
 # test + build artifacts
 coverage/
 test-results/
+.playwright-mcp/
+*.png
+.env.bak-session
 

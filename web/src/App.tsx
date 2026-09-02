@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./styles/room.css";
+import "./loop/loop.css";
+import { AttemptTimeline } from "./loop/AttemptTimeline.js";
 import type { CaseDetail, Lane, RecoveryCase, RunSummary, StreamEvent } from "./types.js";
 import { caseDetail, decide, listCases, queue, recover, scoreboard, simulateCapture, streamCase } from "./api.js";
 
@@ -348,43 +350,14 @@ function CasePane({
         );
       })()}
 
+      <AttemptTimeline attempts={detail?.attempts ?? []} />
       {attempt && (
         <div className="verdict">
           <div className="verdict__line">
-            <span className="verdict__k">attempt {attempt.attemptNo}</span>
-            <span
-              className={
-                "verdict__v " +
-                (attempt.status === "RECOVERED"
-                  ? "verdict__v--clear"
-                  : attempt.status === "FAILED"
-                    ? "verdict__v--deny"
-                    : "verdict__v--action")
-              }
-            >
-              {attempt.action} → {attempt.status}
-              {attempt.recoveredPaise > 0 ? ` · ${rupees(attempt.recoveredPaise)} captured` : ""}
-            </span>
-          </div>
-          <div className="verdict__line">
-            <span className="verdict__k">idem key</span>
-            <span className="verdict__v verdict__v--mono">{attempt.idempotencyKey}</span>
-          </div>
-          {attempt.razorpayRef && (
-            <div className="verdict__line">
-              <span className="verdict__k">{attempt.razorpayRef.startsWith("plink_") ? "rzp link" : "rzp order"}</span>
-              <span className="verdict__v verdict__v--mono">{attempt.razorpayRef}</span>
-            </div>
-          )}
-          {attempt.settledPaymentId && (
-            <div className="verdict__line">
-              <span className="verdict__k">rzp payment</span>
-              <span className="verdict__v verdict__v--mono">{attempt.settledPaymentId}</span>
-            </div>
-          )}
-          <div className="verdict__line">
             <span className="verdict__k" />
-            <span className="verdict__note">exactly-once · one key = one order · 5xx re-checks GET /payments/:id before concluding</span>
+            <span className="verdict__note">
+              exactly-once · one key = one order · a 5xx re-checks GET /payments/:id before concluding
+            </span>
           </div>
         </div>
       )}
