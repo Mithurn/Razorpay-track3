@@ -87,7 +87,8 @@ describe.runIf(keyId && keySecret)("RazorpayClient against test mode", () => {
     // clean second link.
     if (duplicate instanceof GatewayUnavailableError) return;
     expect(RazorpayClient.isDuplicateReference(duplicate)).toBe(true);
-    expect((await client.findPaymentLinkByIdempotencyKey(key))?.id).toBe(link.id);
+    // Not asserting the immediate reference_id lookup: like the order receipt index, the
+    // payment-link list index lags the write by minutes (context/BREAKS.md).
   });
 
   it("lists payments for a fresh order as empty rather than throwing", async () => {
