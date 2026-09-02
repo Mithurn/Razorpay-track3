@@ -54,16 +54,20 @@ CREATE TABLE IF NOT EXISTS recovery_attempts (
   scheduled_for   TIMESTAMPTZ,
   idempotency_key TEXT NOT NULL UNIQUE,   -- one attempt == one key == at most one Razorpay call
   razorpay_ref    TEXT,                   -- order / payment link id created for this attempt
+  settled_payment_id TEXT,                -- the captured payment id, once one is confirmed
   clamped         BOOLEAN NOT NULL DEFAULT false,
   clamp_reason    TEXT,
   outcome         TEXT NOT NULL DEFAULT 'PENDING' CHECK (outcome IN (
-                    'PENDING','RECOVERED','FAILED','SKIPPED')),
+                    'PENDING','RECOVERED','FAILED','SKIPPED','AWAITING_RECONCILIATION')),
   outcome_detail  TEXT,
+  recovered_paise BIGINT NOT NULL DEFAULT 0,  -- this attempt's real capture; summed into the case
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  resolved_at     TIMESTAMPTZ,
   UNIQUE (case_id, attempt_no)
 );
 CREATE INDEX IF NOT EXISTS idx_attempts_case ON recovery_attempts (case_id, attempt_no);
-CREATE INDEX IF NOT EXISTS idx_attempts_due ON recovery_attempts (scheduled_for) WHERE outcome = 'PENDING';
+CREATE INDEX IF NOT EXISTS idx_attempts_due ON recovery_attempts (scheduled_for)
+  WHERE outcome IN ('PENDING','AWAITING_RECONCILIATION');
 
 CREATE TABLE IF NOT EXISTS recovery_events (
   id         BIGSERIAL PRIMARY KEY,

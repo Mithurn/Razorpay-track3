@@ -73,14 +73,4 @@ export class PostgresCaseRepository implements CaseRepository {
     );
     return rowCount === 1;
   }
-
-  async recordCapture(id: string, capturedPaise: number): Promise<void> {
-    if (!Number.isInteger(capturedPaise) || capturedPaise <= 0) {
-      throw new Error(`recordCapture needs a positive integer paise amount, got ${capturedPaise}`);
-    }
-    await this.db.query(
-      "UPDATE recovery_cases SET recovered_paise = recovered_paise + $2, updated_at = now() WHERE id = $1",
-      [id, capturedPaise],
-    );
-  }
 }

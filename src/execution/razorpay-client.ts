@@ -20,10 +20,20 @@ const orderSchema = z.object({
   receipt: z.string().nullable().optional(),
 });
 
+const paymentLinkStatus = z.enum(["created", "partially_paid", "expired", "cancelled", "paid"]);
+
 const paymentLinkSchema = z.object({
   id: z.string(),
   short_url: z.string(),
   amount: z.number(),
+  status: paymentLinkStatus.optional(),
+});
+
+const paymentLinkPaymentSchema = z.object({
+  payment_id: z.string(),
+  status: z.string(),
+  amount: z.number(),
+  method: z.string().nullable().optional(),
 });
 
 const paymentSchema = z.object({
@@ -170,7 +180,41 @@ export class RazorpayClient implements PaymentGateway {
       },
     });
     const link = this.parse(paymentLinkSchema, body, "/payment_links");
-    return { id: link.id, url: link.short_url, amountPaise: link.amount };
+    return { id: link.id, url: link.short_url, amountPaise: link.amount, status: link.status };
+  }
+
+  async getPaymentLink(
+    linkId: string,
+  ): Promise<(GatewayPaymentLink & { payments: GatewayPayment[] }) | null> {
+    try {
+      const body = await this.call(`/payment_links/${encodeURIComponent(linkId)}`);
+      const link = this.parse(
+        paymentLinkSchema.extend({ payments: z.array(paymentLinkPaymentSchema).default([]) }),
+        body,
+        "/payment_links/:id",
+      );
+      return {
+        id: link.id,
+        url: link.short_url,
+        amountPaise: link.amount,
+        status: link.status,
+        payments: link.payments.map((p) => {
+          const status = paymentStatus.safeParse(p.status);
+          return {
+            id: p.payment_id,
+            orderId: null,
+            amountPaise: p.amount,
+            capturedPaise: p.status === "captured" ? p.amount : 0,
+            status: status.success ? status.data : "failed",
+            method: p.method ?? null,
+            errorReason: null,
+          };
+        }),
+      };
+    } catch (err) {
+      if (err instanceof GatewayRejectedError) return null;
+      throw err;
+    }
   }
 
   async getPayment(paymentId: string): Promise<GatewayPayment | null> {

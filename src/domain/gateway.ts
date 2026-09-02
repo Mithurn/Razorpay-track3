@@ -7,7 +7,12 @@ export type PaymentStatus = z.infer<typeof paymentStatus>;
 
 export type GatewayOrder = { id: string; amountPaise: number };
 
-export type GatewayPaymentLink = { id: string; url: string; amountPaise: number };
+export type GatewayPaymentLink = {
+  id: string;
+  url: string;
+  amountPaise: number;
+  status?: "created" | "partially_paid" | "expired" | "cancelled" | "paid";
+};
 
 export type GatewayPayment = {
   id: string;
@@ -78,6 +83,8 @@ export interface PaymentGateway {
   findPaymentLinkByIdempotencyKey(idempotencyKey: string): Promise<GatewayPaymentLink | null>;
 
   listOrderPayments(orderId: string): Promise<GatewayPayment[]>;
+
+  getPaymentLink(linkId: string): Promise<(GatewayPaymentLink & { payments: GatewayPayment[] }) | null>;
 
   listDowntimes(): Promise<Downtime[]>;
 }
