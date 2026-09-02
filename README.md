@@ -85,10 +85,8 @@ api / worker / bench   →   agent · safety · execution · persistence   →  
 cp .env.example .env      # OPENROUTER_API_KEY + Razorpay test keys
 docker compose up -d      # postgres :5434, redis :6381
 npm install
-ADMIN_DATABASE_URL=postgres://recovery:recovery_dev@localhost:5434/recovery npm run db:schema
-npm run dev               # API + recovery worker on :3000
-npm run web               # the Recovery Room UI
-npm test                  # 82 tests
+./start.sh                # infra + schema + seed + API (:3000) and web (:5173)
+npm test                  # 82 tests (needs docker compose up)
 
 # the evaluation
 npx tsx --env-file=.env bench/run.ts --size 120        # records agent turns to bench/.cache

@@ -9,12 +9,24 @@ npm install
 npm run db:schema             # applies db/schema.sql
 ```
 
-## Every session
+## Every session — one command
 
 ```bash
-docker compose up -d          # if the containers aren't already up
-npm run seed:room             # fills the room from the recorded 60-case run (free, no model calls)
-npm run dev                   # starts the API (:3000) and the web app (:5173) together
+./start.sh
+```
+
+Brings up Postgres + Redis, applies the schema, seeds the room from the recorded 60-case run
+(free, no model calls), and starts the API (:3000) and the web app (:5173). Ctrl-C stops it.
+
+`./start.sh --bare` skips the seed and keeps whatever is already in the database.
+
+Or run the pieces yourself:
+
+```bash
+docker compose up -d
+npm run db:schema
+npm run seed:room
+npm run dev
 ```
 
 Open **http://localhost:5173**. You'll see:
