@@ -3,7 +3,6 @@ import {
   ReactFlow,
   ReactFlowProvider,
   Controls,
-  MiniMap,
   MarkerType,
   Position,
   useReactFlow,
@@ -11,7 +10,7 @@ import {
   type Node,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import type { EdgeId, LoopState, StageStatus } from "./useCaseLoopState.js";
+import type { EdgeId, LoopState } from "./useCaseLoopState.js";
 import { StageNode } from "./nodes/StageNode.js";
 import { InvestigateNode } from "./nodes/InvestigateNode.js";
 import { GateNode } from "./nodes/GateNode.js";
@@ -42,14 +41,6 @@ const SPECS: Spec[] = [
 ];
 
 const marker = { type: MarkerType.ArrowClosed, width: 15, height: 15, color: "#5a5f6b" };
-
-const STATUS_HEX: Record<StageStatus, string> = {
-  idle: "#3a3f4b",
-  active: "#e0a642",
-  done: "#5fb98a",
-  failed: "#d96a5a",
-  vetoed: "#d96a5a",
-};
 
 function flowEdge(id: string, source: string, target: string, current: EdgeId | null, key: EdgeId): Edge {
   return { id, source, target, type: "flow", markerEnd: marker, data: { animated: current === key } };
@@ -187,16 +178,6 @@ function Graph({ state }: { state: LoopState }) {
         zoomOnDoubleClick
       >
         <Controls showInteractive={false} />
-        <MiniMap
-          pannable
-          zoomable
-          bgColor="#1b1e25"
-          maskColor="rgba(12,14,18,0.6)"
-          nodeStrokeColor="#6b7180"
-          nodeStrokeWidth={3}
-          style={{ width: 132, height: 84 }}
-          nodeColor={(n) => STATUS_HEX[(n.data as { status?: StageStatus }).status ?? "idle"]}
-        />
       </ReactFlow>
     </div>
   );

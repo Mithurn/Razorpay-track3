@@ -67,8 +67,10 @@ function str(v: unknown): string | undefined {
 function head(text: string, n = 96): string {
   const t = text.replace(/\s+/g, " ").trim();
   if (t.length <= n) return t;
-  // show the most recent slice while running, so the node tracks the live thought
-  return "…" + t.slice(Math.max(0, t.length - n));
+  // track the live thought: show the most recent slice, starting at a word boundary
+  const tail = t.slice(t.length - n);
+  const cut = tail.indexOf(" ");
+  return "…" + (cut > 0 ? tail.slice(cut + 1) : tail);
 }
 
 export function emptyLoopState(): LoopState {

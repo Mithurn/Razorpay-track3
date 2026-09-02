@@ -112,7 +112,7 @@
   pointer-events: none;
 }
 
-/* controls + minimap, dark */
+/* controls, dark */
 .loop-graph .react-flow__controls {
   box-shadow: none;
   border: 1px solid var(--line);
@@ -127,14 +127,6 @@
 }
 .loop-graph .react-flow__controls-button:hover {
   background: var(--bg-inset);
-}
-.loop-graph .react-flow__minimap {
-  background: var(--bg-inset);
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
-}
-.loop-graph .react-flow__minimap-mask {
-  fill: color-mix(in oklch, var(--bg) 55%, transparent);
 }
 
 /* stage nodes */
