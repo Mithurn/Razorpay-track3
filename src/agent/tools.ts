@@ -3,13 +3,9 @@ import { tool } from "ai";
 import type { RecoveryCase } from "../domain/case.js";
 import type { Attempt, Clock } from "../domain/attempt.js";
 import type { Downtime, PaymentGateway } from "../domain/gateway.js";
+import type { SimilarCaseSummary } from "../domain/ports.js";
 
-export type SimilarCaseSummary = {
-  failureReason: string;
-  action: string;
-  outcome: string;
-  hoursToResolution: number | null;
-};
+export type SimilarCasesQuery = { method?: string | null; limit?: number };
 
 export type AgentDeps = {
   kase: RecoveryCase;
@@ -17,7 +13,7 @@ export type AgentDeps = {
   instrumentHint: string | null;
   gateway: Pick<PaymentGateway, "listDowntimes">;
   priorAttempts: Attempt[];
-  similarCases: () => Promise<SimilarCaseSummary[]>;
+  similarCases: (query: SimilarCasesQuery) => Promise<SimilarCaseSummary[]>;
   clock: Clock;
 };
 
@@ -85,10 +81,17 @@ export function buildTools(deps: AgentDeps) {
 
     get_similar_resolved_cases: tool({
       description:
-        "How past failures with this same error reason were resolved, and whether that worked. " +
-        "Use it to check what actually recovers this kind of decline.",
-      inputSchema: z.object({}),
-      execute: async () => ({ failureReason: deps.kase.failureReason, cases: await deps.similarCases() }),
+        "How past cases with this same error reason actually ended: the action taken, whether it " +
+        "recovered the money, and how long that took. Narrow with method to one rail, or raise " +
+        "limit for more history, based on what you still need to decide.",
+      inputSchema: z.object({
+        method: z.string().optional().describe("Filter to one payment rail, e.g. 'card' or 'netbanking'"),
+        limit: z.number().int().min(1).max(20).optional().describe("How many attempt records to pull (default 8)"),
+      }),
+      execute: async (input) => ({
+        failureReason: deps.kase.failureReason,
+        cases: await deps.similarCases(input),
+      }),
     }),
 
     get_this_case_prior_attempts: tool({

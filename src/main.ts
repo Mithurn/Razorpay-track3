@@ -54,6 +54,13 @@ const pipeline = new RecoveryPipeline({
   outcomeResolver,
   clock: systemClock,
   riskHoldForCase: isRiskHold,
+  similarCases: (kase, query) =>
+    cases.similarResolved(kase.failureReason, {
+      method: query.method ?? null,
+      beforeFailedAt: kase.failedAt,
+      runId: kase.runId,
+      limit: query.limit ?? 8,
+    }),
   runAgent: agentRunnerFor({
     model: guardModel(
       resolveModel(config.AGENT_MODEL, {

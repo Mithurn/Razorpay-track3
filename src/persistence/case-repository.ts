@@ -1,4 +1,4 @@
-import type { CaseRepository, NewCase } from "../domain/ports.js";
+import type { CaseRepository, NewCase, SimilarCaseSummary } from "../domain/ports.js";
 import type { Lane, RecoveryCase } from "../domain/case.js";
 import { recoveryCase } from "../domain/case.js";
 import type { Db } from "./pool.js";
@@ -93,5 +93,36 @@ export class PostgresCaseRepository implements CaseRepository {
       [id, from, to],
     );
     return rowCount === 1;
+  }
+
+  async similarResolved(
+    failureReason: string,
+    opts: { method: string | null; beforeFailedAt: string; runId: string | null; limit: number },
+  ): Promise<SimilarCaseSummary[]> {
+    const { rows } = await this.db.query(
+      `SELECT c.failure_reason AS "failureReason",
+              a.action,
+              a.outcome,
+              CASE WHEN a.resolved_at IS NULL
+                   THEN NULL
+                   ELSE EXTRACT(EPOCH FROM (a.resolved_at - c.failed_at)) / 3600
+              END AS "hoursToResolution"
+       FROM recovery_cases c
+       JOIN recovery_attempts a ON a.case_id = c.id AND a.outcome IN ('RECOVERED', 'FAILED')
+       WHERE c.failure_reason = $1
+         AND c.lane = 'RECOVERED'
+         AND c.run_id IS NOT DISTINCT FROM $2
+         AND c.failed_at < $3::timestamptz
+         AND ($4::text IS NULL OR c.method = $4)
+       ORDER BY c.failed_at DESC, a.attempt_no DESC
+       LIMIT $5`,
+      [failureReason, opts.runId, opts.beforeFailedAt, opts.method, opts.limit],
+    );
+    return rows.map((row) => ({
+      failureReason: row.failureReason,
+      action: row.action,
+      outcome: row.outcome,
+      hoursToResolution: row.hoursToResolution === null ? null : Number(row.hoursToResolution),
+    }));
   }
 }

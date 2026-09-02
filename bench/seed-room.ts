@@ -66,6 +66,13 @@ async function main(): Promise<void> {
         outcomeResolver: new GroundTruthResolver(truth, { now: () => clock.current }, epoch),
         clock: { now: () => clock.current },
         riskHoldForCase: isRiskHold,
+        similarCases: (kase, query) =>
+          cases.similarResolved(kase.failureReason, {
+            method: query.method ?? null,
+            beforeFailedAt: kase.failedAt,
+            runId: kase.runId,
+            limit: query.limit ?? 8,
+          }),
         runAgent: runner,
       });
       let simHours: number | null = null;

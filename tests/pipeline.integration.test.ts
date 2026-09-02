@@ -81,6 +81,8 @@ describe.runIf(adminUrl)("RecoveryPipeline", () => {
 
   afterEach(async () => {
     now = new Date("2026-09-02T09:00:00.000Z");
+    await db.query("DELETE FROM recovery_attempts WHERE case_id IN (SELECT id FROM recovery_cases WHERE customer_ref = 'similar-test')");
+    await db.query("DELETE FROM recovery_cases WHERE customer_ref = 'similar-test'");
     if (caseId) {
       await db.query("DELETE FROM recovery_events WHERE case_id = $1", [caseId]);
       await db.query("DELETE FROM recovery_attempts WHERE case_id = $1", [caseId]);
@@ -252,5 +254,56 @@ describe.runIf(adminUrl)("RecoveryPipeline", () => {
     expect(events).toContain("AGENT_DEGRADED");
     const attempt = await new PostgresAttemptRepository(db).byCaseAndNo(caseId, 1);
     expect(attempt).not.toBeNull();
+  });
+
+  it("similarResolved returns settled attempts of earlier resolved cases with the same reason", async () => {
+    const reason = "card_declined_" + randomUUID().slice(0, 8);
+    await seed({ failureReason: reason });
+    const settledCase = randomUUID();
+    const otherMethod = randomUUID();
+    const otherReason = randomUUID();
+    for (const [id, method, caseReason] of [
+      [settledCase, "card", reason],
+      [otherMethod, "netbanking", reason],
+      [otherReason, "card", "insufficient_funds"],
+    ] as const) {
+      await db.query(
+        `INSERT INTO recovery_cases (id, merchant_ref, customer_ref, amount_paise, currency,
+           failure_code, failure_reason, failed_at, method, lane)
+         VALUES ($1, 'm', 'similar-test', 149900, 'INR', 'BAD_REQUEST_ERROR', $2,
+           $3::timestamptz - interval '48h', $4, 'RECOVERED')`,
+        [id, caseReason, now.toISOString(), method],
+      );
+    }
+    await db.query(
+      `INSERT INTO recovery_attempts (id, case_id, attempt_no, root_cause, action, idempotency_key,
+         outcome, resolved_at)
+       VALUES
+         ($1, $4, 1, 'soft_decline', 'RETRY_NOW', 'k1', 'FAILED', NULL),
+         ($2, $4, 2, 'soft_decline', 'PAYMENT_LINK', 'k2', 'RECOVERED',
+           $3::timestamptz - interval '48h' + interval '5h'),
+         ($5, $6, 1, 'soft_decline', 'PAYMENT_LINK', 'k3', 'RECOVERED', NULL)`,
+      [randomUUID(), randomUUID(), now.toISOString(), settledCase, randomUUID(), otherMethod],
+    );
+
+    const repo = new PostgresCaseRepository(db);
+    const all = await repo.similarResolved(reason, {
+      method: null,
+      beforeFailedAt: now.toISOString(),
+      runId: null,
+      limit: 8,
+    });
+    expect(all).toHaveLength(3);
+    expect(all.filter((r) => r.outcome === "RECOVERED" && r.hoursToResolution !== null)).toEqual([
+      { failureReason: reason, action: "PAYMENT_LINK", outcome: "RECOVERED", hoursToResolution: 5 },
+    ]);
+
+    const cardsOnly = await repo.similarResolved(reason, {
+      method: "card",
+      beforeFailedAt: now.toISOString(),
+      runId: null,
+      limit: 8,
+    });
+    expect(cardsOnly).toHaveLength(2);
   });
 });

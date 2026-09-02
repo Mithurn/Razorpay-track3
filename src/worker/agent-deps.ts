@@ -1,7 +1,8 @@
 import type { RecoveryCase } from "../domain/case.js";
 import type { Attempt, Clock } from "../domain/attempt.js";
 import type { PaymentGateway } from "../domain/gateway.js";
-import type { AgentDeps, SimilarCaseSummary } from "../agent/tools.js";
+import type { SimilarCaseSummary } from "../domain/ports.js";
+import type { AgentDeps, SimilarCasesQuery } from "../agent/tools.js";
 
 // Razorpay names the instrument differently per rail (issuer / bank / vpa_handle); the case
 // carries whichever applies. This is what lets the agent line a card decline up against a
@@ -14,7 +15,7 @@ export function instrumentHint(kase: RecoveryCase): string | null {
 export type BuildDeps = {
   gateway: Pick<PaymentGateway, "listDowntimes">;
   clock: Clock;
-  similarCases?: (kase: RecoveryCase) => Promise<SimilarCaseSummary[]>;
+  similarCases?: (kase: RecoveryCase, query: SimilarCasesQuery) => Promise<SimilarCaseSummary[]>;
 };
 
 export async function buildAgentDeps(
@@ -28,7 +29,7 @@ export async function buildAgentDeps(
     instrumentHint: instrumentHint(kase),
     gateway: deps.gateway,
     priorAttempts,
-    similarCases: () => (deps.similarCases ? deps.similarCases(kase) : Promise.resolve([])),
+    similarCases: (query) => (deps.similarCases ? deps.similarCases(kase, query) : Promise.resolve([])),
     clock: deps.clock,
   };
 }

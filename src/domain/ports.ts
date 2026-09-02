@@ -60,12 +60,28 @@ export type NewCase = Omit<RecoveryCase, "lane" | "recoveredPaise" | "method" | 
   groundTruth?: Record<string, unknown> | null;
 };
 
+export type SimilarCaseSummary = {
+  failureReason: string;
+  action: string;
+  outcome: string;
+  hoursToResolution: number | null;
+};
+
 export interface CaseRepository {
   create(newCase: NewCase): Promise<RecoveryCase>;
   byId(id: string): Promise<RecoveryCase | null>;
   listByRun(runId: string): Promise<RecoveryCase[]>;
   listLive(): Promise<RecoveryCase[]>;
   listByLane(lane: Lane): Promise<RecoveryCase[]>;
+  /**
+   * How cases with this failure reason actually ended: the last settled attempt of each already
+   * resolved case, its action and outcome. Scoped to the same run (null run = live lane) and to
+   * cases that failed strictly before `beforeFailedAt`, so the eval cannot peek forward.
+   */
+  similarResolved(
+    failureReason: string,
+    opts: { method: string | null; beforeFailedAt: string; runId: string | null; limit: number },
+  ): Promise<SimilarCaseSummary[]>;
   /** Compare-and-set. Returns false if the row was not in `from` — the caller re-reads. */
   moveLane(id: string, from: Lane, to: Lane): Promise<boolean>;
 }

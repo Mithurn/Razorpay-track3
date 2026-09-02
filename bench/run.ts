@@ -133,6 +133,13 @@ async function driveCase(c: CorpusCase, deps: ArmDeps): Promise<number | null> {
     outcomeResolver: new GroundTruthResolver(deps.truth, { now: () => clock.current }, epoch),
     clock: { now: () => clock.current },
     riskHoldForCase: isRiskHold,
+    similarCases: (kase, query) =>
+      deps.cases.similarResolved(kase.failureReason, {
+        method: query.method ?? null,
+        beforeFailedAt: kase.failedAt,
+        runId: kase.runId,
+        limit: query.limit ?? 8,
+      }),
     runAgent: deps.runner,
   });
 
