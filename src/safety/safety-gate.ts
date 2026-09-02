@@ -37,7 +37,9 @@ export function safetyGate(
 ): GateResult {
   const belowEscalate = CAUTION_RANK[proposal.kind] < CAUTION_RANK.ESCALATE;
 
-  if (ctx.riskHold && belowEscalate) {
+  // Not a rank test: WRITE_OFF ranks equal to ESCALATE because neither moves money, but it
+  // closes the case with no human ever seeing it. A risk hold has exactly one acceptable end.
+  if (ctx.riskHold && proposal.kind !== "ESCALATE") {
     return { outcome: "clamp", action: escalate("risk hold on the original payment"), reason: "risk_hold" };
   }
 
