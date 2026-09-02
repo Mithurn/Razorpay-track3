@@ -26,6 +26,7 @@ export function App() {
   const [escalations, setEscalations] = useState<RecoveryCase[]>([]);
   const [board, setBoard] = useState<{ agent?: RunSummary; fixed?: RunSummary }>({});
   const [selected, setSelected] = useState<string | null>(null);
+  const [tab, setTab] = useState<"flow" | "waiting">("flow");
 
   const refresh = useCallback(async () => {
     const [all, esc, sb] = await Promise.all([listCases(), queue(), scoreboard().catch(() => ({}))]);
@@ -57,79 +58,85 @@ export function App() {
   return (
     <div className="room" data-surface="room">
       <header className="room__header">
-        <div className="brand">
-          <span className="brand__name">Recovery Room</span>
-          <span className="brand__sub">a bounded agent working a queue of failed payments</span>
-          {freshCase && (
-            <button className="btn btn--primary brand__watch" onClick={watchLive}>
-              ▶ watch a live recovery
-            </button>
-          )}
-        </div>
+        <span className="brand__name">Recovery Room</span>
         <Scoreboard board={board} liveCases={cases} />
       </header>
 
-      <section className="panel">
-        <div className="panel__label">
-          <span>Case flow</span>
-          <span>{cases.length}</span>
+      <aside className="sidebar">
+        <div className="sidebar__tabs">
+          <button
+            className={"sidebar__tab" + (tab === "flow" ? " sidebar__tab--active" : "")}
+            onClick={() => setTab("flow")}
+          >
+            Case flow <span className="sidebar__count">{cases.length}</span>
+          </button>
+          <button
+            className={"sidebar__tab" + (tab === "waiting" ? " sidebar__tab--active" : "")}
+            onClick={() => setTab("waiting")}
+          >
+            Waiting on you
+            {escalations.length > 0 && <span className="sidebar__badge">{escalations.length}</span>}
+          </button>
         </div>
-        {LANE_ORDER.map((lane) => {
-          const list = byLane.get(lane) ?? [];
-          if (list.length === 0) return null;
-          return (
-            <div className="lane" key={lane}>
-              <div className="lane__head">
-                <span>{lane.replace(/_/g, " ")}</span>
-                <span className="lane__count">{list.length}</span>
-              </div>
-              {list.slice(0, 12).map((c) => (
-                <div
-                  key={c.id}
-                  className={
-                    "card" +
-                    (selected === c.id ? " card--active" : "") +
-                    (c.lane === "RECOVERED" ? " card--recovered" : "") +
-                    (c.lane === "ESCALATED" ? " card--escalated" : "")
-                  }
-                  onClick={() => setSelected(c.id)}
-                >
-                  <div className="card__row">
-                    <span className="card__cust">{c.customerRef}</span>
-                    <span className="card__amount">
-                      {c.lane === "RECOVERED" ? rupees(c.recoveredPaise) : rupees(c.amountPaise)}
-                    </span>
-                  </div>
-                  <span className="card__reason">
-                    {c.failureReason}
-                    {c.instrument?.issuer ? ` · ${c.instrument.issuer}` : ""}
-                  </span>
-                </div>
-              ))}
-              {list.length > 12 && <span className="card__reason">+{list.length - 12} more</span>}
-            </div>
-          );
-        })}
-      </section>
 
-      <CasePane caseId={selected} onRecover={recover} onSimulateCapture={simulateCapture} />
-
-      <section className="panel">
-        <div className="panel__label">
-          <span>Waiting on you</span>
-          <span>{escalations.length}</span>
-        </div>
-        {escalations.length === 0 ? (
-          <p className="empty">
-            Nothing needs a human right now. When the agent hits a risk hold, or genuinely can't
-            tell what to do, the case takes a seat here.
-          </p>
-        ) : (
-          escalations.map((c) => (
-            <EscalationRow key={c.id} kase={c} onDone={refresh} onOpen={() => setSelected(c.id)} />
-          ))
+        {freshCase && (
+          <button className="btn btn--primary sidebar__watch" onClick={watchLive}>
+            ▶ watch a live recovery
+          </button>
         )}
-      </section>
+
+        <div className="sidebar__body">
+          {tab === "flow"
+            ? LANE_ORDER.map((lane) => {
+                const list = byLane.get(lane) ?? [];
+                if (list.length === 0) return null;
+                return (
+                  <div className="lane" key={lane}>
+                    <div className="lane__head">
+                      <span>{lane.replace(/_/g, " ")}</span>
+                      <span className="lane__count">{list.length}</span>
+                    </div>
+                    {list.slice(0, 12).map((c) => (
+                      <div
+                        key={c.id}
+                        className={
+                          "card" +
+                          (selected === c.id ? " card--active" : "") +
+                          (c.lane === "RECOVERED" ? " card--recovered" : "") +
+                          (c.lane === "ESCALATED" ? " card--escalated" : "")
+                        }
+                        onClick={() => setSelected(c.id)}
+                      >
+                        <div className="card__row">
+                          <span className="card__cust">{c.customerRef}</span>
+                          <span className="card__amount">
+                            {c.lane === "RECOVERED" ? rupees(c.recoveredPaise) : rupees(c.amountPaise)}
+                          </span>
+                        </div>
+                        <span className="card__reason">
+                          {c.failureReason}
+                          {c.instrument?.issuer ? ` · ${c.instrument.issuer}` : ""}
+                        </span>
+                      </div>
+                    ))}
+                    {list.length > 12 && <span className="card__reason">+{list.length - 12} more</span>}
+                  </div>
+                );
+              })
+            : escalations.length === 0
+              ? (
+                <p className="empty">
+                  Nothing needs a human right now. When the agent hits a risk hold, or genuinely
+                  can't tell what to do, the case takes a seat here.
+                </p>
+              )
+              : escalations.map((c) => (
+                  <EscalationRow key={c.id} kase={c} onDone={refresh} onOpen={() => setSelected(c.id)} />
+                ))}
+        </div>
+      </aside>
+
+      <Stage caseId={selected} freshCase={freshCase?.id ?? null} onRecover={recover} onSimulateCapture={simulateCapture} />
     </div>
   );
 }
@@ -173,12 +180,14 @@ function Scoreboard({ board, liveCases }: { board: { agent?: RunSummary; fixed?:
   );
 }
 
-function CasePane({
+function Stage({
   caseId,
+  freshCase,
   onRecover,
   onSimulateCapture,
 }: {
   caseId: string | null;
+  freshCase: string | null;
   onRecover: (id: string) => Promise<void>;
   onSimulateCapture: (id: string) => Promise<void>;
 }) {
@@ -224,13 +233,18 @@ function CasePane({
 
   if (!caseId) {
     return (
-      <section className="panel">
-        <div className="panel__label">
-          <span>Live case</span>
-        </div>
+      <section className="stage stage--empty">
         <p className="empty">
-          Pick a card to watch how the agent worked it — the signals it pulled, what it concluded,
-          how the safety gate ruled, and what actually happened.
+          Pick a case on the left to watch how the agent worked it — the signals it pulled, what
+          it concluded, how the safety gate ruled, and what actually happened.
+          {freshCase && (
+            <>
+              <br />
+              <button className="btn btn--primary" onClick={() => onRecover(freshCase)}>
+                ▶ watch a live recovery
+              </button>
+            </>
+          )}
         </p>
       </section>
     );
@@ -253,135 +267,138 @@ function CasePane({
   });
 
   return (
-    <section className="panel">
-      <div className="panel__label">
-        <span>{live && <span className="dot" />}Live case</span>
-        <span>{kase?.lane.replace(/_/g, " ")}</span>
+    <section className="stage">
+      <div className="stage__topbar">
+        <div className="stage__id">
+          <span className="case__cust">
+            {live && <span className="dot" />}
+            {kase?.customerRef ?? "…"}
+          </span>
+          <span className="case__facts">
+            {kase && (
+              <>
+                {rupees(kase.amountPaise)} · {kase.failureReason} ·{" "}
+                {kase.instrument?.issuer ?? kase.method ?? "card"} ·{" "}
+                {kase.customerHistory.filter((h) => h.status === "captured").length}/
+                {kase.customerHistory.length} clean payments
+              </>
+            )}
+          </span>
+        </div>
+        {kase && (
+          <div className="fence">
+            <span>attempt {attempt?.attemptNo ?? 0}/4</span>
+            <span className={kase.amountPaise > 500000 ? "fence--over" : ""}>
+              exposure {rupees(kase.amountPaise)} / ₹5,000 cap
+            </span>
+            <span>cooldown 6h</span>
+            <span className="stage__lane">{kase.lane.replace(/_/g, " ")}</span>
+          </div>
+        )}
+        {kase?.lane === "INCOMING" && (
+          <button className="btn btn--primary" onClick={() => onRecover(caseId)}>
+            work this case now
+          </button>
+        )}
+        {kase?.lane === "ATTEMPTING" && attempt?.status === "PENDING" && attempt.razorpayRef && (
+          <button className="btn btn--primary" onClick={() => onSimulateCapture(caseId)}>
+            customer completes payment →
+          </button>
+        )}
       </div>
 
-      {kase && (
-        <div className="case__head">
-          <span className="case__cust">{kase.customerRef}</span>
-          <span className="case__facts">
-            {rupees(kase.amountPaise)} · {kase.failureReason} ·{" "}
-            {kase.instrument?.issuer ?? kase.method ?? "card"} ·{" "}
-            {kase.customerHistory.filter((h) => h.status === "captured").length}/{kase.customerHistory.length} clean payments
-          </span>
+      <div className="stage__body">
+        <div className="stage__graph">
+          <LoopGraph state={loopState} />
         </div>
-      )}
 
-      {kase && (
-        <div className="fence">
-          <span>attempt {attempt?.attemptNo ?? 0}/4</span>
-          <span className={kase.amountPaise > 500000 ? "fence--over" : ""}>
-            exposure {rupees(kase.amountPaise)} / ₹5,000 cap
-          </span>
-          <span>cooldown 6h</span>
-        </div>
-      )}
-
-      {kase?.lane === "INCOMING" && (
-        <button className="btn btn--primary" onClick={() => onRecover(caseId)}>
-          work this case now
-        </button>
-      )}
-      {kase?.lane === "ATTEMPTING" && attempt?.status === "PENDING" && attempt.razorpayRef && (
-        <button className="btn btn--primary" onClick={() => onSimulateCapture(caseId)}>
-          customer completes payment →
-        </button>
-      )}
-
-      <LoopGraph state={loopState} />
-
-      {findings.length > 0 && (
-        <div className="findings">
-          {findings.map((f, i) => (
-            <div className="findings__row" key={i}>
-              <span className="findings__dot" />
-              {f}
+        <div className="stage__side">
+          {findings.length > 0 && (
+            <div className="findings">
+              {findings.map((f, i) => (
+                <div className="findings__row" key={i}>
+                  <span className="findings__dot" />
+                  {f}
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      )}
+          )}
 
-      {reasoningText && (
-        <div className="stream">
-          <Fading text={reasoningText} seq={seq.current} />
-        </div>
-      )}
+          {reasoningText && (
+            <div className="stream">
+              <Fading text={reasoningText} seq={seq.current} />
+            </div>
+          )}
 
-      {proposal && (
-        <div className="verdict">
-          <div className="verdict__line">
-            <span className="verdict__k">root cause</span>
-            <span className="verdict__v">
-              {String((proposal.payload as { rootCause?: string }).rootCause ?? "undiagnosed")}
-              {proposal.type === "AGENT_DEGRADED" ? " · degraded to safe fallback" : ""}
-            </span>
-          </div>
-          <div className="verdict__line">
-            <span className="verdict__k">proposed</span>
-            <span className="verdict__v verdict__v--action">
-              {String((proposal.payload as { action?: { kind?: string } }).action?.kind ?? "")}
-            </span>
-          </div>
-        </div>
-      )}
+          {proposal && (
+            <div className="verdict">
+              <div className="verdict__line">
+                <span className="verdict__k">root cause</span>
+                <span className="verdict__v">
+                  {String((proposal.payload as { rootCause?: string }).rootCause ?? "undiagnosed")}
+                  {proposal.type === "AGENT_DEGRADED" ? " · degraded to safe fallback" : ""}
+                </span>
+              </div>
+              <div className="verdict__line">
+                <span className="verdict__k">proposed</span>
+                <span className="verdict__v verdict__v--action">
+                  {String((proposal.payload as { action?: { kind?: string } }).action?.kind ?? "")}
+                </span>
+              </div>
+            </div>
+          )}
 
-      {gate && (() => {
-        const g = gate.payload as { outcome?: string; proposed?: string; applied?: string; reason?: string };
-        const clamped = g.outcome === "clamp" || g.outcome === "skip";
-        return (
-          <div className="verdict">
-            <div className="verdict__line">
-              <span className="verdict__k">safety gate</span>
-              <span className="verdict__v">
-                {clamped ? (
-                  <>
-                    proposed <span className="verdict__v--action">{g.proposed}</span> →{" "}
-                    <span className="verdict__v--deny">
-                      {g.outcome === "skip" ? "SKIP" : `clamped to ${g.applied}`}
+          {gate &&
+            (() => {
+              const g = gate.payload as { outcome?: string; proposed?: string; applied?: string; reason?: string };
+              const clamped = g.outcome === "clamp" || g.outcome === "skip";
+              return (
+                <div className="verdict">
+                  <div className="verdict__line">
+                    <span className="verdict__k">safety gate</span>
+                    <span className="verdict__v">
+                      {clamped ? (
+                        <>
+                          proposed <span className="verdict__v--action">{g.proposed}</span> →{" "}
+                          <span className="verdict__v--deny">
+                            {g.outcome === "skip" ? "SKIP" : `clamped to ${g.applied}`}
+                          </span>
+                          {g.reason ? ` · ${g.reason}` : ""}
+                        </>
+                      ) : (
+                        <>
+                          passed <span className="verdict__v--action">{g.applied}</span> unchanged
+                        </>
+                      )}
                     </span>
-                    {g.reason ? ` · ${g.reason}` : ""}
-                  </>
-                ) : (
-                  <>
-                    passed <span className="verdict__v--action">{g.applied}</span> unchanged
-                  </>
-                )}
-              </span>
-            </div>
-            <div className="verdict__line">
-              <span className="verdict__k" />
-              <span className="verdict__note">deterministic · pure function · can only add caution, never remove it</span>
-            </div>
-          </div>
-        );
-      })()}
+                  </div>
+                  <div className="verdict__line">
+                    <span className="verdict__k" />
+                    <span className="verdict__note">
+                      deterministic · pure function · can only add caution, never remove it
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
 
-      <AttemptTimeline attempts={detail?.attempts ?? []} />
-      {attempt && (
-        <div className="verdict">
-          <div className="verdict__line">
-            <span className="verdict__k" />
-            <span className="verdict__note">
-              exactly-once · one key = one order · a 5xx re-checks GET /payments/:id before concluding
-            </span>
-          </div>
-        </div>
-      )}
-
-      {events.length > 0 && (
-        <div className="audit">
-          <div className="audit__head">audit trail · append-only, enforced by database grant</div>
-          {events.map((e) => (
-            <div className="audit__row" key={e.id}>
-              <span className="audit__t">{new Date(e.createdAt).toLocaleTimeString()}</span>
-              <span>{e.type}</span>
+          {events.length > 0 && (
+            <div className="audit">
+              <div className="audit__head">audit trail · append-only, enforced by database grant</div>
+              {events.map((e) => (
+                <div className="audit__row" key={e.id}>
+                  <span className="audit__t">{new Date(e.createdAt).toLocaleTimeString()}</span>
+                  <span>{e.type}</span>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
-      )}
+      </div>
+
+      <div className="stage__timeline">
+        <AttemptTimeline attempts={detail?.attempts ?? []} />
+      </div>
     </section>
   );
 }

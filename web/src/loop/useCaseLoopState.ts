@@ -64,9 +64,11 @@ function str(v: unknown): string | undefined {
   return typeof v === "string" ? v : undefined;
 }
 
-function head(text: string, n = 140): string {
+function head(text: string, n = 96): string {
   const t = text.replace(/\s+/g, " ").trim();
-  return t.length > n ? t.slice(0, n) + "…" : t;
+  if (t.length <= n) return t;
+  // show the most recent slice while running, so the node tracks the live thought
+  return "…" + t.slice(Math.max(0, t.length - n));
 }
 
 export function emptyLoopState(): LoopState {
@@ -155,9 +157,10 @@ export function deriveLoopState(events: LoopEvent[], live: LiveSignals = {}): Lo
 
   // EXECUTE + attempt refs (from live signal or the recorded outcome)
   const startedAttempt = events.some((e) => e.type === "ATTEMPT_STARTED");
-  const recRef = str(lastOutcome?.payload?.razorpayRef) ?? null;
+  const recRef =
+    outcomeEvents.map((e) => str(e.payload?.razorpayRef)).find((r): r is string => Boolean(r)) ?? null;
   const recStatus = str(lastOutcome?.payload?.status);
-  const recPaise = Number(lastOutcome?.payload?.recoveredPaise ?? 0);
+  const recPaise = Math.max(0, ...outcomeEvents.map((e) => Number(e.payload?.recoveredPaise ?? 0)));
   if (lastOutcome || startedAttempt) {
     s.attempt = {
       status: recStatus ?? "PENDING",

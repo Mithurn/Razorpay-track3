@@ -1,13 +1,13 @@
 import { Handle, Position } from "@xyflow/react";
 import type { LoopGate, StageStatus } from "../useCaseLoopState.js";
 
-export type GateNodeData = { status: StageStatus; gate: LoopGate | null };
+export type GateNodeData = { status: StageStatus; gate: LoopGate | null; sourcePos?: Position; targetPos?: Position };
 
 export function GateNode({ data }: { data: GateNodeData }) {
   const g = data.gate;
   return (
     <div className={`sn sn--gate sn--${data.status}`}>
-      <Handle type="target" position={Position.Left} />
+      <Handle type="target" position={data.targetPos ?? Position.Left} />
       <span className="sn__title">safety gate</span>
       {g ? (
         g.outcome === "allow" ? (
@@ -22,7 +22,7 @@ export function GateNode({ data }: { data: GateNodeData }) {
       ) : (
         <span className="sn__detail sn__detail--faint">deterministic · can only add caution</span>
       )}
-      <Handle type="source" position={Position.Right} />
+      <Handle type="source" position={data.sourcePos ?? Position.Right} />
     </div>
   );
 }

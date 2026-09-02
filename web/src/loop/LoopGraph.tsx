@@ -2,13 +2,16 @@ import { useEffect, useMemo, useRef } from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
+  Controls,
+  MiniMap,
   MarkerType,
+  Position,
   useReactFlow,
   type Edge,
   type Node,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import type { EdgeId, LoopState } from "./useCaseLoopState.js";
+import type { EdgeId, LoopState, StageStatus } from "./useCaseLoopState.js";
 import { StageNode } from "./nodes/StageNode.js";
 import { InvestigateNode } from "./nodes/InvestigateNode.js";
 import { GateNode } from "./nodes/GateNode.js";
@@ -17,64 +20,86 @@ import { FlowEdge } from "./edges/FlowEdge.js";
 const nodeTypes = { stage: StageNode, investigate: InvestigateNode, gate: GateNode };
 const edgeTypes = { flow: FlowEdge };
 
-const POS: Record<string, { x: number; y: number }> = {
-  incoming: { x: 0, y: 70 },
-  investigate: { x: 168, y: 6 },
-  propose: { x: 432, y: 64 },
-  gate: { x: 606, y: 52 },
-  execute: { x: 842, y: 64 },
-  outcome: { x: 1036, y: 64 },
+// Snake layout: row 1 flows right (incoming → investigate → propose), drops to row 2, which
+// flows left (gate → execute → outcome). The dashed re-plan edge loops outcome back up to
+// investigate — the shape is literally the loop.
+type Spec = {
+  id: string;
+  type: string;
+  x: number;
+  y: number;
+  sourcePos: Position;
+  targetPos: Position;
 };
 
-const marker = { type: MarkerType.ArrowClosed, width: 13, height: 13, color: "#5a5f6b" };
+const SPECS: Spec[] = [
+  { id: "incoming", type: "stage", x: 40, y: 70, sourcePos: Position.Right, targetPos: Position.Left },
+  { id: "investigate", type: "investigate", x: 280, y: 0, sourcePos: Position.Right, targetPos: Position.Left },
+  { id: "propose", type: "stage", x: 720, y: 70, sourcePos: Position.Bottom, targetPos: Position.Left },
+  { id: "gate", type: "gate", x: 700, y: 340, sourcePos: Position.Left, targetPos: Position.Top },
+  { id: "execute", type: "stage", x: 360, y: 350, sourcePos: Position.Left, targetPos: Position.Right },
+  { id: "outcome", type: "stage", x: 60, y: 350, sourcePos: Position.Top, targetPos: Position.Right },
+];
+
+const marker = { type: MarkerType.ArrowClosed, width: 15, height: 15, color: "#5a5f6b" };
+
+const STATUS_HEX: Record<StageStatus, string> = {
+  idle: "#3a3f4b",
+  active: "#e0a642",
+  done: "#5fb98a",
+  failed: "#d96a5a",
+  vetoed: "#d96a5a",
+};
 
 function flowEdge(id: string, source: string, target: string, current: EdgeId | null, key: EdgeId): Edge {
   return { id, source, target, type: "flow", markerEnd: marker, data: { animated: current === key } };
 }
 
-function buildNodes(state: LoopState): Node[] {
+function nodeData(id: string, state: LoopState) {
   const s = state.stages;
-  const attemptDetail = state.attempt?.razorpayRef ?? (state.attempt ? state.attempt.status.toLowerCase() : undefined);
-  const raw = [
-    { id: "incoming", type: "stage", position: POS.incoming!, data: { title: "incoming", status: s.INCOMING } },
-    {
-      id: "investigate",
-      type: "investigate",
-      position: POS.investigate!,
-      data: {
+  switch (id) {
+    case "incoming":
+      return { title: "incoming", status: s.INCOMING };
+    case "investigate":
+      return {
         status: s.INVESTIGATE,
         tools: state.tools,
         findingCount: state.findingCount,
         reasoningHead: state.reasoningHead,
         replanCount: state.replanCount,
-      },
-    },
-    {
-      id: "propose",
-      type: "stage",
-      position: POS.propose!,
-      data: { title: "propose", status: s.PROPOSE, detail: state.proposal?.action },
-    },
-    { id: "gate", type: "gate", position: POS.gate!, data: { status: s.GATE, gate: state.gate } },
-    {
-      id: "execute",
-      type: "stage",
-      position: POS.execute!,
-      data: { title: "execute", status: s.EXECUTE, detail: attemptDetail },
-    },
-    {
-      id: "outcome",
-      type: "stage",
-      position: POS.outcome!,
-      data: {
+      };
+    case "propose":
+      return { title: "propose", status: s.PROPOSE, detail: state.proposal?.action };
+    case "gate":
+      return { status: s.GATE, gate: state.gate };
+    case "execute":
+      return {
+        title: "execute",
+        status: s.EXECUTE,
+        detail: state.attempt?.razorpayRef ?? (state.attempt ? state.attempt.status.toLowerCase() : undefined),
+      };
+    default:
+      return {
         title: "outcome",
         status: s.OUTCOME,
         detail: state.finalLane?.replace(/_/g, " ").toLowerCase(),
         replanSource: true,
-      },
-    },
-  ];
-  return raw.map((n) => ({ ...n, draggable: false, selectable: false, connectable: false }) as Node);
+      };
+  }
+}
+
+function buildNodes(state: LoopState): Node[] {
+  return SPECS.map((spec) => ({
+    id: spec.id,
+    type: spec.type,
+    position: { x: spec.x, y: spec.y },
+    sourcePosition: spec.sourcePos,
+    targetPosition: spec.targetPos,
+    draggable: false,
+    selectable: false,
+    connectable: false,
+    data: { ...nodeData(spec.id, state), sourcePos: spec.sourcePos, targetPos: spec.targetPos },
+  }));
 }
 
 function buildEdges(state: LoopState): Edge[] {
@@ -98,13 +123,22 @@ function buildEdges(state: LoopState): Edge[] {
   ];
 }
 
+// full signature — any visible change rebuilds the nodes
 function signature(state: LoopState): string {
   return [
-    Object.values(state.stages).join(""),
+    layoutSig(state),
     state.tools.map((t) => t.status).join(""),
+    state.reasoningHead,
+    state.findingCount,
+  ].join("|");
+}
+
+// structural signature — only these drive a re-fit, so streaming prose doesn't thrash the view
+function layoutSig(state: LoopState): string {
+  return [
+    Object.values(state.stages).join(""),
     state.currentEdge ?? "",
     state.replanCount,
-    state.reasoningHead.length,
     state.proposal?.action ?? "",
     state.gate?.outcome ?? "",
     state.attempt?.razorpayRef ?? "",
@@ -113,15 +147,16 @@ function signature(state: LoopState): string {
 
 function Graph({ state }: { state: LoopState }) {
   const sig = signature(state);
+  const lay = layoutSig(state);
   const nodes = useMemo(() => buildNodes(state), [sig]); // eslint-disable-line react-hooks/exhaustive-deps
   const edges = useMemo(() => buildEdges(state), [sig]); // eslint-disable-line react-hooks/exhaustive-deps
   const { fitView } = useReactFlow();
   const wrap = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const id = requestAnimationFrame(() => fitView({ padding: 0.14, duration: 200 }));
+    const id = requestAnimationFrame(() => fitView({ padding: 0.12, duration: 240 }));
     return () => cancelAnimationFrame(id);
-  }, [sig, fitView]);
+  }, [lay, fitView]);
 
   useEffect(() => {
     const el = wrap.current;
@@ -142,17 +177,27 @@ function Graph({ state }: { state: LoopState }) {
         fitViewOptions={{ padding: 0.14 }}
         onInit={(inst) => inst.fitView({ padding: 0.14 })}
         minZoom={0.2}
-        maxZoom={1.2}
+        maxZoom={2.2}
         nodesDraggable={false}
         nodesConnectable={false}
         elementsSelectable={false}
-        panOnDrag={false}
-        panOnScroll={false}
-        zoomOnScroll={false}
-        zoomOnPinch={false}
-        zoomOnDoubleClick={false}
-        preventScrolling={false}
-      />
+        panOnDrag
+        zoomOnScroll
+        zoomOnPinch
+        zoomOnDoubleClick
+      >
+        <Controls showInteractive={false} />
+        <MiniMap
+          pannable
+          zoomable
+          bgColor="#1b1e25"
+          maskColor="rgba(12,14,18,0.6)"
+          nodeStrokeColor="#6b7180"
+          nodeStrokeWidth={3}
+          style={{ width: 132, height: 84 }}
+          nodeColor={(n) => STATUS_HEX[(n.data as { status?: StageStatus }).status ?? "idle"]}
+        />
+      </ReactFlow>
     </div>
   );
 }

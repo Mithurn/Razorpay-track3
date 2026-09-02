@@ -1,10 +1,10 @@
 .room {
   display: grid;
-  grid-template-columns: 340px 1fr 340px;
+  grid-template-columns: 260px 1fr;
   grid-template-rows: auto 1fr;
-  gap: var(--space-md);
+  gap: var(--space-sm);
   height: 100vh;
-  padding: var(--space-md) var(--space-lg);
+  padding: var(--space-sm) var(--space-md);
   background: var(--bg);
 }
 
@@ -13,32 +13,139 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-2xl);
-  padding-bottom: var(--space-sm);
+  gap: var(--space-xl);
+  padding-bottom: var(--space-xs);
   border-bottom: 1px solid var(--line);
-}
-
-.brand {
-  display: flex;
-  flex-direction: column;
 }
 
 .brand__name {
   font-family: var(--font-display);
-  font-size: var(--text-lg);
+  font-size: var(--text-md);
   letter-spacing: -0.01em;
   color: var(--text);
+  white-space: nowrap;
 }
 
-.brand__sub {
+/* Sidebar — Case flow / Waiting on you tabs */
+.sidebar {
+  grid-column: 1;
+  grid-row: 2;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.sidebar__tabs {
+  display: flex;
+  border-bottom: 1px solid var(--line);
+}
+.sidebar__tab {
+  flex: 1;
+  padding: var(--space-xs) var(--space-2xs);
+  font-family: var(--font-ui);
   font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   color: var(--text-faint);
-  letter-spacing: 0.04em;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+.sidebar__tab--active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+.sidebar__count {
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+.sidebar__badge {
+  background: var(--deny);
+  color: var(--bg);
+  border-radius: 999px;
+  padding: 0 5px;
+  font-size: 0.625rem;
+  font-variant-numeric: tabular-nums;
+}
+.sidebar__watch {
+  margin: var(--space-xs) var(--space-xs) 0;
+}
+.sidebar__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
 }
 
-.brand__watch {
-  margin-top: var(--space-xs);
-  align-self: flex-start;
+/* Stage — the live-case view */
+.stage {
+  grid-column: 2;
+  grid-row: 2;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.stage--empty {
+  align-items: center;
+  justify-content: center;
+}
+.stage__topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-md);
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--line);
+}
+.stage__id {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.stage__lane {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+}
+.stage__body {
+  flex: 1;
+  min-height: 260px;
+  display: flex;
+  gap: var(--space-md);
+}
+.stage__graph {
+  flex: 1 1 64%;
+  min-width: 0;
+  display: flex;
+}
+.stage__side {
+  flex: 0 0 34%;
+  max-width: 380px;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding-right: var(--space-2xs);
+}
+.stage__timeline {
+  flex: none;
 }
 
 /* Scoreboard: agent vs fixed */
@@ -65,7 +172,7 @@
 
 .board__money {
   font-family: var(--font-display);
-  font-size: var(--text-xl);
+  font-size: var(--text-lg);
   font-variant-numeric: tabular-nums;
   line-height: 1.1;
 }
@@ -206,9 +313,8 @@
 }
 
 .stream {
-  flex: 1 1 auto;
-  min-height: 160px;
-  max-height: 340px;
+  flex: none;
+  max-height: 320px;
   overflow-y: auto;
   line-height: var(--leading-body);
   font-family: var(--font-prose);
@@ -216,6 +322,8 @@
   white-space: pre-wrap;
   font-size: var(--text-sm);
   padding-right: var(--space-xs);
+  border-left: 2px solid var(--accent-dim);
+  padding-left: var(--space-sm);
 }
 .sk-word {
   animation: word-fade 380ms var(--ease-out) both;
