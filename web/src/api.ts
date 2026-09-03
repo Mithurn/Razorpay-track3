@@ -1,4 +1,4 @@
-import type { CaseDetail, RecoveryCase, RunSummary, StreamEvent } from "./types.js";
+import type { CaseDetail, RecoveryCase, RoomMetrics, RoomStreamEvent, RunSummary, StreamEvent } from "./types.js";
 
 const BASE = "/api";
 
@@ -51,6 +51,7 @@ export const scoreboard = () =>
 
 export const runtimeConfig = () => get<RuntimeConfig>("/config");
 export const verifyAudit = (id: string) => get<AuditVerify>(`/cases/${id}/audit/verify`);
+export const metrics = () => get<RoomMetrics>("/metrics");
 
 export async function recover(id: string): Promise<void> {
   await post(`/cases/${id}/recover`);
@@ -67,9 +68,24 @@ export async function decide(
   await post(`/cases/${id}/decision`, body);
 }
 
+// Safe-checkpoint stop: never aborts a call already in flight to Razorpay or the model, only
+// prevents the next action. Global (`stopAll`) is the room-wide emergency brake; `resumeAll`
+// lifts it — neither touches a case already resolved to STOPPED, which is one-way for now.
+export async function stopCase(id: string, note?: string): Promise<void> {
+  await post(`/cases/${id}/stop`, note ? { note } : undefined);
+}
+
+export async function stopAll(note?: string): Promise<{ stoppedNow: number }> {
+  return post(`/stop`, note ? { note } : undefined);
+}
+
+export async function resumeAll(): Promise<void> {
+  await post(`/resume`);
+}
+
 // SSE reader as an async generator: fetch -> reader -> split on \n\n -> JSON.parse the data line.
-export async function* streamCase(id: string, signal: AbortSignal): AsyncGenerator<StreamEvent> {
-  const res = await fetch(`${BASE}/cases/${id}/stream`, { signal, headers: { accept: "text/event-stream" } });
+async function* readSse<T>(path: string, signal: AbortSignal): AsyncGenerator<T> {
+  const res = await fetch(`${BASE}${path}`, { signal, headers: { accept: "text/event-stream" } });
   if (!res.body) return;
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
@@ -84,10 +100,13 @@ export async function* streamCase(id: string, signal: AbortSignal): AsyncGenerat
       const line = chunk.split("\n").find((l) => l.startsWith("data: "));
       if (!line) continue;
       try {
-        yield JSON.parse(line.slice(6)) as StreamEvent;
+        yield JSON.parse(line.slice(6)) as T;
       } catch {
         /* keep-alive comment or partial */
       }
     }
   }
 }
+
+export const streamCase = (id: string, signal: AbortSignal) => readSse<StreamEvent>(`/cases/${id}/stream`, signal);
+export const streamRoom = (signal: AbortSignal) => readSse<RoomStreamEvent>("/stream", signal);

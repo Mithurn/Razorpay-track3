@@ -1,14 +1,16 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import "./styles/room.css";
 import "./loop/loop.css";
+import "./room/room-extra.css";
 import { AttemptTimeline } from "./loop/AttemptTimeline.js";
 import { LoopGraph } from "./loop/LoopGraph.js";
 import { deriveLoopState, type StageId } from "./loop/useCaseLoopState.js";
 import { useLiveRun } from "./loop/useLiveRun.js";
-import { Commentary } from "./loop/Commentary.js";
-import { ConclusionCard, type Conclusion } from "./loop/ConclusionCard.js";
-import { AuditTrail } from "./loop/AuditTrail.js";
-import type { AuditRow } from "./loop/auditText.js";
+import { ActivityStream } from "./loop/ActivityStream.js";
+import { deriveActivities, type RawEvent } from "./loop/activities.js";
+import { TopBar } from "./room/TopBar.js";
+import { CustomerPanel } from "./room/CustomerPanel.js";
+import { useRoomStream } from "./room/useRoomStream.js";
 import type { CaseDetail, Lane, RecoveryCase, RunSummary } from "./types.js";
 import type { RuntimeConfig } from "./api.js";
 import {
@@ -20,8 +22,10 @@ import {
   runtimeConfig,
   scoreboard,
   simulateCapture,
+  stopCase,
   verifyAudit,
 } from "./api.js";
+import type { AuditVerify } from "./api.js";
 
 const LANE_ORDER: Lane[] = [
   "INCOMING",
@@ -32,10 +36,12 @@ const LANE_ORDER: Lane[] = [
   "RECOVERED",
   "ESCALATED",
   "WRITTEN_OFF",
+  "STOPPED",
 ];
 
+const TERMINAL: Lane[] = ["RECOVERED", "ESCALATED", "WRITTEN_OFF", "STOPPED"];
+
 const rupees = (paise: number) => `₹${Math.round(paise / 100).toLocaleString("en-IN")}`;
-const pct = (n: number) => `${Math.round(n * 100)}%`;
 
 export function App() {
   const [cases, setCases] = useState<RecoveryCase[]>([]);
@@ -45,6 +51,7 @@ export function App() {
   const [tab, setTab] = useState<"flow" | "waiting">("flow");
   const [cfg, setCfg] = useState<RuntimeConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const room = useRoomStream();
 
   const describeError = (err: unknown) => (err instanceof Error ? err.message : "request failed");
 
@@ -73,6 +80,14 @@ export function App() {
     return () => clearInterval(t);
   }, [refresh]);
 
+  // The room stream is the primary driver of "live": any durable event anywhere refetches the
+  // case lists immediately, rather than waiting up to 2s for the poll. The poll stays as a
+  // fallback in case the stream drops.
+  useEffect(() => {
+    if (room.version > 0) refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [room.version]);
+
   const byLane = useMemo(() => {
     const map = new Map<Lane, RecoveryCase[]>();
     for (const l of LANE_ORDER) map.set(l, []);
@@ -96,6 +111,14 @@ export function App() {
     }
   }, []);
 
+  const stopCaseGuarded = useCallback(async (id: string) => {
+    try {
+      await stopCase(id);
+    } catch (err) {
+      setError(describeError(err));
+    }
+  }, []);
+
   const freshCase = cases.find((c) => c.lane === "INCOMING");
   const watchLive = useCallback(async () => {
     if (!freshCase) return;
@@ -105,10 +128,7 @@ export function App() {
 
   return (
     <div className="room" data-surface="room">
-      <header className="room__header">
-        <span className="brand__name">Recovery Room</span>
-        <Scoreboard board={board} liveCases={cases} />
-      </header>
+      <TopBar metrics={room.metrics} connected={room.connected} board={board} onError={setError} />
 
       {error && (
         <div className="banner banner--error" role="alert">
@@ -160,7 +180,7 @@ export function App() {
                           "card" +
                           (selected === c.id ? " card--active" : "") +
                           (c.lane === "RECOVERED" ? " card--recovered" : "") +
-                          (c.lane === "ESCALATED" ? " card--escalated" : "")
+                          (c.lane === "ESCALATED" || c.lane === "STOPPED" ? " card--escalated" : "")
                         }
                         onClick={() => setSelected(c.id)}
                       >
@@ -205,50 +225,8 @@ export function App() {
         cfg={cfg}
         onRecover={recoverGuarded}
         onSimulateCapture={simulateCaptureGuarded}
+        onStop={stopCaseGuarded}
       />
-    </div>
-  );
-}
-
-function Scoreboard({ board, liveCases }: { board: { agent?: RunSummary; fixed?: RunSummary }; liveCases: RecoveryCase[] }) {
-  const liveRecovered = liveCases.filter((c) => c.lane === "RECOVERED").reduce((s, c) => s + c.recoveredPaise, 0);
-  const liveCount = liveCases.filter((c) => c.lane === "RECOVERED").length;
-  const a = board.agent;
-  const f = board.fixed;
-
-  if (!a || !f) {
-    return (
-      <div className="board">
-        <div className="board__col board__col--agent">
-          <span className="board__arm">recovered · this room</span>
-          <span className="board__money">{rupees(liveRecovered)}</span>
-          <span className="board__meta">
-            {liveCount > 0 ? `${liveCount} case${liveCount === 1 ? "" : "s"} recovered live` : "run the batch for the agent-vs-fixed number"}
-          </span>
-        </div>
-      </div>
-    );
-  }
-
-  const delta = a.recoveredPaise - f.recoveredPaise;
-  return (
-    <div className="board">
-      <div className="board__col board__col--agent">
-        <span className="board__arm">recovered · this room</span>
-        <span className="board__money">{rupees(liveRecovered)}</span>
-        <span className="board__meta">
-          {liveCount} case{liveCount === 1 ? "" : "s"} recovered live · agent beat fixed by {rupees(Math.max(delta, 0))} in the batch
-        </span>
-      </div>
-      <div className="board__col board__col--fixed">
-        <span className="board__arm">agent vs fixed · batch of {a.cases}</span>
-        <span className="board__money">
-          {rupees(a.recoveredPaise)} <span className="board__vs">vs</span> {rupees(f.recoveredPaise)}
-        </span>
-        <span className="board__meta">
-          {pct(a.recoveryRate)} vs {pct(f.recoveryRate)} recovered · {pct(a.escalationRate)} vs {pct(f.escalationRate)} escalated
-        </span>
-      </div>
     </div>
   );
 }
@@ -263,23 +241,39 @@ const STAGE_LABEL: Record<StageId, string> = {
   OUTCOME: "wrapping up",
 };
 
+function toRaw(events: CaseDetail["events"]): RawEvent[] {
+  return events.map((e) => ({ type: e.type, payload: e.payload, at: e.createdAt }));
+}
+function liveToRaw(audit: ReturnType<typeof useLiveRun>["audit"]): RawEvent[] {
+  return audit.map((e) => ({ type: e.eventType, payload: e.payload, at: e.at }));
+}
+
 function Stage({
   caseId,
   freshCase,
   cfg,
   onRecover,
   onSimulateCapture,
+  onStop,
 }: {
   caseId: string | null;
   freshCase: string | null;
   cfg: RuntimeConfig | null;
   onRecover: (id: string) => Promise<void>;
   onSimulateCapture: (id: string) => Promise<void>;
+  onStop: (id: string) => Promise<void>;
 }) {
   const [detail, setDetail] = useState<CaseDetail | null>(null);
+  const [showCustomer, setShowCustomer] = useState(false);
+  const [showGraph, setShowGraph] = useState(false);
   const [tick, setTick] = useState(0);
   const run = useLiveRun(caseId);
   const limits = cfg?.limits ?? DEFAULT_LIMITS;
+
+  useEffect(() => {
+    setShowCustomer(false);
+    setShowGraph(false);
+  }, [caseId]);
 
   useEffect(() => {
     if (!caseId) {
@@ -320,7 +314,6 @@ function Stage({
 
   const kase = detail?.case;
   const events = detail?.events ?? [];
-  const proposedEvent = [...events].reverse().find((e) => e.type === "AGENT_PROPOSED" || e.type === "AGENT_DEGRADED");
   const attempt = detail?.attempts.at(-1);
 
   const loopState = deriveLoopState(events, {
@@ -333,10 +326,15 @@ function Stage({
     doneLane: run.doneLane,
   });
 
-  const conclusion = deriveConclusion(run.proposal, proposedEvent);
-  const elapsedMs = runElapsedMs(run, events);
-  const auditRows = mergeAudit(events, run.audit);
-  const activeStage = (Object.entries(loopState.stages).find(([, st]) => st === "active")?.[0] ?? "INVESTIGATE") as StageId;
+  const fromEvents = toRaw(events);
+  const fromLive = liveToRaw(run.audit);
+  const rawEvents = fromLive.length > fromEvents.length ? fromLive : fromEvents;
+  const activities = deriveActivities(rawEvents);
+  const liveStepStatus = run.live
+    ? { step: run.tools.length + (run.proposal ? 1 : 0), budget: cfg?.stepBudget ?? 6, elapsedMs: run.startedAt ? Date.now() - run.startedAt : 0 }
+    : null;
+
+  const canStop = kase && !TERMINAL.includes(kase.lane);
 
   return (
     <section className="stage">
@@ -369,52 +367,53 @@ function Stage({
             <span className="stage__lane">{kase.lane.replace(/_/g, " ")}</span>
           </div>
         )}
-        {kase?.lane === "INCOMING" && (
-          <button className="btn btn--primary" onClick={() => onRecover(caseId)}>
-            work this case now
-          </button>
-        )}
-        {kase?.lane === "ATTEMPTING" && attempt?.status === "PENDING" && attempt.razorpayRef && (
-          <button className="btn btn--primary" onClick={() => onSimulateCapture(caseId)}>
-            customer completes payment →
-          </button>
-        )}
+        <div className="stage__actions">
+          {kase && (
+            <button className="btn btn--ghost" onClick={() => setShowCustomer((v) => !v)}>
+              customer {showCustomer ? "▴" : "▾"}
+            </button>
+          )}
+          {kase?.lane === "INCOMING" && (
+            <button className="btn btn--primary" onClick={() => onRecover(caseId)}>
+              work this case now
+            </button>
+          )}
+          {kase?.lane === "ATTEMPTING" && attempt?.status === "PENDING" && attempt.razorpayRef && (
+            <button className="btn btn--primary" onClick={() => onSimulateCapture(caseId)}>
+              customer completes payment →
+            </button>
+          )}
+          {canStop && (
+            <button className="btn btn--stop" onClick={() => onStop(caseId)}>
+              stop this case
+            </button>
+          )}
+          <VerifyAuditButton caseId={caseId} />
+        </div>
       </div>
 
+      {showCustomer && kase && <CustomerPanel kase={kase} />}
+
       <div className="stage__body">
-        <div className="stage__graph">
-          <LoopGraph state={loopState} />
+        <div className="stage__stream">
+          <ActivityStream activities={activities} liveNarration={loopState.reasoningHead} liveStepStatus={liveStepStatus} />
         </div>
 
-        <div className="stage__side">
-          {(run.commentary.length > 0 || run.live) && (
-            <Commentary
-              lines={run.commentary}
-              status={
-                run.live
-                  ? {
-                      stage: STAGE_LABEL[activeStage],
-                      step: run.tools.length + (run.proposal ? 1 : 0),
-                      budget: cfg?.stepBudget ?? 6,
-                      toolCalls: run.tools.length,
-                      elapsedMs: run.startedAt ? Date.now() - run.startedAt : 0,
-                    }
-                  : null
-              }
-            />
+        <div className="stage__graph-toggle">
+          <button className="btn btn--ghost" onClick={() => setShowGraph((v) => !v)}>
+            {showGraph ? "hide" : "show"} execution graph {showGraph ? "▴" : "▾"}
+          </button>
+          {run.live && !showGraph && (
+            <span className="stage__graph-hint">
+              {STAGE_LABEL[(Object.entries(loopState.stages).find(([, st]) => st === "active")?.[0] ?? "INVESTIGATE") as StageId]}
+            </span>
           )}
-
-          {conclusion && (
-            <ConclusionCard
-              conclusion={conclusion}
-              model={cfg?.model ?? "agent"}
-              elapsedMs={elapsedMs}
-              deadlineMs={cfg?.deadlineMs ?? 90_000}
-            />
-          )}
-
-          <AuditTrail rows={auditRows} limits={limits} onVerify={() => verifyAudit(caseId)} />
         </div>
+        {showGraph && (
+          <div className="stage__graph">
+            <LoopGraph state={loopState} />
+          </div>
+        )}
       </div>
 
       <div className="stage__timeline">
@@ -424,50 +423,30 @@ function Stage({
   );
 }
 
-function deriveConclusion(
-  live: ReturnType<typeof useLiveRun>["proposal"],
-  stored: CaseDetail["events"][number] | undefined,
-): Conclusion | null {
-  if (live) {
-    return {
-      rootCause: live.rootCause,
-      action: live.action,
-      confidence: live.confidence,
-      reasoning: live.reasoning,
-      toolCalls: live.toolCalls,
-      degraded: live.degraded,
-    };
-  }
-  if (!stored) return null;
-  const p = stored.payload as {
-    rootCause?: string | null;
-    action?: { kind?: string };
-    confidence?: number;
-    reasoning?: string;
-    toolCalls?: number;
+// Proves the append-only guarantee rather than just claiming it: connects as the app DB role and
+// tries to UPDATE recovery_events, expecting the database itself to refuse.
+function VerifyAuditButton({ caseId }: { caseId: string }) {
+  const [result, setResult] = useState<AuditVerify | "pending" | null>(null);
+  const run = async () => {
+    setResult("pending");
+    try {
+      setResult(await verifyAudit(caseId));
+    } catch {
+      setResult(null);
+    }
   };
-  return {
-    rootCause: p.rootCause ?? null,
-    action: p.action?.kind ?? "?",
-    confidence: p.confidence ?? 0,
-    reasoning: p.reasoning ?? "",
-    toolCalls: p.toolCalls ?? 0,
-    degraded: stored.type === "AGENT_DEGRADED",
-  };
-}
-
-function runElapsedMs(run: ReturnType<typeof useLiveRun>, events: CaseDetail["events"]): number | null {
-  if (run.startedAt && run.concludedAt) return run.concludedAt - run.startedAt;
-  const started = [...events].reverse().find((e) => e.type === "INVESTIGATION_STARTED");
-  const proposed = [...events].reverse().find((e) => e.type === "AGENT_PROPOSED" || e.type === "AGENT_DEGRADED");
-  if (started && proposed) return Date.parse(proposed.createdAt) - Date.parse(started.createdAt);
-  return null;
-}
-
-function mergeAudit(events: CaseDetail["events"], live: ReturnType<typeof useLiveRun>["audit"]): AuditRow[] {
-  const fromEvents: AuditRow[] = events.map((e) => ({ eventType: e.type, payload: e.payload, at: e.createdAt }));
-  const fromLive: AuditRow[] = live.map((e) => ({ eventType: e.eventType, payload: e.payload, at: e.at }));
-  return fromLive.length > fromEvents.length ? fromLive : fromEvents;
+  return (
+    <span className="verify-audit">
+      <button className="btn btn--ghost" onClick={run} disabled={result === "pending"}>
+        {result === "pending" ? "checking…" : "verify audit trail"}
+      </button>
+      {result && result !== "pending" && (
+        <span className={"verify-audit__result" + (result.enforced ? " verify-audit__result--ok" : " verify-audit__result--bad")}>
+          {result.enforced ? "✓ append-only enforced by the database" : "✗ " + (result.error ?? "not enforced")}
+        </span>
+      )}
+    </span>
+  );
 }
 
 function EscalationRow({

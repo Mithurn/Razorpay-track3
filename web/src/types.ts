@@ -100,3 +100,19 @@ export type RunSummary = {
   overNudges: number;
   overNudgeRate: number;
 };
+
+// GET /metrics — room-wide totals over live cases, computed fresh from recovery_cases. Never a
+// "recoverable" or "lift" claim: there is no live control arm to honestly compare against.
+export type RoomMetrics = {
+  recoveredPaise: number;
+  exposurePaise: number;
+  liveCases: number;
+  byLane: Partial<Record<Lane, number>>;
+};
+
+// GET /stream — the room-wide feed: every durable event across every case, tagged with which
+// case it belongs to. Opens with a metrics snapshot so a fresh subscriber renders immediately.
+export type RoomStreamEvent =
+  | { type: "open" }
+  | ({ type: "metrics" } & RoomMetrics)
+  | { type: "audit"; caseId: string; eventType: string; payload: Record<string, unknown>; at: string };
