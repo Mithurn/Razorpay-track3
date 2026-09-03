@@ -133,10 +133,14 @@ describe.runIf(adminUrl)("RecoveryPipeline", () => {
     expect(kase!.recoveredPaise).toBe(149900);
     expect(gw.orders).toBe(1);
 
-    const events = (await new PostgresEventLog(db).forCase(caseId)).map((e) => e.type);
-    expect(events).toEqual(
+    const recorded = await new PostgresEventLog(db).forCase(caseId);
+    expect(recorded.map((e) => e.type)).toEqual(
       expect.arrayContaining(["INVESTIGATION_STARTED", "AGENT_PROPOSED", "GATE_APPLIED", "ATTEMPT_STARTED", "ATTEMPT_OUTCOME", "CASE_RESOLVED"]),
     );
+    // A guardrail's absence is structured too — no rule fired, so both are explicitly null, not
+    // simply missing from the payload.
+    const gateEvent = recorded.find((e) => e.type === "GATE_APPLIED");
+    expect(gateEvent!.payload).toMatchObject({ outcome: "allow", rule: null, detail: null, proposed: "RETRY_NOW", applied: "RETRY_NOW" });
   });
 
   it("routes a risk-flagged proposal to ESCALATED without moving money", async () => {
@@ -155,7 +159,12 @@ describe.runIf(adminUrl)("RecoveryPipeline", () => {
     expect(gw.orders).toBe(0);
 
     const gateEvent = (await new PostgresEventLog(db).forCase(caseId)).find((e) => e.type === "GATE_APPLIED");
-    expect(gateEvent!.payload).toMatchObject({ outcome: "clamp", proposed: "RETRY_NOW", applied: "ESCALATE" });
+    expect(gateEvent!.payload).toMatchObject({
+      outcome: "clamp",
+      proposed: "RETRY_NOW",
+      applied: "ESCALATE",
+      rule: "risk_hold",
+    });
   });
 
   it("escalates a risk-hold case even when the agent misdiagnoses it", async () => {
@@ -178,8 +187,10 @@ describe.runIf(adminUrl)("RecoveryPipeline", () => {
       outcome: "clamp",
       proposed: "RETRY_NOW",
       applied: "ESCALATE",
-      reason: "risk_hold",
+      rule: "risk_hold",
+      activity: "gate",
     });
+    expect(typeof (gateEvent!.payload as { detail: unknown }).detail).toBe("string");
   });
 
   it("reschedules a failed attempt, then escalates once the cap is reached", async () => {

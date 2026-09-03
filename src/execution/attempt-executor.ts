@@ -32,7 +32,12 @@ export class AttemptExecutor {
     await this.events.append({
       caseId: request.caseId,
       type: "ATTEMPT_STARTED",
-      payload: { attemptNo: request.attemptNo, action: request.action, clamped: request.clamp !== null },
+      payload: {
+        attemptNo: request.attemptNo,
+        action: request.action,
+        clamped: request.clamp !== null,
+        activity: "execute",
+      },
     });
 
     try {
@@ -88,7 +93,7 @@ export class AttemptExecutor {
       await this.events.append({
         caseId: request.caseId,
         type: "ATTEMPT_STARTED",
-        payload: { nudgeChannel: action.channel, attemptNo: request.attemptNo },
+        payload: { nudgeChannel: action.channel, attemptNo: request.attemptNo, activity: "execute" },
       });
       return null;
     }
@@ -151,6 +156,7 @@ export class AttemptExecutor {
         detail: settled.detail,
         recoveredPaise: settled.recoveredPaise,
         razorpayRef: settled.razorpayRef,
+        activity: "execute",
       },
     });
     return settled;

@@ -70,7 +70,7 @@ const proposal = await runRecoveryAgent(
   },
   {
     onReasoningDelta: (t) => process.stdout.write(t),
-    onToolCall: (n) => process.stderr.write(`\n[tool] ${n}\n`),
+    onToolCall: (call) => void process.stderr.write(`\n[tool] ${call.name}\n`),
   },
 );
 

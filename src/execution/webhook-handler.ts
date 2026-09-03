@@ -77,7 +77,7 @@ export class WebhookHandler {
       await this.events.append({
         caseId: attempt.caseId,
         type: "ATTEMPT_OUTCOME",
-        payload: { via: "webhook", event: parsed.event, ref },
+        payload: { via: "webhook", event: parsed.event, ref, activity: "execute" },
       });
     }
 
@@ -95,7 +95,11 @@ export class WebhookHandler {
 
     if (status === "RECOVERED" && !["RECOVERED", "ESCALATED", "WRITTEN_OFF"].includes(kase.lane)) {
       await this.cases.moveLane(kase.id, kase.lane, "RECOVERED");
-      await this.events.append({ caseId: kase.id, type: "CASE_RESOLVED", payload: { lane: "RECOVERED", via: "webhook" } });
+      await this.events.append({
+        caseId: kase.id,
+        type: "CASE_RESOLVED",
+        payload: { lane: "RECOVERED", via: "webhook", activity: "outcome" },
+      });
     }
     return { status: "processed", attemptStatus: status };
   }

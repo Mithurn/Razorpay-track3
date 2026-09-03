@@ -8,8 +8,9 @@ import type { PaymentGateway } from "../domain/gateway.js";
 import { runRecoveryAgent, type AgentConfig, type AgentEvents } from "../agent/recovery-agent.js";
 import type { AgentDeps } from "../agent/tools.js";
 import { reconstructAction } from "../execution/action-codec.js";
-import { TERMINAL_LANES } from "../domain/case.js";
+import { TERMINAL_LANES, IN_FLIGHT_LANES } from "../domain/case.js";
 import { buildAgentDeps, type BuildDeps } from "./agent-deps.js";
+import { StopRegistry, type StopRequest } from "./stop-registry.js";
 
 export type AgentRunner = (deps: AgentDeps, events: AgentEvents) => Promise<AgentProposal>;
 
@@ -25,8 +26,10 @@ const HOUR_MS = 3_600_000;
 const DEFAULT_RESCHEDULE_HOURS = 12;
 const SETTLEMENT_RECHECK_HOURS = 2;
 
+type TerminalLane = Extract<Lane, "RECOVERED" | "ESCALATED" | "WRITTEN_OFF" | "STOPPED">;
+
 export type StepOutcome =
-  | { kind: "resolved"; lane: Extract<Lane, "RECOVERED" | "ESCALATED" | "WRITTEN_OFF"> }
+  | { kind: "resolved"; lane: TerminalLane }
   | { kind: "reschedule"; delayMs: number; reason: string }
   | { kind: "awaiting_settlement"; delayMs: number }
   // Another worker already claimed this case's turn (concurrent queue jobs); this one bows out.
@@ -42,15 +45,53 @@ export type PipelineDeps = BuildDeps & {
   runAgent: AgentRunner;
   limits?: SafetyLimits;
   riskHoldForCase?: (kase: RecoveryCase) => boolean;
+  stopRegistry?: StopRegistry;
 };
 
 export class RecoveryPipeline {
   private readonly executor: AttemptExecutor;
   private readonly limits: SafetyLimits;
+  private readonly stopRegistry: StopRegistry;
 
   constructor(private readonly deps: PipelineDeps) {
     this.executor = new AttemptExecutor(deps.attempts, deps.events, deps.gateway, deps.outcomeResolver);
     this.limits = deps.limits ?? DEFAULT_LIMITS;
+    this.stopRegistry = deps.stopRegistry ?? new StopRegistry();
+  }
+
+  // Registers a stop and, for a case nothing is actively working right now (idle in INCOMING, or
+  // parked in RETRY_SCHEDULED awaiting a delayed job that may be hours off), resolves it to
+  // STOPPED immediately rather than waiting for that job to eventually fire. A case genuinely
+  // in flight is left to reach its own next checkpoint — see step()'s two stop checks — never
+  // interrupted mid-call.
+  async requestStop(caseId: string, request: StopRequest): Promise<void> {
+    this.stopRegistry.stopCase(caseId, request);
+    const kase = await this.deps.cases.byId(caseId);
+    if (kase && !IN_FLIGHT_LANES.includes(kase.lane) && !TERMINAL_LANES.includes(kase.lane)) {
+      await this.stop(kase, request);
+    }
+  }
+
+  // The emergency brake: no case run after this call starts a new investigation, gate, or
+  // execute step until resumeAll(). Live idle/parked cases are resolved to STOPPED immediately,
+  // same as requestStop; in-flight ones catch it at their own next checkpoint.
+  async requestStopAll(request: StopRequest): Promise<{ stoppedNow: number }> {
+    this.stopRegistry.stopAll(request);
+    const live = await this.deps.cases.listLive();
+    let stoppedNow = 0;
+    for (const kase of live) {
+      if (!IN_FLIGHT_LANES.includes(kase.lane) && !TERMINAL_LANES.includes(kase.lane)) {
+        await this.stop(kase, request);
+        stoppedNow++;
+      }
+    }
+    return { stoppedNow };
+  }
+
+  // Lifts the emergency brake only. Does not touch any per-case stop, and does not revive a case
+  // already resolved to STOPPED — reviving one is a deliberate separate action, not built yet.
+  resumeAll(): void {
+    this.stopRegistry.resumeAll();
   }
 
   // The worker's single entry point: settle anything parked from a prior turn, and only run a
@@ -83,6 +124,9 @@ export class RecoveryPipeline {
     const kase = await this.deps.cases.byId(caseId);
     if (!kase) throw new Error(`pipeline: no case ${caseId}`);
 
+    const stopBefore = this.stopRegistry.check(caseId);
+    if (stopBefore) return this.stop(kase, stopBefore);
+
     // Claim the case for this turn. Moving it to DIAGNOSING is a compare-and-set against the lane
     // this job just read; a concurrent job that already advanced it makes the move fail. A case
     // already in DIAGNOSING is owned by another job unless this call is a retry reclaiming it.
@@ -95,7 +139,11 @@ export class RecoveryPipeline {
     const priorAttempts = await this.deps.attempts.listByCase(caseId);
     const attemptNo = priorAttempts.filter((a) => a.status !== "SKIPPED").length + 1;
 
-    await this.deps.events.append({ caseId, type: "INVESTIGATION_STARTED", payload: { attemptNo } });
+    await this.deps.events.append({
+      caseId,
+      type: "INVESTIGATION_STARTED",
+      payload: { attemptNo, activity: "investigate" },
+    });
 
     const agentDeps = await buildAgentDeps(kase, priorAttempts, this.deps);
     const proposal = await this.deps.runAgent(agentDeps, agentEvents);
@@ -108,12 +156,23 @@ export class RecoveryPipeline {
         action: proposal.action,
         reasoning: proposal.reasoning,
         toolCalls: proposal.toolCalls,
+        activity: "propose",
       },
     });
 
+    // Re-check after the agent call, which can run for tens of seconds: a stop requested while
+    // it was in flight must land before the gate or the executor ever runs, not just before the
+    // investigation started.
+    const stopAfter = this.stopRegistry.check(caseId);
+    if (stopAfter) return this.stop(kase, stopAfter);
+
     await this.enter(kase, "DECIDING");
     const gate = this.applyGate(kase, proposal, priorAttempts, attemptNo);
-    await this.deps.events.append({ caseId, type: "GATE_APPLIED", payload: gate.event });
+    await this.deps.events.append({
+      caseId,
+      type: "GATE_APPLIED",
+      payload: { ...gate.event, activity: "gate" },
+    });
 
     if (gate.kind === "skip") {
       await this.enter(kase, "RETRY_SCHEDULED");
@@ -149,24 +208,24 @@ export class RecoveryPipeline {
     };
     const result = safetyGate(proposal.action, ctx, this.limits);
 
+    // One shape for every outcome — a caller reading GATE_APPLIED never branches on which
+    // fields exist. `rule` and `detail` are null exactly when nothing fired, i.e. "allow".
+    const event = {
+      outcome: result.outcome,
+      rule: result.outcome === "allow" ? null : result.rule,
+      detail: result.outcome === "allow" ? null : result.detail,
+      proposed: proposal.action.kind,
+      applied: result.outcome === "skip" ? null : result.action.kind,
+    };
+
     if (result.outcome === "skip") {
-      return {
-        kind: "skip" as const,
-        delayMs: this.limits.cooldownHours * HOUR_MS,
-        reason: result.reason,
-        event: { outcome: "skip", reason: result.reason },
-      };
+      return { kind: "skip" as const, delayMs: this.limits.cooldownHours * HOUR_MS, reason: result.detail, event };
     }
     return {
       kind: "act" as const,
       action: result.action,
-      clamp: result.outcome === "clamp" ? { reason: result.reason } : null,
-      event: {
-        outcome: result.outcome,
-        proposed: proposal.action.kind,
-        applied: result.action.kind,
-        reason: result.outcome === "clamp" ? result.reason : null,
-      },
+      clamp: result.outcome === "clamp" ? { reason: result.detail } : null,
+      event,
     };
   }
 
@@ -201,9 +260,19 @@ export class RecoveryPipeline {
     await this.deps.events.append({
       caseId: kase.id,
       type: "CASE_RESOLVED",
-      payload: reason ? { lane, reason } : { lane },
+      payload: { ...(reason ? { lane, reason } : { lane }), activity: "outcome" },
     });
     return { kind: "resolved", lane };
+  }
+
+  private async stop(kase: RecoveryCase, request: StopRequest): Promise<StepOutcome> {
+    await this.enter(kase, "STOPPED");
+    await this.deps.events.append({
+      caseId: kase.id,
+      type: "CASE_STOPPED",
+      payload: { reason: request.reason, note: request.note ?? null, activity: "outcome" },
+    });
+    return { kind: "resolved", lane: "STOPPED" };
   }
 
   // Returns whether the case is now in `lane`: true if it already was or this call moved it,
@@ -225,8 +294,8 @@ function rescheduleDelay(action: RecoveryAction): number {
   return (action.kind === "RETRY_SCHEDULED" ? action.atHoursFromNow : DEFAULT_RESCHEDULE_HOURS) * HOUR_MS;
 }
 
-function terminalLane(lane: Lane): Extract<Lane, "RECOVERED" | "ESCALATED" | "WRITTEN_OFF"> {
-  return lane as Extract<Lane, "RECOVERED" | "ESCALATED" | "WRITTEN_OFF">;
+function terminalLane(lane: Lane): TerminalLane {
+  return lane as TerminalLane;
 }
 
 function hoursSinceLastAttempt(prior: Attempt[], clock: Clock): number | null {

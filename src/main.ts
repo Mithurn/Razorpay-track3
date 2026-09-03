@@ -2,6 +2,7 @@ import Fastify from "fastify";
 import { loadConfig } from "./config.js";
 import { createPool } from "./persistence/pool.js";
 import { PostgresCaseRepository } from "./persistence/case-repository.js";
+import { LanePublishingCaseRepository } from "./persistence/lane-publishing-case-repository.js";
 import { PostgresAttemptRepository } from "./persistence/attempt-repository.js";
 import { PostgresEventLog } from "./persistence/event-log.js";
 import { PublishingEventLog } from "./persistence/publishing-event-log.js";
@@ -30,13 +31,15 @@ import { registerRoutes } from "./api/routes.js";
 const config = loadConfig();
 
 const pool = createPool(config.DATABASE_URL);
-const cases = new PostgresCaseRepository(pool);
 const attempts = new PostgresAttemptRepository(pool);
 const webhooks = new PostgresWebhookInbox(pool);
 const runs = new RunRepository(pool);
 const bus = new CaseEventBus();
 // Every appended event is mirrored to the live stream as an `audit` event.
 const events = new PublishingEventLog(new PostgresEventLog(pool), bus);
+// Every successful lane move is recorded as a CASE_LANE_CHANGED event through the same log, so
+// case position is never a bare UPDATE invisible to the audit trail.
+const cases = new LanePublishingCaseRepository(new PostgresCaseRepository(pool), events);
 
 const razorpay = new RazorpayClient({
   keyId: config.RAZORPAY_KEY_ID,
@@ -76,7 +79,7 @@ const pipeline = new RecoveryPipeline({
 
 const connection = redisConnection(config.REDIS_URL);
 const queue = recoveryQueue(connection);
-const worker = recoveryWorker(connection, makeProcessor(pipeline, queue, bus));
+const worker = recoveryWorker(connection, makeProcessor(pipeline, queue, bus, events));
 const sweep = startReconcileSweep(attempts, cases, queue);
 
 const webhookHandler = new WebhookHandler(razorpay, webhooks, attempts, cases, events, executor);
@@ -101,6 +104,7 @@ await registerRoutes(app, {
   queue,
   webhookHandler,
   bus,
+  pipeline,
   modelHealth: () => checkModelHealth(config.OPENROUTER_API_KEY, config.AGENT_MODEL),
   verifyAppendOnly: () => verifyAppendOnly(pool),
   runtimeInfo: {

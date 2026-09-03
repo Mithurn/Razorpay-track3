@@ -1,6 +1,6 @@
-import type { CaseRepository, NewCase, SimilarCaseSummary } from "../domain/ports.js";
+import type { CaseRepository, NewCase, RoomMetrics, SimilarCaseSummary } from "../domain/ports.js";
 import type { Lane, RecoveryCase } from "../domain/case.js";
-import { recoveryCase } from "../domain/case.js";
+import { recoveryCase, TERMINAL_LANES } from "../domain/case.js";
 import type { Db } from "./pool.js";
 
 const COLUMNS = `id, run_id, merchant_ref, customer_ref, original_payment_id, amount_paise,
@@ -103,6 +103,26 @@ export class PostgresCaseRepository implements CaseRepository {
       [id, from, to],
     );
     return rowCount === 1;
+  }
+
+  async metrics(): Promise<RoomMetrics> {
+    const { rows } = await this.db.query(
+      `SELECT lane,
+              count(*)::bigint AS n,
+              coalesce(sum(amount_paise), 0)::bigint AS amount,
+              coalesce(sum(recovered_paise), 0)::bigint AS recovered
+         FROM recovery_cases
+        WHERE run_id IS NULL
+        GROUP BY lane`,
+    );
+    const metrics: RoomMetrics = { recoveredPaise: 0, exposurePaise: 0, liveCases: 0, byLane: {} };
+    for (const row of rows as { lane: Lane; n: number; amount: number; recovered: number }[]) {
+      metrics.byLane[row.lane] = row.n;
+      metrics.liveCases += row.n;
+      metrics.recoveredPaise += row.recovered;
+      if (!TERMINAL_LANES.includes(row.lane)) metrics.exposurePaise += row.amount;
+    }
+    return metrics;
   }
 
   async similarResolved(

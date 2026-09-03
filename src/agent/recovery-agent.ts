@@ -7,7 +7,8 @@ import { buildTools, type AgentDeps } from "./tools.js";
 import { SYSTEM_PROMPT, caseBrief } from "./prompt.js";
 
 export type ToolSource = "local" | "razorpay-live";
-export type ToolResult = { name: string; source: ToolSource; raw: unknown; ms: number };
+export type ToolCall = { name: string; callId: string; args: unknown };
+export type ToolResult = { name: string; callId: string; source: ToolSource; raw: unknown; ms: number };
 
 // check_bank_downtime hits the live Razorpay downtime feed; everything else is a local read.
 const LIVE_TOOLS = new Set(["check_bank_downtime"]);
@@ -32,8 +33,10 @@ export type AgentConfig = {
 
 export type AgentEvents = {
   onReasoningDelta?: (text: string) => void;
-  onToolCall?: (name: string) => void;
-  onToolResult?: (result: ToolResult) => void;
+  // Awaited around the actual tool execution, so a durable TOOL_CALLED record always commits
+  // before the TOOL_RESULT that follows it — not just called first, actually landed first.
+  onToolCall?: (call: ToolCall) => void | Promise<void>;
+  onToolResult?: (result: ToolResult) => void | Promise<void>;
   onConcluded?: (proposal: AgentProposal) => void;
 };
 
@@ -73,23 +76,36 @@ export async function runRecoveryAgent(
     execute: async () => ({ received: true }),
   });
 
-  // Wrap each investigation tool so its raw output and wall-clock timing reach the stream.
+  let toolCalls = 0;
+
+  // Wrap each investigation tool so the call and its raw output, with wall-clock timing, reach
+  // the stream. Fired from here, not from onStepFinish, so onToolCall lands before onToolResult
+  // for the same call — the AI SDK only reports a finished step, by which point the call already
+  // executed, which would otherwise report the result before the call that produced it.
   const investigationTools = Object.fromEntries(
     Object.entries(buildTools(deps)).map(([name, t]) => [
       name,
       {
         ...t,
         execute: async (args: unknown, opts: unknown) => {
+          const callId = (opts as { toolCallId: string }).toolCallId;
+          toolCalls++;
+          await events.onToolCall?.({ name, callId, args });
           const start = performance.now();
           const raw = await (t.execute as (a: unknown, o: unknown) => Promise<unknown>)(args, opts);
-          events.onToolResult?.({ name, source: sourceOf(name), raw, ms: Math.round(performance.now() - start) });
+          await events.onToolResult?.({
+            name,
+            callId,
+            source: sourceOf(name),
+            raw,
+            ms: Math.round(performance.now() - start),
+          });
           return raw;
         },
       },
     ]),
   );
   const tools = { ...investigationTools, submit_proposal: submit };
-  let toolCalls = 0;
 
   try {
     const result = streamText({
@@ -104,14 +120,6 @@ export async function runRecoveryAgent(
         stepNumber >= config.stepBudget - 1
           ? { toolChoice: { type: "tool", toolName: "submit_proposal" }, activeTools: ["submit_proposal"] }
           : {},
-      onStepFinish: (step) => {
-        for (const call of step.toolCalls) {
-          if (call.toolName !== "submit_proposal") {
-            toolCalls++;
-            events.onToolCall?.(call.toolName);
-          }
-        }
-      },
     });
 
     for await (const part of result.fullStream) {

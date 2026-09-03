@@ -71,6 +71,16 @@ export type SimilarCaseSummary = {
   hoursToResolution: number | null;
 };
 
+export type RoomMetrics = {
+  // Summed from recovered_paise, real captures only, live cases only — not a projection.
+  recoveredPaise: number;
+  // Money still in play: amountPaise of live cases not yet in a terminal lane. Not a claim about
+  // how much of it is recoverable — there is no live ground truth to honestly say that.
+  exposurePaise: number;
+  liveCases: number;
+  byLane: Partial<Record<Lane, number>>;
+};
+
 export interface CaseRepository {
   create(newCase: NewCase): Promise<RecoveryCase>;
   byId(id: string): Promise<RecoveryCase | null>;
@@ -90,4 +100,6 @@ export interface CaseRepository {
   ): Promise<SimilarCaseSummary[]>;
   /** Compare-and-set. Returns false if the row was not in `from` — the caller re-reads. */
   moveLane(id: string, from: Lane, to: Lane): Promise<boolean>;
+  /** Room-wide totals over live cases (run_id IS NULL), for the top-bar / room-level view. */
+  metrics(): Promise<RoomMetrics>;
 }

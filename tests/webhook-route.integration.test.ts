@@ -132,6 +132,7 @@ describe.runIf(adminUrl)("POST /webhooks/razorpay", () => {
       queue: { add: async () => undefined } as never,
       webhookHandler: handler,
       bus: new CaseEventBus(),
+      pipeline: { requestStop: async () => undefined, requestStopAll: async () => ({ stoppedNow: 0 }), resumeAll: () => undefined },
       modelHealth: async () => ({ model: "test", reachable: true }),
       verifyAppendOnly: async () => ({ enforced: true, role: "recovery_app" }),
       runtimeInfo: {

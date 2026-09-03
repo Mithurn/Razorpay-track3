@@ -4,6 +4,7 @@ import { Queue, Worker } from "bullmq";
 import { Redis } from "ioredis";
 import { createPool, type Db } from "../src/persistence/pool.js";
 import { PostgresCaseRepository } from "../src/persistence/case-repository.js";
+import { LanePublishingCaseRepository } from "../src/persistence/lane-publishing-case-repository.js";
 import { PostgresAttemptRepository } from "../src/persistence/attempt-repository.js";
 import { PostgresEventLog } from "../src/persistence/event-log.js";
 import { RecoveryPipeline } from "../src/worker/pipeline.js";
@@ -111,10 +112,11 @@ describe.runIf(adminUrl && redisUrl)("recovery worker end to end", () => {
     const resolver: OutcomeResolver = { resolve: async () => verdicts.shift() ?? { kind: "pending" } };
 
     const gateway = new FakeGateway();
+    const eventLog = new PostgresEventLog(db);
     const pipeline = new RecoveryPipeline({
-      cases: new PostgresCaseRepository(db),
+      cases: new LanePublishingCaseRepository(new PostgresCaseRepository(db), eventLog),
       attempts: new PostgresAttemptRepository(db),
-      events: new PostgresEventLog(db),
+      events: eventLog,
       gateway,
       outcomeResolver: resolver,
       clock: { now: () => new Date() },
@@ -124,7 +126,7 @@ describe.runIf(adminUrl && redisUrl)("recovery worker end to end", () => {
     queue = new Queue<RecoveryJob>(RECOVERY_QUEUE, { connection });
     worker = new Worker<RecoveryJob>(
       RECOVERY_QUEUE,
-      async (job) => makeProcessor(pipeline, queue, new CaseEventBus())(job.data),
+      async (job) => makeProcessor(pipeline, queue, new CaseEventBus(), eventLog)(job.data),
       { connection },
     );
 
@@ -140,9 +142,16 @@ describe.runIf(adminUrl && redisUrl)("recovery worker end to end", () => {
     expect(kase!.recoveredPaise).toBe(149900);
     expect(gateway.orders).toBe(1);
 
-    const events = (await new PostgresEventLog(db).forCase(caseId)).map((e) => e.type);
-    expect(events).toEqual(
-      expect.arrayContaining(["INVESTIGATION_STARTED", "AGENT_PROPOSED", "GATE_APPLIED", "ATTEMPT_OUTCOME", "CASE_RESOLVED"]),
+    const recordedTypes = (await eventLog.forCase(caseId)).map((e) => e.type);
+    expect(recordedTypes).toEqual(
+      expect.arrayContaining([
+        "CASE_LANE_CHANGED",
+        "INVESTIGATION_STARTED",
+        "AGENT_PROPOSED",
+        "GATE_APPLIED",
+        "ATTEMPT_OUTCOME",
+        "CASE_RESOLVED",
+      ]),
     );
   }, 15_000);
 });

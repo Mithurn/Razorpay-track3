@@ -15,6 +15,7 @@ async function buildApp(demoAccessToken: string | undefined): Promise<FastifyIns
     queue: { add: async () => undefined } as never,
     webhookHandler: {} as never,
     bus: { subscribe: () => () => undefined } as never,
+    pipeline: { requestStop: async () => undefined, requestStopAll: async () => ({ stoppedNow: 0 }), resumeAll: () => undefined },
     modelHealth: async () => ({ model: "test", reachable: true }),
     verifyAppendOnly: async () => ({ enforced: true, role: "recovery_app" }),
     runtimeInfo: {
@@ -37,7 +38,14 @@ describe("mutating case routes require the demo access token", () => {
     app = undefined;
   });
 
-  for (const route of ["/cases/x/recover", "/cases/x/decision", "/cases/x/simulate-capture"]) {
+  for (const route of [
+    "/cases/x/recover",
+    "/cases/x/decision",
+    "/cases/x/simulate-capture",
+    "/cases/x/stop",
+    "/stop",
+    "/resume",
+  ]) {
     it(`rejects ${route} with no Authorization header`, async () => {
       app = await buildApp("real-token");
       const res = await app.inject({ method: "POST", url: route });
