@@ -26,10 +26,16 @@ export type GateContext = {
   confidence: number;
 };
 
+// A stable identifier for which guardrail fired — the "rule name" half of the audit record.
+// `detail` (below) carries the human-readable specifics (the actual numbers involved); the two
+// are deliberately separate fields, not one interpolated string, so a caller can group or filter
+// by rule without parsing text.
+export type GuardrailRule = "risk_hold" | "max_attempts" | "exposure_cap" | "low_confidence" | "cooldown";
+
 export type GateResult =
   | { outcome: "allow"; action: RecoveryAction }
-  | { outcome: "clamp"; action: RecoveryAction; reason: string }
-  | { outcome: "skip"; reason: string };
+  | { outcome: "clamp"; action: RecoveryAction; rule: GuardrailRule; detail: string }
+  | { outcome: "skip"; rule: GuardrailRule; detail: string };
 
 const escalate = (reason: string): RecoveryAction => ({ kind: "ESCALATE", reason });
 
@@ -43,38 +49,31 @@ export function safetyGate(
   // Not a rank test: WRITE_OFF ranks equal to ESCALATE because neither moves money, but it
   // closes the case with no human ever seeing it. A risk hold has exactly one acceptable end.
   if (ctx.riskHold && proposal.kind !== "ESCALATE") {
-    return { outcome: "clamp", action: escalate("risk hold on the original payment"), reason: "risk_hold" };
+    const detail = "the original payment carries a risk hold";
+    return { outcome: "clamp", action: escalate(detail), rule: "risk_hold", detail };
   }
 
   if (ctx.attemptNo > limits.maxAttempts && belowEscalate) {
-    return {
-      outcome: "clamp",
-      action: escalate(`attempt ${ctx.attemptNo} exceeds cap of ${limits.maxAttempts}`),
-      reason: "max_attempts",
-    };
+    const detail = `attempt ${ctx.attemptNo} exceeds the cap of ${limits.maxAttempts}`;
+    return { outcome: "clamp", action: escalate(detail), rule: "max_attempts", detail };
   }
 
   const movesMoney =
     proposal.kind === "RETRY_NOW" || proposal.kind === "RETRY_SCHEDULED" || proposal.kind === "PAYMENT_LINK";
 
   if (movesMoney && ctx.case.amountPaise > limits.maxExposurePaise) {
-    return {
-      outcome: "clamp",
-      action: escalate(`amount ${ctx.case.amountPaise} exceeds auto-recovery cap ${limits.maxExposurePaise}`),
-      reason: "exposure_cap",
-    };
+    const detail = `amount ${ctx.case.amountPaise} exceeds the auto-recovery cap of ${limits.maxExposurePaise}`;
+    return { outcome: "clamp", action: escalate(detail), rule: "exposure_cap", detail };
   }
 
   if (movesMoney && ctx.confidence < limits.minConfidence) {
-    return {
-      outcome: "clamp",
-      action: escalate(`confidence ${ctx.confidence} below auto-recovery floor ${limits.minConfidence}`),
-      reason: "low_confidence",
-    };
+    const detail = `confidence ${ctx.confidence} is below the auto-recovery floor of ${limits.minConfidence}`;
+    return { outcome: "clamp", action: escalate(detail), rule: "low_confidence", detail };
   }
 
   if (movesMoney && ctx.hoursSinceLastAttempt !== null && ctx.hoursSinceLastAttempt < limits.cooldownHours) {
-    return { outcome: "skip", reason: `cooldown: ${ctx.hoursSinceLastAttempt.toFixed(1)}h < ${limits.cooldownHours}h` };
+    const detail = `${ctx.hoursSinceLastAttempt.toFixed(1)}h since the last attempt, below the ${limits.cooldownHours}h cooldown`;
+    return { outcome: "skip", rule: "cooldown", detail };
   }
 
   return { outcome: "allow", action: proposal };

@@ -36,13 +36,20 @@ CREATE TABLE IF NOT EXISTS recovery_cases (
   ground_truth        JSONB,               -- eval only
   lane                TEXT NOT NULL DEFAULT 'INCOMING' CHECK (lane IN (
                         'INCOMING','DIAGNOSING','DECIDING','ATTEMPTING',
-                        'RECOVERED','RETRY_SCHEDULED','ESCALATED','WRITTEN_OFF')),
+                        'RECOVERED','RETRY_SCHEDULED','ESCALATED','WRITTEN_OFF','STOPPED')),
   recovered_paise     BIGINT NOT NULL DEFAULT 0,   -- summed from real captures only
   created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_cases_run ON recovery_cases (run_id);
 CREATE INDEX IF NOT EXISTS idx_cases_lane ON recovery_cases (lane);
+
+-- Widens the lane CHECK for a table that already existed before STOPPED was added — the inline
+-- CHECK above only applies to a table created fresh. Idempotent: safe to re-run.
+ALTER TABLE recovery_cases DROP CONSTRAINT IF EXISTS recovery_cases_lane_check;
+ALTER TABLE recovery_cases ADD CONSTRAINT recovery_cases_lane_check CHECK (lane IN (
+  'INCOMING','DIAGNOSING','DECIDING','ATTEMPTING',
+  'RECOVERED','RETRY_SCHEDULED','ESCALATED','WRITTEN_OFF','STOPPED'));
 
 CREATE TABLE IF NOT EXISTS recovery_attempts (
   id              UUID PRIMARY KEY,

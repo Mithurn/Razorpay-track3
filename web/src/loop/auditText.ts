@@ -48,9 +48,9 @@ export function auditSentence(row: AuditRow, limits: AuditLimits): AuditSentence
         };
       }
       if (outcome === "skip") {
-        return { text: `Safety gate — skipped this attempt (${p.reason})`, tone: "deny" };
+        return { text: `Safety gate — skipped this attempt (${p.detail})`, tone: "deny" };
       }
-      return { text: `Safety gate — clamped ${p.proposed} to ${p.applied} (${p.reason})`, tone: "deny" };
+      return { text: `Safety gate — clamped ${p.proposed} to ${p.applied} (${p.detail})`, tone: "deny" };
     }
 
     case "ATTEMPT_STARTED": {

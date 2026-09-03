@@ -13,7 +13,7 @@ export function GateNode({ data }: { data: GateNodeData }) {
         g.outcome === "allow" ? (
           <span className="sn__detail">passed {g.applied} unchanged</span>
         ) : g.outcome === "skip" ? (
-          <span className="sn__detail sn__detail--deny">skipped · {g.reason}</span>
+          <span className="sn__detail sn__detail--deny">skipped · {g.detail}</span>
         ) : (
           <span className="sn__detail sn__detail--deny">
             {g.proposed} → clamped to {g.applied}

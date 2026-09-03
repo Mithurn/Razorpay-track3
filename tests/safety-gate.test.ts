@@ -101,7 +101,7 @@ describe("safetyGate", () => {
     expect(result.outcome).toBe("clamp");
     if (result.outcome === "clamp") {
       expect(result.action.kind).toBe("ESCALATE");
-      expect(result.reason).toBe("risk_hold");
+      expect(result.rule).toBe("risk_hold");
     }
   });
 
@@ -128,7 +128,7 @@ describe("safetyGate", () => {
       expect(result.outcome).toBe("clamp");
       if (result.outcome === "clamp") {
         expect(result.action.kind).toBe("ESCALATE");
-        expect(result.reason).toBe("low_confidence");
+        expect(result.rule).toBe("low_confidence");
       }
     }
   });
@@ -177,6 +177,26 @@ describe("safetyGate", () => {
     const result = safetyGate(proposal, ctx);
     expect(result.outcome).toBe("allow");
     if (result.outcome === "allow") expect(result.action).toEqual(proposal);
+  });
+
+  it("carries a stable rule id separate from the human-readable detail, for every outcome", () => {
+    const passing: GateContext = {
+      case: buildCase(149900),
+      attemptNo: 1,
+      hoursSinceLastAttempt: null,
+      riskHold: false,
+      confidence: 1,
+    };
+    const allow = safetyGate({ kind: "RETRY_NOW" }, passing);
+    expect(allow.outcome).toBe("allow");
+
+    const clamp = safetyGate({ kind: "RETRY_NOW" }, { ...passing, riskHold: true });
+    expect(clamp).toMatchObject({ outcome: "clamp", rule: "risk_hold" });
+    if (clamp.outcome === "clamp") expect(typeof clamp.detail).toBe("string");
+
+    const skip = safetyGate({ kind: "RETRY_NOW" }, { ...passing, attemptNo: 2, hoursSinceLastAttempt: 1 });
+    expect(skip).toMatchObject({ outcome: "skip", rule: "cooldown" });
+    if (skip.outcome === "skip") expect(typeof skip.detail).toBe("string");
   });
 
   it("is pure — the same inputs give the same result and the context is not mutated", () => {
