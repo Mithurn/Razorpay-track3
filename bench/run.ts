@@ -47,12 +47,18 @@ async function main(): Promise<void> {
   const events = new PostgresEventLog(pool);
   const runs = new RunRepository(pool);
 
-  const razorpay = new RazorpayClient({
-    keyId: config.RAZORPAY_KEY_ID,
-    keySecret: config.RAZORPAY_KEY_SECRET,
-    webhookSecret: config.RAZORPAY_WEBHOOK_SECRET,
-  });
-  const downtimes = await razorpay.listDowntimes().catch(() => []);
+  // A --mock run replays recorded agent turns and never calls check_bank_downtime live, so it
+  // needs no Razorpay credentials at all — skip the call rather than relying on a placeholder
+  // key to fail gracefully against a real endpoint.
+  const downtimes = values.mock
+    ? []
+    : await new RazorpayClient({
+        keyId: config.RAZORPAY_KEY_ID,
+        keySecret: config.RAZORPAY_KEY_SECRET,
+        webhookSecret: config.RAZORPAY_WEBHOOK_SECRET,
+      })
+        .listDowntimes()
+        .catch(() => []);
   console.error(`loaded ${downtimes.length} live downtimes from Razorpay`);
 
   const armsToRun: Arm[] = values.arm ? [values.arm as Arm] : ALL_ARMS;

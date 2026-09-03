@@ -110,6 +110,7 @@ await registerRoutes(app, {
     limits: DEFAULT_LIMITS,
   },
   razorpayWebhookSecret: config.RAZORPAY_WEBHOOK_SECRET,
+  demoAccessToken: config.DEMO_ACCESS_TOKEN,
 });
 
 await app.listen({ port: config.PORT, host: "0.0.0.0" });

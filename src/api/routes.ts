@@ -1,6 +1,6 @@
-import { createHmac, randomUUID } from "node:crypto";
+import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { Queue } from "bullmq";
 import type { AttemptRepository, CaseRepository, EventLog } from "../domain/ports.js";
 import type { RunRepository } from "../persistence/run-repository.js";
@@ -30,6 +30,9 @@ export type RouteDeps = {
   verifyAppendOnly: () => Promise<AuditVerifyResult>;
   runtimeInfo: RuntimeInfo;
   razorpayWebhookSecret: string;
+  // Gates the mutating case routes. Not Razorpay's webhook route, which is HMAC-verified on its
+  // own terms — a bearer-token hook must never be applied there or real deliveries would 401.
+  demoAccessToken: string | undefined;
 };
 
 const decisionBody = z.object({
@@ -38,7 +41,20 @@ const decisionBody = z.object({
   note: z.string().max(500).optional(),
 });
 
+function requireAccessToken(token: string | undefined) {
+  return async (req: FastifyRequest, reply: FastifyReply) => {
+    const header = req.headers.authorization;
+    const provided = header?.startsWith("Bearer ") ? header.slice(7) : null;
+    const expected = Buffer.from(token ?? "");
+    const given = Buffer.from(provided ?? "");
+    if (!token || !provided || given.length !== expected.length || !timingSafeEqual(given, expected)) {
+      return reply.code(401).send({ error: "unauthorized" });
+    }
+  };
+}
+
 export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Promise<void> {
+  const requireAuth = { onRequest: requireAccessToken(deps.demoAccessToken) };
   app.get("/cases", async () => ({ cases: await deps.cases.listLive() }));
 
   app.get("/queue", async () => ({ cases: await deps.cases.listByLane("ESCALATED") }));
@@ -75,7 +91,7 @@ export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Pro
     return { events: await deps.events.forCase(q.data.caseId) };
   });
 
-  app.post("/cases/:id/recover", async (req, reply) => {
+  app.post("/cases/:id/recover", requireAuth, async (req, reply) => {
     const { id } = req.params as { id: string };
     if (!(await deps.cases.byId(id))) return reply.code(404).send({ error: "not found" });
     await enqueueRecovery(deps.queue, id);
@@ -86,7 +102,7 @@ export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Pro
   // tries to UPDATE recovery_events, expecting the database to refuse.
   app.get("/cases/:id/audit/verify", async () => deps.verifyAppendOnly());
 
-  app.post("/cases/:id/decision", async (req, reply) => {
+  app.post("/cases/:id/decision", requireAuth, async (req, reply) => {
     const { id } = req.params as { id: string };
     const body = decisionBody.safeParse(req.body);
     if (!body.success) return reply.code(400).send({ error: body.error.issues });
@@ -128,7 +144,7 @@ export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Pro
   // Demo aid: stands in for the customer completing payment on Razorpay's mock bank page. Builds
   // a real signed webhook for the pending order and runs it through the same handler a real
   // Razorpay delivery hits — the settle and ledger code paths are genuinely exercised.
-  app.post("/cases/:id/simulate-capture", async (req, reply) => {
+  app.post("/cases/:id/simulate-capture", requireAuth, async (req, reply) => {
     const { id } = req.params as { id: string };
     const kase = await deps.cases.byId(id);
     if (!kase) return reply.code(404).send({ error: "not found" });

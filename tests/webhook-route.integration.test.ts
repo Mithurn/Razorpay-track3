@@ -141,6 +141,7 @@ describe.runIf(adminUrl)("POST /webhooks/razorpay", () => {
         limits: { maxAttempts: 4, maxExposurePaise: 500000, cooldownHours: 6, minConfidence: 0.6 },
       },
       razorpayWebhookSecret: SECRET,
+      demoAccessToken: "test-token",
     });
   }
 
