@@ -49,14 +49,22 @@ export function App() {
   const describeError = (err: unknown) => (err instanceof Error ? err.message : "request failed");
 
   useEffect(() => {
-    runtimeConfig().then(setCfg).catch(() => undefined);
+    runtimeConfig()
+      .then(setCfg)
+      .catch((err) => console.warn("runtimeConfig failed, falling back to hardcoded limits:", err));
   }, []);
 
   const refresh = useCallback(async () => {
-    const [all, esc, sb] = await Promise.all([listCases(), queue(), scoreboard().catch(() => ({}))]);
-    setCases(all);
-    setEscalations(esc);
-    setBoard(sb);
+    try {
+      const [all, esc, sb] = await Promise.all([listCases(), queue(), scoreboard().catch(() => ({}))]);
+      setCases(all);
+      setEscalations(esc);
+      setBoard(sb);
+      setError(null);
+    } catch (err) {
+      // Keep the last-known lanes on screen rather than clearing them on a transient blip.
+      setError(describeError(err));
+    }
   }, []);
 
   useEffect(() => {
