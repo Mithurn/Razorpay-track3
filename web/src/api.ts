@@ -23,10 +23,17 @@ async function get<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+// Every caller of post() hits a route gated by DEMO_ACCESS_TOKEN on the server; the token is
+// exposed to the client under the VITE_ prefix Vite requires for env vars reaching the browser.
+const DEMO_ACCESS_TOKEN = import.meta.env.VITE_DEMO_ACCESS_TOKEN as string | undefined;
+
 async function post<T>(path: string, body?: unknown): Promise<T> {
+  const headers: Record<string, string> = {};
+  if (body !== undefined) headers["content-type"] = "application/json";
+  if (DEMO_ACCESS_TOKEN) headers.authorization = `Bearer ${DEMO_ACCESS_TOKEN}`;
   const res = await fetch(`${BASE}${path}`, {
     method: "POST",
-    headers: body === undefined ? undefined : { "content-type": "application/json" },
+    headers,
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (!res.ok) throw await readError(res, path);
