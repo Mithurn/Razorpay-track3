@@ -47,6 +47,7 @@ export const scoreboard = () =>
   get<Record<string, { summary: RunSummary }>>("/scoreboard").then((r) => ({
     agent: r.agent?.summary,
     fixed: r.fixed?.summary,
+    rules: r.rules?.summary,
   }));
 
 export const runtimeConfig = () => get<RuntimeConfig>("/config");

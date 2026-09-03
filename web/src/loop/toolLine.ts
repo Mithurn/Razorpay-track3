@@ -8,6 +8,7 @@ const ACT: Record<string, string> = {
   check_bank_downtime: "checking Razorpay downtime feed…",
   get_similar_resolved_cases: "looking up similar resolved cases…",
   get_this_case_prior_attempts: "checking this case's prior attempts…",
+  get_recovery_playbook: "checking the merchant's recovery playbook…",
 };
 
 export function actLine(name: string): string {
@@ -63,6 +64,11 @@ export function resultLine(name: string, raw: unknown): string {
     if (attempts.length === 0) return "→ no prior attempts on this payment";
     const last = rec(attempts[attempts.length - 1]);
     return `→ ${attempts.length} prior · last ${last.action ?? "?"} ${last.outcome ?? ""}`.trim();
+  }
+
+  if (name === "get_recovery_playbook") {
+    const playbook = Array.isArray(o.playbook) ? o.playbook.length : 0;
+    return `→ ${playbook} default move${playbook === 1 ? "" : "s"} on file`;
   }
 
   return `→ ${name} done`;

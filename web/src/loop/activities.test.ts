@@ -31,7 +31,7 @@ describe("deriveActivities", () => {
 
     const gate = activities[2]!;
     expect(gate.tone).toBe("clear");
-    expect(gate.summary).toContain("passed");
+    expect(gate.summary).toContain("within every limit");
 
     const execute = activities[3]!;
     expect(execute.status).toBe("done");
@@ -41,7 +41,7 @@ describe("deriveActivities", () => {
 
     const outcome = activities[4]!;
     expect(outcome.tone).toBe("clear");
-    expect(outcome.summary).toBe("recovered");
+    expect(outcome.summary).toBe("Recovered");
   });
 
   it("gives the guardrail clamp a deny tone and names the rule", () => {
@@ -71,7 +71,8 @@ describe("deriveActivities", () => {
     const outcome = activities.find((a) => a.kind === "outcome")!;
     expect(outcome.title).toBe("Stopped");
     expect(outcome.tone).toBe("deny");
-    expect(outcome.summary).toContain("user_requested");
+    expect(outcome.summary).toContain("your request");
+    expect(outcome.detail).toContainEqual({ label: "reason", value: "user_requested" });
   });
 
   it("starts a fresh investigate activity per re-plan attempt, not one merged block", () => {

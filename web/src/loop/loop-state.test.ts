@@ -35,7 +35,7 @@ describe("deriveLoopState", () => {
   it("walks INVESTIGATE → PROPOSE → GATE(allow) → EXECUTE → OUTCOME on a clean recovery", () => {
     const s = deriveLoopState([
       investigationStarted,
-      proposed("RETRY_SCHEDULED"),
+      proposed("RETRY_SCHEDULED", { toolCalls: 5 }),
       gate({ outcome: "allow", proposed: "RETRY_SCHEDULED", applied: "RETRY_SCHEDULED" }),
       { type: "ATTEMPT_STARTED", payload: {} },
       outcome({ status: "RECOVERED", razorpayRef: "order_abc", recoveredPaise: 149900 }),

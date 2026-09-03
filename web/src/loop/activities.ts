@@ -78,10 +78,12 @@ function newInvestigate(ev: RawEvent): Activity {
   };
 }
 
-function closeInvestigate(a: Activity): void {
+function closeInvestigate(a: Activity, reportedToolCalls?: number): void {
   a.status = "done";
-  const done = a.tools.filter((t) => t.status === "done").length;
-  a.summary = `${done} signal${done === 1 ? "" : "s"} checked`;
+  const traced = a.tools.filter((t) => t.status === "done").length;
+  // Live runs carry a per-tool trace; recorded batch cases only carry the count on the proposal.
+  const n = traced > 0 ? traced : (reportedToolCalls ?? 0);
+  a.summary = n > 0 ? `${n} signal${n === 1 ? "" : "s"} checked` : "no signals checked";
 }
 
 function newPropose(ev: RawEvent): Activity {
@@ -122,10 +124,24 @@ function newGate(ev: RawEvent): Activity {
   const tone: Tone = outcome === "allow" ? "clear" : "deny";
   const summary =
     outcome === "allow"
-      ? `passed · ${applied ?? proposed} unchanged`
+      ? "within every limit — proposal unchanged"
       : outcome === "skip"
         ? `skipped this attempt — ${rule} (${detailText})`
         : `clamped ${proposed} → ${applied} — ${rule}`;
+  const detail: DetailRow[] =
+    outcome === "allow"
+      ? [
+          { label: "outcome", value: "allow" },
+          { label: "checked", value: "attempt cap · exposure cap · risk hold · cooldown" },
+          { label: "action", value: applied ?? proposed },
+        ]
+      : [
+          { label: "outcome", value: outcome },
+          { label: "rule", value: rule ?? "—" },
+          { label: "detail", value: detailText ?? "—" },
+          { label: "proposed", value: proposed },
+          { label: "applied", value: applied ?? "—" },
+        ];
   return {
     id: `gate-${ev.at}`,
     kind: "gate",
@@ -135,13 +151,7 @@ function newGate(ev: RawEvent): Activity {
     startedAt: ev.at,
     endedAt: ev.at,
     summary,
-    detail: [
-      { label: "outcome", value: outcome },
-      { label: "rule", value: rule ?? "none — nothing fired" },
-      { label: "detail", value: detailText ?? "—" },
-      { label: "proposed", value: proposed },
-      { label: "applied", value: applied ?? "—" },
-    ],
+    detail,
     tools: [],
   };
 }
@@ -182,17 +192,23 @@ function closeExecute(a: Activity, ev: RawEvent): void {
       : status === "FAILED"
         ? `failed${p.detail ? ` — ${p.detail}` : ""}`
         : `awaiting settlement${ref ? ` · ${ref}` : ""}`;
-  a.detail.push(
-    { label: "status", value: status },
-    { label: "recovered", value: rupees(recoveredPaise) },
-    { label: "razorpay ref", value: ref ?? "—" },
-    { label: "detail", value: str(p.detail) ?? "—" },
-  );
+  a.detail.push({ label: "status", value: status });
+  if (recoveredPaise > 0) a.detail.push({ label: "recovered", value: rupees(recoveredPaise) });
+  if (ref) a.detail.push({ label: "razorpay ref", value: ref });
+  if (str(p.detail)) a.detail.push({ label: "detail", value: str(p.detail)! });
 }
 
-function newOutcome(ev: RawEvent): Activity {
+const LANE_VERB: Record<string, string> = {
+  RECOVERED: "Recovered",
+  ESCALATED: "Escalated to a human",
+  WRITTEN_OFF: "Written off",
+  STOPPED: "Stopped",
+};
+
+function newOutcome(ev: RawEvent, rationale?: string): Activity {
   const p = ev.payload;
   if (ev.type === "CASE_STOPPED") {
+    const reason = str(p.reason) ?? "user_requested";
     return {
       id: `outcome-${ev.at}`,
       kind: "outcome",
@@ -201,10 +217,10 @@ function newOutcome(ev: RawEvent): Activity {
       tone: "deny",
       startedAt: ev.at,
       endedAt: ev.at,
-      summary: `stopped — ${p.reason ?? "user_requested"}`,
+      summary: reason === "user_requested" ? "stopped on your request" : `stopped — ${reason}`,
       detail: [
-        { label: "reason", value: str(p.reason) ?? "—" },
-        { label: "note", value: str(p.note) ?? "—" },
+        { label: "reason", value: reason },
+        ...(str(p.note) ? [{ label: "note", value: str(p.note)! }] : []),
       ],
       tools: [],
     };
@@ -212,6 +228,9 @@ function newOutcome(ev: RawEvent): Activity {
   const lane = str(p.lane) ?? "";
   const via = str(p.via);
   const tone: Tone = lane === "RECOVERED" ? "clear" : lane === "ESCALATED" ? "wait" : "deny";
+  // The event itself carries no reason for escalate / write-off — the "why" is the agent's own
+  // diagnosis reasoning from the proposal that led here.
+  const why = str(p.reason) ?? (lane !== "RECOVERED" ? rationale : undefined);
   return {
     id: `outcome-${ev.at}`,
     kind: "outcome",
@@ -220,11 +239,11 @@ function newOutcome(ev: RawEvent): Activity {
     tone,
     startedAt: ev.at,
     endedAt: ev.at,
-    summary: `${lane.replace(/_/g, " ").toLowerCase()}${via ? ` · by ${via}` : ""}`,
+    summary: LANE_VERB[lane] ?? lane.replace(/_/g, " "),
     detail: [
-      { label: "lane", value: lane },
-      { label: "via", value: via ?? "agent" },
-      { label: "reason", value: str(p.reason) ?? "—" },
+      { label: "outcome", value: LANE_VERB[lane] ?? lane },
+      { label: "decided by", value: via ?? "agent" },
+      ...(why ? [{ label: "why", value: why }] : []),
     ],
     tools: [],
   };
@@ -287,7 +306,8 @@ export function deriveActivities(events: RawEvent[]): Activity[] {
 
       case "AGENT_PROPOSED":
       case "AGENT_DEGRADED":
-        if (current && current.status === "active" && current.kind === "investigate") closeInvestigate(current);
+        if (current && current.status === "active" && current.kind === "investigate")
+          closeInvestigate(current, num(ev.payload.toolCalls));
         push(newPropose(ev));
         break;
 
@@ -296,6 +316,10 @@ export function deriveActivities(events: RawEvent[]): Activity[] {
         break;
 
       case "ATTEMPT_STARTED":
+        // A repeated ATTEMPT_STARTED for an attempt already in flight (same attemptNo, no outcome
+        // yet) is not a new step — keep the one block rather than spawning a second, permanently
+        // "running" one.
+        if (currentExecute && currentExecute.status === "active") break;
         currentExecute = newExecute(ev);
         activities.push(currentExecute);
         current = currentExecute;
@@ -307,17 +331,34 @@ export function deriveActivities(events: RawEvent[]): Activity[] {
         break;
 
       case "CASE_RESOLVED":
-      case "CASE_STOPPED":
-        push(newOutcome(ev));
+      case "CASE_STOPPED": {
+        const proposal = lastOfKind(activities, "propose");
+        const rationale = proposal?.detail.find((d) => d.label === "reasoning")?.value;
+        push(newOutcome(ev, rationale && rationale !== "—" ? rationale : undefined));
         break;
+      }
 
       default:
         break; // CASE_LANE_CHANGED and CASE_CREATED are structural, not shown in the narrative stream
     }
   }
 
-  // A block still "active" with no explicit close (e.g. investigate cut short mid-run) gets a
-  // duration once we know it ended — filled in by the caller once the block's own end is known.
+  // Once the case has a terminal outcome, nothing is still running — force any block left
+  // "active" (a dropped stream, a malformed tape) to done so the UI never shows a phantom spinner
+  // under a resolved case.
+  const settled = activities.some((a) => a.kind === "outcome");
+  if (settled) {
+    for (const a of activities) {
+      if (a.status !== "active") continue;
+      if (a.kind === "investigate") closeInvestigate(a);
+      else {
+        a.status = "done";
+        if (!a.endedAt) a.endedAt = a.startedAt;
+        if (!a.summary) a.summary = "completed";
+      }
+    }
+  }
+
   return activities;
 }
 

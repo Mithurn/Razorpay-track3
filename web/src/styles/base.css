@@ -14,10 +14,29 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: var(--font-ui);
+  font-family: var(--font-sans);
   font-size: var(--text-base);
+  font-weight: var(--w-normal);
   line-height: var(--leading-body);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "cv11";
+}
+
+/* Financial metrics, counters, any numeric dashboard value */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+code,
+kbd,
+samp,
+pre {
+  font-family: var(--font-mono);
 }
 
 h1,
@@ -42,8 +61,9 @@ h2,
 h3,
 h4 {
   font-style: normal;
-  font-weight: 500;
+  font-weight: var(--w-semibold);
   line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-snug);
   text-wrap: balance;
 }
 
@@ -95,7 +115,7 @@ img {
 }
 
 .btn:hover:not(:disabled) {
-  border-color: var(--text);
+  border-color: var(--line-strong);
   color: var(--text);
 }
 
@@ -187,6 +207,26 @@ img {
   }
   to {
     transform: rotate(360deg);
+  }
+}
+
+.spin {
+  animation: spin 0.8s linear infinite;
+}
+
+.caret {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  background: var(--info);
+  animation: caret-blink 1s steps(1) infinite;
+}
+
+@keyframes caret-blink {
+  50% {
+    opacity: 0;
   }
 }
 

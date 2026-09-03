@@ -1,23 +1,33 @@
 :root {
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  /* One sans, one mono. Geist Sans = business/operator layer, Geist Mono = agent/machine layer.
+     No serif, no second sans, anywhere. */
+  --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --font-display: var(--font-sans);
 
-  --text-xs: 0.75rem;
-  --text-sm: 0.8125rem;
-  --text-base: 0.9375rem;
-  --text-md: 1.1875rem;
-  --text-lg: 1.5rem;
-  --text-xl: 1.875rem;
-  --text-2xl: 2.375rem;
-  --text-3xl: 3rem;
+  /* Type scale (rem @ 16px root) */
+  --text-2xs: 0.6875rem; /* 11 — dense IDs, badges */
+  --text-xs: 0.75rem; /* 12 — secondary metadata, normal technical data */
+  --text-sm: 0.8125rem; /* 13 — buttons, list labels */
+  --text-base: 0.875rem; /* 14 — body / supporting text */
+  --text-15: 0.9375rem; /* 15 — activity titles */
+  --text-md: 1.125rem; /* 18 — product & customer titles */
+  --text-lg: 1.25rem; /* 20 — primary financial metrics */
+  --text-xl: 1.5rem;
+  --text-2xl: 1.875rem;
+  --text-3xl: 2.375rem;
 
-  --leading-tight: 1.15;
-  --leading-snug: 1.35;
-  --leading-body: 1.55;
+  --w-normal: 400;
+  --w-medium: 500;
+  --w-semibold: 600;
 
-  --tracking-tight: -0.022em;
-  --tracking-snug: -0.012em;
+  --leading-tight: 1.2;
+  --leading-snug: 1.4;
+  --leading-body: 1.5;
+  --leading-mono: 1.5;
+
+  --tracking-tight: -0.02em;
+  --tracking-snug: -0.008em;
 
   --space-2xs: 4px;
   --space-xs: 8px;
@@ -47,34 +57,69 @@
    restrained accent. Measured from linear.app (see context/design.md), oklch-matched rather
    than pasted, so it holds together with our own status colors. */
 [data-surface="room"] {
-  --bg: oklch(7% 0.006 250);
-  --bg-raised: oklch(10% 0.007 250);
-  --bg-inset: oklch(4.5% 0.005 250);
-  --bg-overlay: oklch(13.5% 0.009 250);
+  /* Elevation ladder — depth from surface steps + borders, never shadow or gradient.
+     L0 root · L1 panels · L2 cards/interactive · L3 selected/active/overlay. */
+  --bg: oklch(7% 0.009 262); /* L0 */
+  --bg-raised: oklch(11% 0.01 262); /* L1 */
+  --bg-raised-2: oklch(15% 0.012 262); /* L2 */
+  --bg-overlay: oklch(19% 0.013 262); /* L3 */
+  --bg-inset: oklch(5% 0.007 262); /* wells: JSON blocks, code, deep audit */
 
-  --line: rgba(255, 255, 255, 0.07);
-  --line-strong: rgba(255, 255, 255, 0.14);
+  --line: rgba(255, 255, 255, 0.08); /* subtle — quiet dividers */
+  --line-strong: rgba(255, 255, 255, 0.16); /* default — card + control borders */
+  --line-accent: var(--accent); /* strong — selected / focused */
 
-  --text: oklch(95% 0.003 250);
-  --text-muted: oklch(68% 0.02 255);
-  --text-faint: oklch(50% 0.018 255);
+  /* every text/bg pair below clears WCAG AA (>=4.5:1) on --bg / --bg-raised */
+  --text: oklch(96% 0.004 262);
+  --text-muted: oklch(77% 0.02 265);
+  --text-faint: oklch(63% 0.021 265);
+  --text-disabled: oklch(48% 0.015 265);
+  --text-on-accent: oklch(99% 0 0); /* text over a solid accent / danger fill */
 
-  /* the one brand accent — indigo/violet, used sparingly (links, the primary CTA, active state) */
-  --accent: oklch(66% 0.16 285);
-  --accent-dim: oklch(28% 0.09 285);
+  --shadow-overlay: 0 16px 48px -12px rgba(0, 0, 0, 0.55); /* modals only — the one place depth needs a lift */
 
-  /* status colors carry real meaning, not decoration */
-  --clear: oklch(70% 0.17 150); /* recovered / passed / allow */
-  --clear-dim: oklch(28% 0.08 150);
-  --deny: oklch(66% 0.19 25); /* escalated / clamp / failed / stop */
-  --deny-dim: oklch(30% 0.1 25);
-  --wait: oklch(76% 0.13 75); /* pending / awaiting / skip */
-  --wait-dim: oklch(36% 0.06 75);
-  --info: oklch(70% 0.13 235); /* investigating / in progress */
-  --info-dim: oklch(28% 0.07 235);
+  /* the one brand accent — indigo/violet: selection, primary CTA, active navigation only */
+  --accent: oklch(67% 0.19 274);
+  --accent-hover: oklch(72% 0.19 274);
+  --accent-solid: oklch(58% 0.19 274);
+  --accent-surface: color-mix(in oklch, var(--accent) 16%, var(--bg-raised));
+  --accent-border: color-mix(in oklch, var(--accent) 42%, transparent);
+  --accent-dim: oklch(30% 0.1 274);
 
-  --radius: 8px;
-  --radius-sm: 5px;
+  /* Status families — foreground · strong · surface (low fill) · border.
+     Each maps to exactly one meaning, everywhere, never decoration. */
+  --clear: oklch(74% 0.17 155); /* success: recovered / passed / captured / allow */
+  --clear-strong: oklch(82% 0.17 155);
+  --clear-surface: color-mix(in oklch, var(--clear) 15%, var(--bg-raised));
+  --clear-border: color-mix(in oklch, var(--clear) 34%, transparent);
+  --clear-dim: oklch(30% 0.08 155);
+
+  --deny: oklch(70% 0.19 25); /* danger: failed / clamp / veto / emergency stop */
+  --deny-strong: oklch(78% 0.19 25);
+  --deny-surface: color-mix(in oklch, var(--deny) 15%, var(--bg-raised));
+  --deny-border: color-mix(in oklch, var(--deny) 34%, transparent);
+  --deny-dim: oklch(32% 0.1 25);
+
+  --wait: oklch(81% 0.13 80); /* warning: waiting on you / risk / pending / skip */
+  --wait-strong: oklch(86% 0.13 80);
+  --wait-surface: color-mix(in oklch, var(--wait) 14%, var(--bg-raised));
+  --wait-border: color-mix(in oklch, var(--wait) 32%, transparent);
+  --wait-dim: oklch(38% 0.07 80);
+
+  --info: oklch(73% 0.13 240); /* info: neutral system information */
+  --info-surface: color-mix(in oklch, var(--info) 14%, var(--bg-raised));
+  --info-border: color-mix(in oklch, var(--info) 32%, transparent);
+  --info-dim: oklch(30% 0.08 240);
+
+  --agent: oklch(72% 0.15 250); /* agent: live reasoning / active execution — "working now" */
+  --agent-strong: oklch(80% 0.16 250);
+  --agent-surface: color-mix(in oklch, var(--agent) 16%, var(--bg-raised));
+  --agent-border: color-mix(in oklch, var(--agent) 38%, transparent);
+  --agent-dim: oklch(30% 0.09 250);
+
+  --radius: 12px; /* large containers */
+  --radius-sm: 8px; /* small controls */
+  --radius-xs: 5px; /* audit rows, chips */
   --radius-full: 9999px;
   --font-ui: var(--font-sans);
   --font-prose: var(--font-sans);

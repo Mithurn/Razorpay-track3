@@ -99,15 +99,22 @@ export type RunSummary = {
   escalationRate: number;
   overNudges: number;
   overNudgeRate: number;
+  // null for an arm that never diagnoses (fixed, rules).
+  rootCauseAccuracy: number | null;
 };
 
 // GET /metrics — room-wide totals over live cases, computed fresh from recovery_cases. Never a
 // "recoverable" or "lift" claim: there is no live control arm to honestly compare against.
 export type RoomMetrics = {
   recoveredPaise: number;
+  // A real Razorpay capture — the only figure shown as "recovered" unqualified.
+  recoveredLivePaise: number;
+  // Bench/demo settlement — never touched Razorpay, always shown labelled.
+  recoveredSimulatedPaise: number;
   exposurePaise: number;
   liveCases: number;
   byLane: Partial<Record<Lane, number>>;
+  braked: boolean;
 };
 
 // GET /stream — the room-wide feed: every durable event across every case, tagged with which

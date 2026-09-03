@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { activityDurationMs, fmtDuration, resultFields, type Activity, type ToolEntry } from "./activities.js";
+import { ACTIVITY_ICON, Check, ChevronDown, ChevronRight } from "../ui/icons.js";
+import { motion, AnimatePresence, blockIn, Spinner, StreamingText } from "../ui/motion.js";
 
 // The hero: one chronological, collapsible list of what the agent did. Live narration streams
 // inside the active block; every finished block collapses to one sentence with a duration and a
@@ -32,27 +34,21 @@ export function ActivityStream({
 
   return (
     <ol className="activity-stream">
-      {activities.map((a) => (
-        <ActivityBlock
-          key={a.id}
-          activity={a}
-          isOpen={a.status === "active" || expanded.has(a.id)}
-          onToggle={() => toggle(a.id)}
-          liveNarration={a.status === "active" && a.kind === "investigate" ? liveNarration : ""}
-          liveStepStatus={a.status === "active" && a.kind === "investigate" ? liveStepStatus : null}
-        />
-      ))}
+      <AnimatePresence initial={false}>
+        {activities.map((a) => (
+          <ActivityBlock
+            key={a.id}
+            activity={a}
+            isOpen={a.status === "active" || expanded.has(a.id)}
+            onToggle={() => toggle(a.id)}
+            liveNarration={a.status === "active" && a.kind === "investigate" ? liveNarration : ""}
+            liveStepStatus={a.status === "active" && a.kind === "investigate" ? liveStepStatus : null}
+          />
+        ))}
+      </AnimatePresence>
     </ol>
   );
 }
-
-const KIND_TITLE_ICON: Record<Activity["kind"], string> = {
-  investigate: "◐",
-  propose: "◆",
-  gate: "▣",
-  execute: "▶",
-  outcome: "●",
-};
 
 function ActivityBlock({
   activity: a,
@@ -69,11 +65,14 @@ function ActivityBlock({
 }) {
   const duration = activityDurationMs(a);
   const canToggle = a.status === "done";
+  const Icon = ACTIVITY_ICON[a.kind];
+  const Chevron = isOpen ? ChevronDown : ChevronRight;
   return (
-    <li className={`act act--${a.tone} act--${a.status}`}>
+    <motion.li layout className={`act act--${a.tone} act--${a.status}`} {...blockIn}>
+      <span className={"act__rail" + (a.status === "active" ? " act__rail--active" : "")} aria-hidden />
       <button className="act__head" onClick={canToggle ? onToggle : undefined} disabled={!canToggle} aria-expanded={isOpen}>
         <span className="act__icon" aria-hidden>
-          {a.status === "active" ? <span className="act__spin">{KIND_TITLE_ICON[a.kind]}</span> : KIND_TITLE_ICON[a.kind]}
+          {a.status === "active" ? <Spinner size={15} /> : <Icon size={15} />}
         </span>
         <span className="act__title">{a.title}</span>
         {a.status === "done" && (
@@ -88,7 +87,7 @@ function ActivityBlock({
             step {liveStepStatus.step}/{liveStepStatus.budget} · {(liveStepStatus.elapsedMs / 1000).toFixed(1)}s
           </span>
         )}
-        {canToggle && <span className="act__chevron">{isOpen ? "▾" : "▸"}</span>}
+        {canToggle && <Chevron size={14} className="act__chevron" />}
       </button>
 
       {isOpen && (
@@ -100,11 +99,15 @@ function ActivityBlock({
               ))}
             </ul>
           )}
-          {liveNarration && <p className="act__narration">{liveNarration}</p>}
+          {liveNarration && (
+            <p className="act__narration">
+              <StreamingText text={liveNarration} />
+            </p>
+          )}
           {a.status === "done" && a.detail.length > 0 && <DetailTable rows={a.detail} />}
         </div>
       )}
-    </li>
+    </motion.li>
   );
 }
 
@@ -114,10 +117,12 @@ function ToolRow({ tool }: { tool: ToolEntry }) {
     <li className="tool-row">
       <button className="tool-row__head" onClick={() => tool.status === "done" && setOpen((v) => !v)}>
         <span className={"tool-row__mark" + (tool.status === "done" ? " tool-row__mark--done" : "")}>
-          {tool.status === "done" ? "✓" : "◌"}
+          {tool.status === "done" ? <Check size={12} /> : <Spinner size={11} />}
         </span>
         <span className="tool-row__label">{tool.label}</span>
-        {tool.source === "razorpay-live" && <span className="tool-row__live">razorpay · live</span>}
+        {tool.source === "razorpay-live" && (
+          <span className="tool-row__src tool-row__src--live">Razorpay live</span>
+        )}
         {tool.summary && <span className="tool-row__summary">{tool.summary}</span>}
       </button>
       {open && tool.status === "done" && (

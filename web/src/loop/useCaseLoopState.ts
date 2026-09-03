@@ -22,6 +22,7 @@ export const TOOL_LABELS: Record<string, string> = {
   check_bank_downtime: "downtime",
   get_similar_resolved_cases: "similar",
   get_this_case_prior_attempts: "prior",
+  get_recovery_playbook: "playbook",
 };
 const TOOL_ORDER = Object.keys(TOOL_LABELS);
 
