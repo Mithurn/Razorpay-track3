@@ -6,7 +6,8 @@ export type Lane =
   | "RECOVERED"
   | "RETRY_SCHEDULED"
   | "ESCALATED"
-  | "WRITTEN_OFF";
+  | "WRITTEN_OFF"
+  | "STOPPED";
 
 export type RecoveryCase = {
   id: string;
@@ -73,16 +74,17 @@ export type AuditEvent = {
   at: string;
 };
 
+export type DoneReason = "resolved" | "rescheduled" | "awaiting_settlement";
+
 export type StreamEvent =
   | { type: "open"; caseId: string }
+  | { type: "status"; lane: string; active: boolean }
   | { type: "reasoning"; text: string }
   | { type: "tool"; name: string }
   | ToolResultEvent
   | ProposalEvent
   | AuditEvent
-  | { type: "attempt"; status: string; recoveredPaise: number }
-  | { type: "lane"; lane: string }
-  | { type: "done"; lane: string };
+  | { type: "done"; lane: string; reason: DoneReason };
 
 export type RunSummary = {
   arm: string;

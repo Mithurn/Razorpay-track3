@@ -19,7 +19,7 @@ describe("deriveLoopState", () => {
 
   it("lights INVESTIGATE and the tool pills mid-run from live signals", () => {
     const s = deriveLoopState([investigationStarted], {
-      open: true,
+      running: true,
       tools: ["get_customer_payment_history", "check_bank_downtime"],
       toolResultCount: 1,
       reasoning: "checking history and downtime",
@@ -56,12 +56,12 @@ describe("deriveLoopState", () => {
     const s = deriveLoopState([
       investigationStarted,
       proposed("RETRY_NOW"),
-      gate({ outcome: "clamp", proposed: "RETRY_NOW", applied: "ESCALATE", reason: "risk_hold" }),
+      gate({ outcome: "clamp", proposed: "RETRY_NOW", applied: "ESCALATE", rule: "risk_hold", detail: "risk hold" }),
       { type: "ATTEMPT_STARTED", payload: {} },
       outcome({ status: "FAILED", razorpayRef: null, recoveredPaise: 0, detail: "escalated_to_human" }),
       resolved("ESCALATED"),
     ]);
-    expect(s.gate).toMatchObject({ outcome: "clamp", proposed: "RETRY_NOW", applied: "ESCALATE" });
+    expect(s.gate).toMatchObject({ outcome: "clamp", proposed: "RETRY_NOW", applied: "ESCALATE", rule: "risk_hold" });
     expect(s.stages.GATE).toBe("vetoed");
     expect(s.stages.OUTCOME).toBe("vetoed");
     expect(s.finalLane).toBe("ESCALATED");

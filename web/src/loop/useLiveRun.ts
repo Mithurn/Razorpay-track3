@@ -57,18 +57,32 @@ function drainThinking(state: Internal): Internal {
   };
 }
 
+// Opening a stream is not evidence that anything is running. A run is live only once the server
+// says the case is in flight, or an actual agent signal arrives — the stream carries no history,
+// so any of these means work is happening right now.
+function running(state: Internal): Internal {
+  return state.live ? state : { ...state, live: true, startedAt: state.startedAt ?? Date.now() };
+}
+
 function reduce(state: Internal, ev: StreamEvent): Internal {
   switch (ev.type) {
     case "open":
-      return { ...state, open: true, live: true, startedAt: state.startedAt ?? Date.now() };
+      return { ...state, open: true };
+
+    case "status":
+      return ev.active ? running(state) : state;
 
     case "reasoning":
-      return drainThinking({ ...state, reasoning: state.reasoning + ev.text, thinkBuffer: state.thinkBuffer + ev.text });
+      return drainThinking({
+        ...running(state),
+        reasoning: state.reasoning + ev.text,
+        thinkBuffer: state.thinkBuffer + ev.text,
+      });
 
     case "tool": {
       if (state.tools.includes(ev.name)) return state;
       return {
-        ...state,
+        ...running(state),
         tools: [...state.tools, ev.name],
         commentary: [...state.commentary, { id: state.nextId, kind: "act", text: actLine(ev.name) }],
         nextId: state.nextId + 1,
@@ -77,20 +91,31 @@ function reduce(state: Internal, ev: StreamEvent): Internal {
 
     case "tool_result":
       return {
-        ...state,
+        ...running(state),
         toolResults: [...state.toolResults, ev],
         commentary: [...state.commentary, { id: state.nextId, kind: "result", text: resultLine(ev.name, ev.raw) }],
         nextId: state.nextId + 1,
       };
 
     case "proposal":
-      return { ...state, proposal: ev, concludedAt: Date.now() };
+      return { ...running(state), proposal: ev, concludedAt: Date.now() };
 
-    case "audit":
-      return { ...state, audit: [...state.audit, ev] };
+    // Audit mirrors every appended event, including ones a webhook or a human decision raises on
+    // a case nobody is investigating. Only the turn's own opening event means a run just began.
+    case "audit": {
+      const next = ev.eventType === "INVESTIGATION_STARTED" ? running(state) : state;
+      return { ...next, audit: [...state.audit, ev] };
+    }
 
+    // Only a resolved case has a final lane; the other reasons end this turn with the case still
+    // open, and letting them set doneLane would draw a finished run that has not finished.
     case "done":
-      return { ...state, live: false, doneLane: ev.lane, concludedAt: state.concludedAt ?? Date.now() };
+      return {
+        ...state,
+        live: false,
+        doneLane: ev.reason === "resolved" ? ev.lane : state.doneLane,
+        concludedAt: state.concludedAt ?? Date.now(),
+      };
 
     default:
       return state;

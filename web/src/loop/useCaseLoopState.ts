@@ -27,9 +27,10 @@ const TOOL_ORDER = Object.keys(TOOL_LABELS);
 
 export type LoopGate = {
   outcome: "allow" | "clamp" | "skip";
+  rule?: string | null;
   proposed?: string;
   applied?: string;
-  reason?: string | null;
+  detail?: string | null;
 };
 
 export type LoopState = {
@@ -48,7 +49,7 @@ export type LoopState = {
 export type LoopEvent = { type: string; payload?: Record<string, unknown> };
 
 export type LiveSignals = {
-  open?: boolean;
+  running?: boolean;
   reasoning?: string;
   tools?: string[];
   toolResultCount?: number;
@@ -58,7 +59,7 @@ export type LiveSignals = {
 };
 
 const REPLAN_LANES = new Set(["RETRY_SCHEDULED"]);
-const TERMINAL_LANES = new Set(["RECOVERED", "ESCALATED", "WRITTEN_OFF"]);
+const TERMINAL_LANES = new Set(["RECOVERED", "ESCALATED", "WRITTEN_OFF", "STOPPED"]);
 
 function str(v: unknown): string | undefined {
   return typeof v === "string" ? v : undefined;
@@ -107,7 +108,7 @@ export function deriveLoopState(events: LoopEvent[], live: LiveSignals = {}): Lo
   const outcomeEvents = events.filter((e) => e.type === "ATTEMPT_OUTCOME");
   const lastOutcome = outcomeEvents.at(-1);
   const resolved = [...events].reverse().find((e) => e.type === "CASE_RESOLVED");
-  const started = investigations > 0 || live.open === true;
+  const started = investigations > 0 || live.running === true;
 
   s.replanCount = Math.max(0, investigations - 1);
 
@@ -150,7 +151,13 @@ export function deriveLoopState(events: LoopEvent[], live: LiveSignals = {}): Lo
   if (gateEvent) {
     const p = gateEvent.payload ?? {};
     const outcome = (str(p.outcome) ?? "allow") as LoopGate["outcome"];
-    s.gate = { outcome, proposed: str(p.proposed), applied: str(p.applied), reason: str(p.reason) ?? null };
+    s.gate = {
+      outcome,
+      rule: str(p.rule) ?? null,
+      proposed: str(p.proposed),
+      applied: str(p.applied),
+      detail: str(p.detail) ?? null,
+    };
     set("PROPOSE", degraded ? "failed" : "done");
     set("GATE", outcome === "allow" ? "done" : "vetoed");
   } else if (s.proposal) {

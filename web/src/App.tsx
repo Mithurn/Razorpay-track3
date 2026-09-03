@@ -324,7 +324,7 @@ function Stage({
   const attempt = detail?.attempts.at(-1);
 
   const loopState = deriveLoopState(events, {
-    open: run.open,
+    running: run.live,
     reasoning: run.reasoning,
     tools: run.tools,
     toolResultCount: run.toolResults.length,
