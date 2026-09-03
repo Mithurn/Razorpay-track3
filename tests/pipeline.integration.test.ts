@@ -9,6 +9,7 @@ import type { AgentProposal } from "../src/domain/recovery-action.js";
 import type { OutcomeResolver, OutcomeVerdict } from "../src/domain/ports.js";
 import type { GatewayOrder, GatewayPayment, GatewayPaymentLink, PaymentGateway } from "../src/domain/gateway.js";
 import { isRiskHold } from "../src/domain/case.js";
+import { LoggingNotifier } from "../src/execution/notifier.js";
 
 const adminUrl = process.env.ADMIN_DATABASE_URL;
 
@@ -69,6 +70,7 @@ describe.runIf(adminUrl)("RecoveryPipeline", () => {
     events: new PostgresEventLog(db),
     gateway: new FakeGateway(),
     outcomeResolver: new ScriptedResolver([{ kind: "pending" }]),
+    notifier: new LoggingNotifier(new PostgresEventLog(db)),
     clock: { now: () => now },
     riskHoldForCase: isRiskHold,
     runAgent: async () => proposal({}),
@@ -221,6 +223,7 @@ describe.runIf(adminUrl)("RecoveryPipeline", () => {
     const pipeline = new RecoveryPipeline(
       baseDeps({
         outcomeResolver: new ScriptedResolver([{ kind: "pending" }]),
+    notifier: new LoggingNotifier(new PostgresEventLog(db)),
         runAgent: async () => proposal({ action: { kind: "PAYMENT_LINK", rail: "card" } }),
       }),
     );
@@ -234,6 +237,7 @@ describe.runIf(adminUrl)("RecoveryPipeline", () => {
     const pipeline = new RecoveryPipeline(
       baseDeps({
         outcomeResolver: new ScriptedResolver([{ kind: "pending" }]),
+    notifier: new LoggingNotifier(new PostgresEventLog(db)),
         runAgent: async () => {
           agentRuns++;
           await new Promise((r) => setTimeout(r, 50));
@@ -265,6 +269,119 @@ describe.runIf(adminUrl)("RecoveryPipeline", () => {
     expect(events).toContain("AGENT_DEGRADED");
     const attempt = await new PostgresAttemptRepository(db).byCaseAndNo(caseId, 1);
     expect(attempt).not.toBeNull();
+
+    // The attempt row is an audit record. A loop that never reached a diagnosis must say so —
+    // it used to default to "technical", which the eval then scored as a correct diagnosis.
+    expect(attempt!.rootCause).toBeNull();
+    const { rows } = await db.query("SELECT root_cause FROM recovery_attempts WHERE case_id = $1", [caseId]);
+    expect(rows[0]!.root_cause).toBeNull();
+  });
+
+  // A nudge has no order and no link, so nothing can ever settle it. It used to sit PENDING and
+  // re-check every two hours forever. This drives it in the live shape — a resolver that only
+  // ever says "pending", exactly like RazorpayOutcomeResolver does for a nudge.
+  it("ends a nudge instead of re-checking it forever, and records that nothing was delivered", async () => {
+    await seed({ failureReason: "card_expired" });
+    const pipeline = new RecoveryPipeline(
+      baseDeps({
+        outcomeResolver: { resolve: async () => ({ kind: "pending" as const }) },
+        runAgent: async () => proposal({ action: { kind: "CUSTOMER_NUDGE", channel: "email" }, diagnosisRootCause: "hard_decline" }),
+        // 10:00 UTC is 15:30 IST — inside the RBI contact window, so the nudge is not skipped.
+      }),
+    );
+
+    const outcome = await pipeline.step(caseId);
+    expect(outcome.kind).not.toBe("awaiting_settlement");
+
+    const attempt = await new PostgresAttemptRepository(db).byCaseAndNo(caseId, 1);
+    expect(attempt?.status).toBe("FAILED");
+    expect(attempt?.detail).toContain("not observable");
+
+    const events = await new PostgresEventLog(db).forCase(caseId);
+    const queued = events.find((e) => e.type === "NUDGE_QUEUED");
+    expect(queued).toBeDefined();
+    // Nothing downstream may read this as a delivered message.
+    expect(queued!.payload).toMatchObject({ channel: "email", delivered: false });
+  });
+
+  // The escalation rail used to be a dead end: a human clicked, the agent re-ran, and the gate
+  // re-vetoed for the same reason the case escalated. These two pin the fix at both ends.
+  describe("human directive on an escalated case", () => {
+    async function directive(action: unknown): Promise<void> {
+      await new PostgresEventLog(db).append({
+        caseId,
+        type: "HUMAN_DIRECTIVE",
+        payload: { action, approver: "ops@acme.test", at: now.toISOString(), note: null },
+      });
+    }
+
+    it("performs the human's action on a risk hold the agent could never have retried, without re-running the agent", async () => {
+      await seed({ failureReason: "payment_risk_check_failed" });
+      await directive({ kind: "PAYMENT_LINK", rail: "card" });
+
+      let agentRan = false;
+      const pipeline = new RecoveryPipeline(
+        baseDeps({
+          runAgent: async () => {
+            agentRan = true;
+            return proposal({});
+          },
+        }),
+      );
+      await pipeline.step(caseId);
+
+      expect(agentRan).toBe(false);
+      const attempt = await new PostgresAttemptRepository(db).byCaseAndNo(caseId, 1);
+      expect(attempt?.action).toBe("PAYMENT_LINK");
+      // No model produced this, so there is no diagnosis to claim.
+      expect(attempt?.rootCause).toBeNull();
+
+      const types = (await new PostgresEventLog(db).forCase(caseId)).map((e) => e.type);
+      expect(types).toContain("AGENT_SKIPPED_HUMAN_DIRECTED");
+      expect(types).not.toContain("AGENT_PROPOSED");
+    });
+
+    // Regression: an ESCALATE attempt never touches Razorpay, but the cooldown clock used to
+    // start ticking from it anyway (a filter that checked only status, never the action's kind).
+    // A human directive issued right after an escalation would then get parked for
+    // cooldownHours regardless of what was decided — found live, driving the actual demo.
+    it("does not let the escalation itself arm the charge cooldown against the human's next move", async () => {
+      await seed({ failureReason: "payment_risk_check_failed" });
+      const gw = new FakeGateway();
+
+      // First turn: the agent escalates a risk hold, same as production. This attempt moves no
+      // money and must not count as "the last charge" for cooldown purposes.
+      const pipeline = new RecoveryPipeline(
+        baseDeps({ gateway: gw, runAgent: async () => proposal({ diagnosisRootCause: "risk_hold", action: { kind: "ESCALATE", reason: "risk" } }) }),
+      );
+      expect(await pipeline.step(caseId)).toEqual({ kind: "resolved", lane: "ESCALATED" });
+
+      // A human directs a payment link immediately after — no wall-clock gap at all.
+      await directive({ kind: "PAYMENT_LINK", rail: "card" });
+      const outcome = await pipeline.step(caseId);
+
+      expect(outcome.kind).not.toBe("reschedule");
+      expect(gw.orders).toBe(0); // a link, not an order
+      const attempt = await new PostgresAttemptRepository(db).byCaseAndNo(caseId, 2);
+      expect(attempt?.action).toBe("PAYMENT_LINK");
+    });
+
+    it("still refuses a hard decline the human tried to auto-reattempt", async () => {
+      await seed({ failureReason: "card_expired" });
+      await directive({ kind: "RETRY_NOW" });
+
+      const gw = new FakeGateway();
+      const pipeline = new RecoveryPipeline(
+        baseDeps({ gateway: gw, hardDeclineForCase: () => true, runAgent: async () => proposal({}) }),
+      );
+      const outcome = await pipeline.step(caseId);
+
+      // A card-network fine is not the merchant's to waive, authorization or not.
+      expect(outcome).toEqual({ kind: "resolved", lane: "ESCALATED" });
+      expect(gw.orders).toBe(0);
+      const attempt = await new PostgresAttemptRepository(db).byCaseAndNo(caseId, 1);
+      expect(attempt?.action).toBe("ESCALATE");
+    });
   });
 
   it("similarResolved returns settled attempts of earlier resolved cases with the same reason", async () => {

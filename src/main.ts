@@ -12,17 +12,18 @@ import { RunRepository } from "./persistence/run-repository.js";
 import { RazorpayClient } from "./execution/razorpay-client.js";
 import { RazorpayOutcomeResolver } from "./execution/razorpay-outcome-resolver.js";
 import { AttemptExecutor } from "./execution/attempt-executor.js";
+import { LoggingNotifier } from "./execution/notifier.js";
 import { WebhookHandler } from "./execution/webhook-handler.js";
 import { RecoveryPipeline, agentRunnerFor } from "./worker/pipeline.js";
 import { DEFAULT_LIMITS } from "./safety/safety-gate.js";
 import { resolveModel } from "./agent/model.js";
 import { checkModelHealth } from "./agent/model-health.js";
 import { createBudget, guardModel } from "./agent/budget.js";
-import { redisConnection, recoveryQueue, recoveryWorker } from "./worker/queue.js";
+import { redisConnection, recoveryQueue, recoveryWorker, enqueueRecovery } from "./worker/queue.js";
 import { makeProcessor } from "./worker/recovery-worker.js";
 import { startReconcileSweep } from "./worker/reconcile-sweep.js";
 import { systemClock } from "./domain/attempt.js";
-import { isRiskHold } from "./domain/case.js";
+import { isRiskHold, isHardDecline } from "./domain/case.js";
 import { CaseEventBus } from "./api/event-bus.js";
 import { registerRoutes } from "./api/routes.js";
 
@@ -47,7 +48,8 @@ const razorpay = new RazorpayClient({
   webhookSecret: config.RAZORPAY_WEBHOOK_SECRET,
 });
 const outcomeResolver = new RazorpayOutcomeResolver(razorpay);
-const executor = new AttemptExecutor(attempts, events, razorpay, outcomeResolver);
+const notifier = new LoggingNotifier(events);
+const executor = new AttemptExecutor(attempts, events, razorpay, outcomeResolver, notifier);
 
 const pipeline = new RecoveryPipeline({
   cases,
@@ -55,8 +57,10 @@ const pipeline = new RecoveryPipeline({
   events,
   gateway: razorpay,
   outcomeResolver,
+  notifier,
   clock: systemClock,
   riskHoldForCase: isRiskHold,
+  hardDeclineForCase: isHardDecline,
   similarCases: (kase, query) =>
     cases.similarResolved(kase.failureReason, {
       method: query.method ?? null,
@@ -82,7 +86,9 @@ const queue = recoveryQueue(connection);
 const worker = recoveryWorker(connection, makeProcessor(pipeline, queue, bus, events));
 const sweep = startReconcileSweep(attempts, cases, queue);
 
-const webhookHandler = new WebhookHandler(razorpay, webhooks, attempts, cases, events, executor);
+// The queue is bound here, in the composition root — the handler only sees the port.
+const enqueuer = { enqueue: (caseId: string) => enqueueRecovery(queue, caseId) };
+const webhookHandler = new WebhookHandler(razorpay, webhooks, attempts, cases, events, executor, enqueuer, config.MERCHANT_REF);
 
 const app = Fastify({ logger: true });
 // Keep the raw JSON bytes on the request so the Razorpay webhook HMAC verifies against exactly
@@ -92,7 +98,9 @@ app.addContentTypeParser("application/json", { parseAs: "string" }, (req, body, 
   try {
     done(null, body === "" ? undefined : JSON.parse(body as string));
   } catch (err) {
-    done(err as Error, undefined);
+    const parseError = err as Error & { statusCode?: number };
+    parseError.statusCode = 400;
+    done(parseError, undefined);
   }
 });
 app.get("/health", async () => ({ status: "ok" }));

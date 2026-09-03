@@ -14,6 +14,7 @@ import { type RecoveryJob } from "../src/worker/queue.js";
 import type { AgentProposal } from "../src/domain/recovery-action.js";
 import type { OutcomeResolver, OutcomeVerdict } from "../src/domain/ports.js";
 import type { GatewayOrder, GatewayPayment, GatewayPaymentLink, PaymentGateway } from "../src/domain/gateway.js";
+import { LoggingNotifier } from "../src/execution/notifier.js";
 
 // A test-only queue name so a dev worker running locally never steals these jobs.
 const RECOVERY_QUEUE = `recovery-test-${randomUUID().slice(0, 8)}`;
@@ -119,6 +120,7 @@ describe.runIf(adminUrl && redisUrl)("recovery worker end to end", () => {
       events: eventLog,
       gateway,
       outcomeResolver: resolver,
+      notifier: new LoggingNotifier(eventLog),
       clock: { now: () => new Date() },
       runAgent: async () => proposal,
     });

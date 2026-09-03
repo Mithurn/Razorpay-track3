@@ -64,6 +64,14 @@ export class PostgresCaseRepository implements CaseRepository {
     return rows.length ? toCase(rows[0] as Row) : null;
   }
 
+  async byOriginalPaymentId(paymentId: string): Promise<RecoveryCase | null> {
+    const { rows } = await this.db.query(
+      `SELECT ${COLUMNS} FROM recovery_cases WHERE original_payment_id = $1 ORDER BY created_at DESC LIMIT 1`,
+      [paymentId],
+    );
+    return rows.length ? toCase(rows[0] as Row) : null;
+  }
+
   async listByRun(runId: string): Promise<RecoveryCase[]> {
     const { rows } = await this.db.query(
       `SELECT ${COLUMNS} FROM recovery_cases WHERE run_id = $1 ORDER BY created_at`,
@@ -106,22 +114,51 @@ export class PostgresCaseRepository implements CaseRepository {
   }
 
   async metrics(): Promise<RoomMetrics> {
-    const { rows } = await this.db.query(
-      `SELECT lane,
-              count(*)::bigint AS n,
-              coalesce(sum(amount_paise), 0)::bigint AS amount,
-              coalesce(sum(recovered_paise), 0)::bigint AS recovered
-         FROM recovery_cases
-        WHERE run_id IS NULL
-        GROUP BY lane`,
-    );
-    const metrics: RoomMetrics = { recoveredPaise: 0, exposurePaise: 0, liveCases: 0, byLane: {} };
-    for (const row of rows as { lane: Lane; n: number; amount: number; recovered: number }[]) {
+    const [byLane, settlement] = await Promise.all([
+      this.db.query(
+        `SELECT lane,
+                count(*)::bigint AS n,
+                coalesce(sum(amount_paise), 0)::bigint AS amount,
+                coalesce(sum(recovered_paise), 0)::bigint AS recovered
+           FROM recovery_cases
+          WHERE run_id IS NULL
+          GROUP BY lane`,
+      ),
+      // `sim_`/`pay_sim_` settled_payment_id never touched Razorpay; everything else is a real capture.
+      this.db.query(
+        `SELECT
+           coalesce(sum(a.recovered_paise) FILTER (
+             WHERE a.settled_payment_id IS NOT NULL
+               AND a.settled_payment_id NOT LIKE 'sim\\_%' ESCAPE '\\'
+               AND a.settled_payment_id NOT LIKE 'pay\\_sim\\_%' ESCAPE '\\'
+           ), 0)::bigint AS live,
+           coalesce(sum(a.recovered_paise) FILTER (
+             WHERE a.settled_payment_id LIKE 'sim\\_%' ESCAPE '\\'
+                OR a.settled_payment_id LIKE 'pay\\_sim\\_%' ESCAPE '\\'
+           ), 0)::bigint AS simulated
+         FROM recovery_attempts a
+         JOIN recovery_cases c ON c.id = a.case_id
+        WHERE c.run_id IS NULL AND a.outcome = 'RECOVERED'`,
+      ),
+    ]);
+
+    const metrics: RoomMetrics = {
+      recoveredPaise: 0,
+      recoveredLivePaise: 0,
+      recoveredSimulatedPaise: 0,
+      exposurePaise: 0,
+      liveCases: 0,
+      byLane: {},
+    };
+    for (const row of byLane.rows as { lane: Lane; n: number; amount: number; recovered: number }[]) {
       metrics.byLane[row.lane] = row.n;
       metrics.liveCases += row.n;
       metrics.recoveredPaise += row.recovered;
       if (!TERMINAL_LANES.includes(row.lane)) metrics.exposurePaise += row.amount;
     }
+    const split = settlement.rows[0] as { live: number; simulated: number } | undefined;
+    metrics.recoveredLivePaise = split?.live ?? 0;
+    metrics.recoveredSimulatedPaise = split?.simulated ?? 0;
     return metrics;
   }
 

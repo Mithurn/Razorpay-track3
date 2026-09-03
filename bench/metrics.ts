@@ -22,6 +22,12 @@ export type ArmMetrics = {
   escalationRate: number;
   overNudges: number;
   overNudgeRate: number;
+  // null for an arm that never diagnoses (fixed, rules) — reported as "no diagnosis," not a
+  // misleading number computed from a fallback value that was never meant as a real answer.
+  rootCauseAccuracy: number | null;
+  // Cases whose first turn reached no diagnosis at all. Counted against rootCauseAccuracy rather
+  // than excluded from it: dropping them shrinks the denominator, which flatters the agent.
+  undiagnosed: number;
 };
 
 export type ExceptionRow = {
@@ -39,6 +45,13 @@ function moneyMoves(a: Attempt): boolean {
   return a.action !== "ESCALATE" && a.action !== "WRITE_OFF" && a.status !== "SKIPPED";
 }
 
+// Graded separately from the action taken — a lookup table can win the action-policy comparison
+// by construction, but has no concept of the cause at all. null means the loop degraded before
+// reaching a diagnosis, which is a miss, not an exemption.
+function firstAttemptRootCause(r: CaseRecord): string | null {
+  return r.attempts.find((a) => a.attemptNo === 1)?.rootCause ?? null;
+}
+
 export function scoreArm(arm: string, records: CaseRecord[]): ArmMetrics {
   const recovered = records.filter((r) => r.kase.lane === "RECOVERED");
   const escalated = records.filter((r) => r.kase.lane === "ESCALATED");
@@ -48,6 +61,13 @@ export function scoreArm(arm: string, records: CaseRecord[]): ArmMetrics {
   const hoursToRecovery = recovered
     .map((r) => r.simHoursToResolution)
     .filter((h): h is number => h !== null);
+
+  // fixed/rules never diagnose — null, not a fallback-coincidence number.
+  const rootCauseAccuracy =
+    arm === "agent"
+      ? div(records.filter((r) => firstAttemptRootCause(r) === r.groundTruth.trueCause).length, records.length)
+      : null;
+  const undiagnosed = records.filter((r) => firstAttemptRootCause(r) === null).length;
 
   return {
     arm,
@@ -68,6 +88,8 @@ export function scoreArm(arm: string, records: CaseRecord[]): ArmMetrics {
     escalationRate: div(escalated.length, records.length),
     overNudges: contacted.filter((r) => r.groundTruth.selfRecovers).length,
     overNudgeRate: div(contacted.filter((r) => r.groundTruth.selfRecovers).length, records.length),
+    rootCauseAccuracy,
+    undiagnosed,
   };
 }
 
@@ -99,10 +121,13 @@ export function formatReport(agent: ArmMetrics, fixed: ArmMetrics, exceptions: E
     row("recovered", (m) => String(m.recovered)),
     row("recovery rate", (m) => pct(m.recoveryRate)),
     row("₹ recovered (bench)", (m) => rupees(m.recoveredPaise)),
+    row("₹ recoverable (ceiling)", (m) => rupees(m.recoverablePaise)),
     row("mean attempts / recovery", (m) => m.meanAttemptsPerRecovery.toFixed(2)),
     row("mean hours to recovery", (m) => m.meanHoursToRecovery.toFixed(1)),
     row("escalation rate", (m) => pct(m.escalationRate)),
     row("over-nudge rate", (m) => pct(m.overNudgeRate)),
+    row("root-cause accuracy", (m) => (m.rootCauseAccuracy === null ? "— (no diagnosis)" : pct(m.rootCauseAccuracy))),
+    row("undiagnosed (degraded)", (m) => (m.rootCauseAccuracy === null ? "—" : `${m.undiagnosed}/${m.cases}`)),
     "",
     `exceptions (${exceptions.length}):`,
     ...exceptions.slice(0, 40).map((e) => `  ${e.customerRef}  ${e.failureReason}  ${e.lane}  — ${e.groundTruthNote}`),

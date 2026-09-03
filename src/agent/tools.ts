@@ -41,6 +41,49 @@ function matchesInstrument(d: Downtime, instrumentHint: string | null): boolean 
   return Object.values(d.instrument).some((v) => v.toUpperCase() === instrumentHint.toUpperCase());
 }
 
+function describeDowntime(d: Downtime) {
+  return { id: d.id, method: d.method, severity: d.severity, instrument: d.instrument, startedAt: d.begin };
+}
+
+// Data, not prose in the system prompt — the model must call get_recovery_playbook to see it.
+const PLAYBOOK: { rootCause: string; defaultAction: string; note: string }[] = [
+  {
+    rootCause: "soft_decline",
+    defaultAction: "RETRY_SCHEDULED",
+    note: "6-12h out. Clean-history customer, generic decline, no downtime — a recoverable payment, not a nudge or an escalation.",
+  },
+  {
+    rootCause: "insufficient_funds",
+    defaultAction: "RETRY_SCHEDULED",
+    note: "~48-72h out, timed toward when the customer historically has money. Escalating this wastes a recoverable payment.",
+  },
+  {
+    rootCause: "bank_downtime",
+    defaultAction: "RETRY_SCHEDULED",
+    note: "Past the downtime window (12-24h if severity is high). Never a nudge — the customer did nothing wrong.",
+  },
+  {
+    rootCause: "hard_decline",
+    defaultAction: "CUSTOMER_NUDGE",
+    note: "Card expired or blocked. A retry is pointless; the customer must act. If the merchant's record shows links on another rail recovering these, use PAYMENT_LINK instead.",
+  },
+  {
+    rootCause: "technical",
+    defaultAction: "RETRY_NOW",
+    note: "Transient technical failure. Use RETRY_SCHEDULED instead if a downtime window is open.",
+  },
+  {
+    rootCause: "risk_hold",
+    defaultAction: "ESCALATE",
+    note: "Risk-flagged or fraud-shaped pattern. Never auto-retry.",
+  },
+  {
+    rootCause: "unrecoverable",
+    defaultAction: "WRITE_OFF",
+    note: "Thin or failing history, an account that never funds, a decline that will not clear.",
+  },
+];
+
 export function buildTools(deps: AgentDeps) {
   return {
     get_customer_payment_history: tool({
@@ -53,30 +96,36 @@ export function buildTools(deps: AgentDeps) {
 
     check_bank_downtime: tool({
       description:
-        "Razorpay's live payment-downtime feed. Tells you whether the issuing bank or payment " +
-        "method behind this failure is currently degraded. A match means the decline is likely the " +
-        "bank, not the customer or the card.",
+        "Razorpay's live payment-downtime feed, checked against the specific issuing bank or VPA " +
+        "behind this failure. `matched` is true only when that exact instrument is degraded right " +
+        "now — real evidence the bank caused this decline, not the customer or the card. " +
+        "`methodWideOutages` lists any other active outage on the same payment method, on a " +
+        "different bank — background context, not evidence about this specific customer.",
       inputSchema: z.object({}),
       execute: async () => {
-        const all = await deps.gateway.listDowntimes();
-        const relevant = all.filter(
-          (d) =>
-            d.status === "started" &&
-            (d.method === deps.method || matchesInstrument(d, deps.instrumentHint)),
+        const active = (await deps.gateway.listDowntimes()).filter((d) => d.status === "started");
+        const issuerMatch = active.filter((d) => matchesInstrument(d, deps.instrumentHint));
+        const methodWideOutages = active.filter(
+          (d) => d.method === deps.method && !matchesInstrument(d, deps.instrumentHint),
         );
         return {
           method: deps.method,
           instrument: deps.instrumentHint,
-          activeDowntimes: relevant.map((d) => ({
-            id: d.id,
-            method: d.method,
-            severity: d.severity,
-            instrument: d.instrument,
-            startedAt: d.begin,
-          })),
-          matched: relevant.length > 0,
+          matched: issuerMatch.length > 0,
+          activeDowntimes: issuerMatch.map(describeDowntime),
+          methodWideOutages: methodWideOutages.map(describeDowntime),
         };
       },
+    }),
+
+    get_recovery_playbook: tool({
+      description:
+        "The merchant's default recovery move for each root cause — a starting point, not a " +
+        "verdict. Call this once you have a root-cause hypothesis, then decide whether the " +
+        "specific evidence you've gathered (history, downtime, similar cases, prior attempts) " +
+        "gives you a reason to deviate from it. State that reason if you do.",
+      inputSchema: z.object({}),
+      execute: async () => ({ playbook: PLAYBOOK }),
     }),
 
     get_similar_resolved_cases: tool({

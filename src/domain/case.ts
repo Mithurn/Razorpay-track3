@@ -56,3 +56,10 @@ export const RISK_CHECK_FAILURE_REASON = "payment_risk_check_failed";
 export function isRiskHold(kase: RecoveryCase): boolean {
   return kase.failureReason === RISK_CHECK_FAILURE_REASON;
 }
+
+// Card-itself declines — an automatic reattempt is what card networks fine merchants for.
+const HARD_DECLINE_FAILURE_REASONS: ReadonlySet<string> = new Set(["card_expired"]);
+
+export function isHardDecline(kase: RecoveryCase): boolean {
+  return HARD_DECLINE_FAILURE_REASONS.has(kase.failureReason);
+}

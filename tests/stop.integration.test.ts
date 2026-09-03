@@ -9,6 +9,7 @@ import { StopRegistry } from "../src/worker/stop-registry.js";
 import type { AgentProposal } from "../src/domain/recovery-action.js";
 import type { OutcomeResolver, OutcomeVerdict } from "../src/domain/ports.js";
 import type { GatewayOrder, GatewayPayment, GatewayPaymentLink, PaymentGateway } from "../src/domain/gateway.js";
+import { LoggingNotifier } from "../src/execution/notifier.js";
 
 const adminUrl = process.env.ADMIN_DATABASE_URL;
 
@@ -102,6 +103,7 @@ describe.runIf(adminUrl)("RecoveryPipeline stop", () => {
     events: new PostgresEventLog(db),
     gateway,
     outcomeResolver: new ScriptedResolver([{ kind: "pending" }]),
+    notifier: new LoggingNotifier(new PostgresEventLog(db)),
     clock: { now: () => new Date() },
     runAgent,
     stopRegistry,
@@ -245,6 +247,7 @@ describe("RecoveryPipeline.requestStopAll", () => {
       events: { append: async (e: unknown) => void appended.push(e), forCase: async () => [] } as never,
       gateway: new FakeGateway(),
       outcomeResolver: new ScriptedResolver([]),
+      notifier: { send: async () => ({ messageRef: "stub", delivered: false }) },
       clock: { now: () => new Date() },
       runAgent: async () => proposal,
     });

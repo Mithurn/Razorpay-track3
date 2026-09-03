@@ -1,5 +1,6 @@
 import { createHmac, randomUUID } from "node:crypto";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import type { Queue } from "bullmq";
 import { createPool, type Db } from "../src/persistence/pool.js";
 import { PostgresCaseRepository } from "../src/persistence/case-repository.js";
 import { PostgresAttemptRepository } from "../src/persistence/attempt-repository.js";
@@ -10,9 +11,13 @@ import { WebhookHandler } from "../src/execution/webhook-handler.js";
 import { RazorpayClient } from "../src/execution/razorpay-client.js";
 import type { OutcomeResolver, OutcomeVerdict } from "../src/domain/ports.js";
 import type { GatewayOrder, GatewayPayment, GatewayPaymentLink, PaymentGateway } from "../src/domain/gateway.js";
+import type { RecoveryJob } from "../src/worker/queue.js";
+import { LoggingNotifier } from "../src/execution/notifier.js";
+import type { CaseEnqueuer } from "../src/domain/ports.js";
 
 const adminUrl = process.env.ADMIN_DATABASE_URL;
 const SECRET = "whsec_test";
+const noopQueue: CaseEnqueuer = { enqueue: async () => undefined };
 
 class FakeGateway implements PaymentGateway {
   orderCreates = 0;
@@ -72,9 +77,9 @@ describe.runIf(adminUrl)("WebhookHandler", () => {
     const attempts = new PostgresAttemptRepository(db);
     const cases = new PostgresCaseRepository(db);
     const events = new PostgresEventLog(db);
-    const executor = new AttemptExecutor(attempts, events, new FakeGateway(), resolver);
+    const executor = new AttemptExecutor(attempts, events, new FakeGateway(), resolver, new LoggingNotifier(events));
     return {
-      handler: new WebhookHandler(client, new PostgresWebhookInbox(db), attempts, cases, events, executor),
+      handler: new WebhookHandler(client, new PostgresWebhookInbox(db), attempts, cases, events, executor, noopQueue, "merch_1"),
       attempts,
       cases,
     };
@@ -152,6 +157,32 @@ describe.runIf(adminUrl)("WebhookHandler", () => {
     expect((await cases.byId(caseId))!.recoveredPaise).toBe(149900);
   });
 
+  it("marks a real payment id's capture as not simulated", async () => {
+    await seedPendingAttempt();
+    const { handler } = build(new PaidOnceResolver());
+    await handler.handle(signed(capturedEvent()));
+    const tape = await new PostgresEventLog(db).forCase(caseId);
+    const outcome = tape.find((e) => e.type === "ATTEMPT_OUTCOME" && e.payload.via === "webhook");
+    expect(outcome?.payload.simulated).toBe(false);
+  });
+
+  it("marks a pay_sim_-prefixed capture (the demo's own button) as simulated", async () => {
+    await seedPendingAttempt();
+    const { handler } = build(new PaidOnceResolver());
+    const simEvent = {
+      event: "payment.captured",
+      payload: {
+        payment: { entity: { id: "pay_sim_abc123", order_id: orderRef, amount: 149900, status: "captured" } },
+      },
+    };
+    await handler.handle(signed(simEvent));
+    const tape = await new PostgresEventLog(db).forCase(caseId);
+    const outcome = tape.find((e) => e.type === "ATTEMPT_OUTCOME" && e.payload.via === "webhook");
+    expect(outcome?.payload.simulated).toBe(true);
+    const resolved = tape.find((e) => e.type === "CASE_RESOLVED");
+    expect(resolved?.payload.simulated).toBe(true);
+  });
+
   it("ignores a duplicate delivery of the same event id — no second credit", async () => {
     await seedPendingAttempt();
     const resolver = new PaidOnceResolver();
@@ -197,5 +228,69 @@ describe.runIf(adminUrl)("WebhookHandler", () => {
       }),
     );
     expect(res.status).toBe("unmatched");
+  });
+
+  const failedEvent = (paymentId: string) => ({
+    event: "payment.failed",
+    payload: {
+      payment: {
+        entity: {
+          id: paymentId,
+          amount: 99900,
+          status: "failed",
+          method: "card",
+          error_code: "BAD_REQUEST_ERROR",
+          error_reason: "card_declined",
+          email: "customer@example.com",
+          card: { issuer: "HDFC" },
+        },
+      },
+    },
+  });
+
+  it("ingests a payment.failed webhook into a new, queued case", async () => {
+    const { handler, cases } = build(new PaidOnceResolver());
+    const res = await handler.handle(signed(failedEvent("pay_fail_1")));
+    expect(res.status).toBe("ingested");
+    if (res.status !== "ingested") return;
+    caseId = res.caseId;
+
+    const kase = await cases.byId(res.caseId);
+    expect(kase).toMatchObject({
+      customerRef: "customer@example.com",
+      originalPaymentId: "pay_fail_1",
+      amountPaise: 99900,
+      failureReason: "card_declined",
+      method: "card",
+      instrument: { issuer: "HDFC" },
+      lane: "INCOMING",
+    });
+  });
+
+  it("does not create a second case for the same payment id, even on a fresh event id", async () => {
+    const { handler, cases } = build(new PaidOnceResolver());
+    const first = await handler.handle(signed(failedEvent("pay_fail_2")));
+    expect(first.status).toBe("ingested");
+    if (first.status !== "ingested") return;
+    caseId = first.caseId;
+
+    const second = await handler.handle(signed(failedEvent("pay_fail_2")));
+    expect(second).toEqual({ status: "ingested", caseId: first.caseId });
+
+    const all = await cases.listLive();
+    expect(all.filter((c) => c.originalPaymentId === "pay_fail_2")).toHaveLength(1);
+  });
+
+  it("ignores a redelivered payment.failed event id", async () => {
+    const { handler, cases } = build(new PaidOnceResolver());
+    const evt = signed(failedEvent("pay_fail_3"));
+    const first = await handler.handle(evt);
+    expect(first.status).toBe("ingested");
+    if (first.status !== "ingested") return;
+    caseId = first.caseId;
+
+    const redelivery = await handler.handle(evt);
+    expect(redelivery.status).toBe("duplicate");
+    expect((await cases.listLive()).filter((c) => c.originalPaymentId === "pay_fail_3")).toHaveLength(1);
   });
 });

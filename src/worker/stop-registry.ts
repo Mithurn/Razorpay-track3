@@ -29,4 +29,9 @@ export class StopRegistry {
   check(caseId: string): StopRequest | null {
     return this.global ?? this.perCase.get(caseId) ?? null;
   }
+
+  // Whether the room-wide emergency brake is currently engaged.
+  isBraked(): boolean {
+    return this.global !== null;
+  }
 }

@@ -65,6 +65,41 @@ describe.runIf(adminUrl)("CaseRepository.metrics", () => {
     expect((after.byLane.RECOVERED ?? 0) - (before.byLane.RECOVERED ?? 0)).toBe(1);
   });
 
+  it("splits recovered_paise into a real Razorpay capture and a simulated settlement, never blended", async () => {
+    const before = await repo.metrics();
+
+    const liveCase = randomUUID();
+    const simCase = randomUUID();
+    ids.push(liveCase, simCase);
+    await repo.create({ ...base, id: liveCase, amountPaise: 111_00 });
+    await repo.moveLane(liveCase, "INCOMING", "RECOVERED");
+    await repo.create({ ...base, id: simCase, amountPaise: 222_00 });
+    await repo.moveLane(simCase, "INCOMING", "RECOVERED");
+
+    await db.query(
+      `INSERT INTO recovery_attempts
+         (id, case_id, attempt_no, root_cause, action, idempotency_key, outcome, settled_payment_id, recovered_paise)
+       VALUES ($1, $2, 1, 'soft_decline', 'RETRY_NOW', $3, 'RECOVERED', $4, $5)`,
+      [randomUUID(), liveCase, `${liveCase}:1`, "pay_live_metrics_test", 111_00],
+    );
+    await db.query(
+      `INSERT INTO recovery_attempts
+         (id, case_id, attempt_no, root_cause, action, idempotency_key, outcome, settled_payment_id, recovered_paise)
+       VALUES ($1, $2, 1, 'soft_decline', 'RETRY_NOW', $3, 'RECOVERED', $4, $5)`,
+      [randomUUID(), simCase, `${simCase}:1`, `sim_${simCase}`, 222_00],
+    );
+    await db.query("UPDATE recovery_cases SET recovered_paise = recovered_paise + 111_00 WHERE id = $1", [liveCase]);
+    await db.query("UPDATE recovery_cases SET recovered_paise = recovered_paise + 222_00 WHERE id = $1", [simCase]);
+
+    const after = await repo.metrics();
+
+    expect(after.recoveredLivePaise - before.recoveredLivePaise).toBe(111_00);
+    expect(after.recoveredSimulatedPaise - before.recoveredSimulatedPaise).toBe(222_00);
+    expect(after.recoveredPaise - before.recoveredPaise).toBe(333_00);
+
+    await db.query("DELETE FROM recovery_attempts WHERE case_id = ANY($1::uuid[])", [[liveCase, simCase]]);
+  });
+
   it("excludes bench-run cases (run_id set) from live totals", async () => {
     const runId = randomUUID();
     await db.query(

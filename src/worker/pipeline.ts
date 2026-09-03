@@ -1,8 +1,16 @@
-import type { CaseRepository, AttemptRepository, EventLog, OutcomeResolver } from "../domain/ports.js";
+import { z } from "zod";
+import type { CaseRepository, AttemptRepository, EventLog, NotificationPort, OutcomeResolver } from "../domain/ports.js";
 import type { Lane, RecoveryCase } from "../domain/case.js";
 import type { Attempt, Clock } from "../domain/attempt.js";
 import type { AgentProposal, RecoveryAction } from "../domain/recovery-action.js";
-import { safetyGate, DEFAULT_LIMITS, type SafetyLimits, type GateContext } from "../safety/safety-gate.js";
+import { MOVES_MONEY, recoveryAction } from "../domain/recovery-action.js";
+import {
+  safetyGate,
+  DEFAULT_LIMITS,
+  msUntilContactWindowOpens,
+  type SafetyLimits,
+  type GateContext,
+} from "../safety/safety-gate.js";
 import { AttemptExecutor } from "../execution/attempt-executor.js";
 import type { PaymentGateway } from "../domain/gateway.js";
 import { runRecoveryAgent, type AgentConfig, type AgentEvents } from "../agent/recovery-agent.js";
@@ -21,6 +29,29 @@ export function agentRunnerFor(config: AgentConfig): AgentRunner {
 // One turn of the recovery loop for a single case: diagnose, gate, attempt, then say what
 // should happen next. Orchestration only; the decision rules are in safetyGate and the money
 // handling in the executor.
+
+// What a human chose on an escalated case. Parsed out of the append-only log, so it is validated
+// at the boundary like any other external input — a hand-written event row is untrusted.
+export const humanDirective = z.object({
+  action: recoveryAction,
+  approver: z.string().min(1),
+  at: z.string().datetime(),
+  note: z.string().max(500).nullable().optional(),
+});
+export type HumanDirective = z.infer<typeof humanDirective>;
+
+function directedProposal(d: HumanDirective): AgentProposal {
+  return {
+    action: d.action,
+    // No model ran, so there is no diagnosis to record and no confidence to score. Full
+    // confidence only so the gate's model-confidence floor does not apply to a human's decision.
+    diagnosisRootCause: null,
+    confidence: 1,
+    reasoning: `Directed by ${d.approver} on an escalated case${d.note ? `: ${d.note}` : "."}`,
+    toolCalls: 0,
+    degraded: false,
+  };
+}
 
 const HOUR_MS = 3_600_000;
 const DEFAULT_RESCHEDULE_HOURS = 12;
@@ -41,10 +72,12 @@ export type PipelineDeps = BuildDeps & {
   events: EventLog;
   gateway: PaymentGateway;
   outcomeResolver: OutcomeResolver;
+  notifier: NotificationPort;
   clock: Clock;
   runAgent: AgentRunner;
   limits?: SafetyLimits;
   riskHoldForCase?: (kase: RecoveryCase) => boolean;
+  hardDeclineForCase?: (kase: RecoveryCase) => boolean;
   stopRegistry?: StopRegistry;
 };
 
@@ -54,7 +87,7 @@ export class RecoveryPipeline {
   private readonly stopRegistry: StopRegistry;
 
   constructor(private readonly deps: PipelineDeps) {
-    this.executor = new AttemptExecutor(deps.attempts, deps.events, deps.gateway, deps.outcomeResolver);
+    this.executor = new AttemptExecutor(deps.attempts, deps.events, deps.gateway, deps.outcomeResolver, deps.notifier);
     this.limits = deps.limits ?? DEFAULT_LIMITS;
     this.stopRegistry = deps.stopRegistry ?? new StopRegistry();
   }
@@ -92,6 +125,11 @@ export class RecoveryPipeline {
   // already resolved to STOPPED — reviving one is a deliberate separate action, not built yet.
   resumeAll(): void {
     this.stopRegistry.resumeAll();
+  }
+
+  // Whether the room-wide emergency brake is engaged right now.
+  isBraked(): boolean {
+    return this.stopRegistry.isBraked();
   }
 
   // The worker's single entry point: settle anything parked from a prior turn, and only run a
@@ -145,20 +183,39 @@ export class RecoveryPipeline {
       payload: { attemptNo, activity: "investigate" },
     });
 
-    const agentDeps = await buildAgentDeps(kase, priorAttempts, this.deps);
-    const proposal = await this.deps.runAgent(agentDeps, agentEvents);
-    await this.deps.events.append({
-      caseId,
-      type: proposal.degraded ? "AGENT_DEGRADED" : "AGENT_PROPOSED",
-      payload: {
-        rootCause: proposal.diagnosisRootCause,
-        confidence: proposal.confidence,
-        action: proposal.action,
-        reasoning: proposal.reasoning,
-        toolCalls: proposal.toolCalls,
-        activity: "propose",
-      },
-    });
+    // A human who resolved this escalation has already decided. Re-running the agent would only
+    // re-derive the conclusion that escalated the case in the first place, so their action stands
+    // in for a proposal — and the gate still runs on it.
+    const directive = await this.pendingDirective(caseId, priorAttempts);
+    const proposal = directive
+      ? directedProposal(directive)
+      : await this.deps.runAgent(await buildAgentDeps(kase, priorAttempts, this.deps), agentEvents);
+
+    await this.deps.events.append(
+      directive
+        ? {
+            caseId,
+            type: "AGENT_SKIPPED_HUMAN_DIRECTED",
+            payload: {
+              action: proposal.action,
+              approver: directive.approver,
+              directedAt: directive.at,
+              activity: "propose",
+            },
+          }
+        : {
+            caseId,
+            type: proposal.degraded ? "AGENT_DEGRADED" : "AGENT_PROPOSED",
+            payload: {
+              rootCause: proposal.diagnosisRootCause,
+              confidence: proposal.confidence,
+              action: proposal.action,
+              reasoning: proposal.reasoning,
+              toolCalls: proposal.toolCalls,
+              activity: "propose",
+            },
+          },
+    );
 
     // Re-check after the agent call, which can run for tens of seconds: a stop requested while
     // it was in flight must land before the gate or the executor ever runs, not just before the
@@ -167,7 +224,7 @@ export class RecoveryPipeline {
     if (stopAfter) return this.stop(kase, stopAfter);
 
     await this.enter(kase, "DECIDING");
-    const gate = this.applyGate(kase, proposal, priorAttempts, attemptNo);
+    const gate = this.applyGate(kase, proposal, priorAttempts, attemptNo, directive);
     await this.deps.events.append({
       caseId,
       type: "GATE_APPLIED",
@@ -183,7 +240,7 @@ export class RecoveryPipeline {
     const attempt = await this.executor.execute({
       caseId,
       attemptNo,
-      rootCause: proposal.diagnosisRootCause ?? "technical",
+      rootCause: proposal.diagnosisRootCause,
       action: gate.action,
       reasoning: proposal.reasoning,
       amountPaise: kase.amountPaise,
@@ -196,15 +253,41 @@ export class RecoveryPipeline {
     return this.afterAttempt(kase, gate.action, attempt, attemptNo);
   }
 
-  private applyGate(kase: RecoveryCase, proposal: AgentProposal, prior: Attempt[], attemptNo: number) {
+  /**
+   * The newest human directive that no attempt has acted on yet. Read from the append-only log
+   * rather than a mutable column: the authorization is an audit fact first, and the pipeline
+   * input is the same record. Null once an attempt has been made since the directive landed.
+   */
+  private async pendingDirective(caseId: string, prior: Attempt[]): Promise<HumanDirective | null> {
+    const events = await this.deps.events.forCase(caseId);
+    const latest = events.filter((e) => e.type === "HUMAN_DIRECTIVE").at(-1);
+    if (!latest) return null;
+    const parsed = humanDirective.safeParse(latest.payload);
+    if (!parsed.success) return null;
+    const actedSince = prior.some((a) => Date.parse(a.createdAt) > Date.parse(latest.createdAt));
+    return actedSince ? null : parsed.data;
+  }
+
+  private applyGate(
+    kase: RecoveryCase,
+    proposal: AgentProposal,
+    prior: Attempt[],
+    attemptNo: number,
+    directive: HumanDirective | null,
+  ) {
     const ctx: GateContext = {
       case: kase,
       attemptNo,
+      humanAuthorization: directive ? { approver: directive.approver, at: directive.at } : null,
       hoursSinceLastAttempt: hoursSinceLastAttempt(prior, this.deps.clock),
+      hoursSinceLastContact: hoursSinceLastContact(prior, this.deps.clock),
       riskHold: proposal.diagnosisRootCause === "risk_hold" || (this.deps.riskHoldForCase?.(kase) ?? false),
+      hardDecline: proposal.diagnosisRootCause === "hard_decline" || (this.deps.hardDeclineForCase?.(kase) ?? false),
+      unrecoverableDiagnosis: proposal.diagnosisRootCause === "unrecoverable",
       // A degraded loop already fell back to the safe action; its zero confidence is a missing
       // diagnosis, not a weak one, and clamping it to ESCALATE would defeat degrade-to-safe.
       confidence: proposal.degraded ? 1 : proposal.confidence,
+      now: this.deps.clock.now(),
     };
     const result = safetyGate(proposal.action, ctx, this.limits);
 
@@ -219,7 +302,9 @@ export class RecoveryPipeline {
     };
 
     if (result.outcome === "skip") {
-      return { kind: "skip" as const, delayMs: this.limits.cooldownHours * HOUR_MS, reason: result.detail, event };
+      const delayMs =
+        result.rule === "contact_window" ? msUntilContactWindowOpens(ctx.now) : this.limits.cooldownHours * HOUR_MS;
+      return { kind: "skip" as const, delayMs, reason: result.detail, event };
     }
     return {
       kind: "act" as const,
@@ -298,8 +383,21 @@ function terminalLane(lane: Lane): TerminalLane {
   return lane as TerminalLane;
 }
 
+// Outreach only: a charge the customer never sees is not contact.
+const OUTREACH: ReadonlySet<RecoveryAction["kind"]> = new Set(["CUSTOMER_NUDGE", "PAYMENT_LINK"]);
+
+function hoursSinceLastContact(prior: Attempt[], clock: Clock): number | null {
+  const contacts = prior.filter((a) => OUTREACH.has(a.action) && a.status !== "SKIPPED");
+  const last = contacts.at(-1);
+  if (!last) return null;
+  return (clock.now().getTime() - Date.parse(last.createdAt)) / HOUR_MS;
+}
+
+// Named for what the gate actually paces: the last time Razorpay was genuinely called. An
+// ESCALATE or WRITE_OFF attempt never touched the bank and must not arm the charge cooldown —
+// it used to, via a filter that only checked SKIPPED and let ESCALATE through as if it were one.
 function hoursSinceLastAttempt(prior: Attempt[], clock: Clock): number | null {
-  const moneyMoves = prior.filter((a) => a.status !== "SKIPPED");
+  const moneyMoves = prior.filter((a) => MOVES_MONEY.has(a.action) && a.status !== "SKIPPED");
   const last = moneyMoves.at(-1);
   if (!last) return null;
   return (clock.now().getTime() - Date.parse(last.createdAt)) / HOUR_MS;

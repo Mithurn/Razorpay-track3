@@ -22,12 +22,22 @@ export class LanePublishingCaseRepository implements CaseRepository {
     return moved;
   }
 
-  create(newCase: NewCase): Promise<RecoveryCase> {
-    return this.inner.create(newCase);
+  async create(newCase: NewCase): Promise<RecoveryCase> {
+    const kase = await this.inner.create(newCase);
+    await this.events.append({
+      caseId: kase.id,
+      type: "CASE_CREATED",
+      payload: { failureReason: kase.failureReason, amountPaise: kase.amountPaise, merchantRef: kase.merchantRef },
+    });
+    return kase;
   }
 
   byId(id: string): Promise<RecoveryCase | null> {
     return this.inner.byId(id);
+  }
+
+  byOriginalPaymentId(paymentId: string): Promise<RecoveryCase | null> {
+    return this.inner.byOriginalPaymentId(paymentId);
   }
 
   listByRun(runId: string): Promise<RecoveryCase[]> {

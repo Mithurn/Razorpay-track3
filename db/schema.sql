@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS recovery_attempts (
   id              UUID PRIMARY KEY,
   case_id         UUID NOT NULL REFERENCES recovery_cases(id),
   attempt_no      INT NOT NULL,
-  root_cause      TEXT NOT NULL,
+  root_cause      TEXT,                   -- NULL = the investigation degraded before diagnosing
   action          TEXT NOT NULL CHECK (action IN (
                     'RETRY_NOW','RETRY_SCHEDULED','PAYMENT_LINK','CUSTOMER_NUDGE',
                     'ESCALATE','WRITE_OFF')),
@@ -74,9 +74,19 @@ CREATE TABLE IF NOT EXISTS recovery_attempts (
   resolved_at     TIMESTAMPTZ,
   UNIQUE (case_id, attempt_no)
 );
+-- A degraded investigation reaches no diagnosis. That has to be representable, or the write path
+-- has to invent a cause to satisfy NOT NULL — which is what it used to do, and it scored as a
+-- correct diagnosis in the eval. Idempotent: safe to re-run.
+ALTER TABLE recovery_attempts ALTER COLUMN root_cause DROP NOT NULL;
+
 CREATE INDEX IF NOT EXISTS idx_attempts_case ON recovery_attempts (case_id, attempt_no);
 CREATE INDEX IF NOT EXISTS idx_attempts_due ON recovery_attempts (scheduled_for)
   WHERE outcome IN ('PENDING','AWAITING_RECONCILIATION');
+-- Real Razorpay order/link ids are unique on their own, but nothing in the app enforced it —
+-- byRazorpayRef used to be able to return an arbitrary one of several attempts sharing a ref.
+-- A webhook naming that ref must resolve to exactly one attempt, never a guess.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_attempts_razorpay_ref ON recovery_attempts (razorpay_ref)
+  WHERE razorpay_ref IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS recovery_events (
   id         BIGSERIAL PRIMARY KEY,

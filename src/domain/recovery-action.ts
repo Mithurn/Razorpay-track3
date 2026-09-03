@@ -23,6 +23,18 @@ export type AgentProposal = {
   degraded: boolean;
 };
 
+/**
+ * The three actions that actually touch Razorpay. Everything that reasons about pacing —
+ * the exposure cap, the confidence floor, the retry cooldown — means "since the last one of
+ * these", never "since the last attempt of any kind." An ESCALATE or WRITE_OFF attempt is a
+ * record that no money moved; it must not reset a cooldown meant to pace charges against a bank.
+ */
+export const MOVES_MONEY: ReadonlySet<RecoveryAction["kind"]> = new Set([
+  "RETRY_NOW",
+  "RETRY_SCHEDULED",
+  "PAYMENT_LINK",
+]);
+
 // The safety gate may move an action up this ladder, never down.
 export const CAUTION_RANK: Record<RecoveryAction["kind"], number> = {
   RETRY_NOW: 0,

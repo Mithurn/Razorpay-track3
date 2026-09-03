@@ -12,7 +12,8 @@ export type AttemptStatus = "PENDING" | "RECOVERED" | "FAILED" | "SKIPPED" | "AW
 export type AttemptRequest = {
   caseId: string;
   attemptNo: number;
-  rootCause: RootCause;
+  /** null when the investigation never reached a diagnosis — a degraded loop records no cause. */
+  rootCause: RootCause | null;
   action: RecoveryAction;
   reasoning: string;
   amountPaise: number;
@@ -27,12 +28,16 @@ export type Attempt = {
   id: string;
   caseId: string;
   attemptNo: number;
+  rootCause: RootCause | null;
   action: RecoveryAction["kind"];
+  reasoning: string | null;
   idempotencyKey: string;
   razorpayRef: string | null;
   settledPaymentId: string | null;
   status: AttemptStatus;
   detail: string | null;
+  clamped: boolean;
+  clampReason: string | null;
   recoveredPaise: number;
   createdAt: string;
 };

@@ -15,10 +15,11 @@ const schema = z.object({
   // Default is a $0 free-tier model so an accidental run cannot spend. Override to
   // google/gemini-2.5-flash for the headline eval (still free-tier; guard with --cap-usd).
   AGENT_MODEL: z.string().default("minimax/minimax-m3:free"),
-  AGENT_MODEL_CHEAP: z.string().default("minimax/minimax-m3:free"),
   RAZORPAY_KEY_ID: z.string().min(1),
   RAZORPAY_KEY_SECRET: z.string().min(1),
   RAZORPAY_WEBHOOK_SECRET: z.string().min(1),
+  // One Razorpay account, one merchant, until real multi-tenancy exists.
+  MERCHANT_REF: z.string().default("acme_subscriptions"),
   AGENT_TIMEOUT_MS: z.coerce.number().int().positive().default(90_000),
   AGENT_STEP_BUDGET: z.coerce.number().int().positive().default(6),
   // Hard ceiling on model spend for the whole server process. The agent throws past this.

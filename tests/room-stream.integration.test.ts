@@ -30,14 +30,14 @@ async function withRoomStream(
     queue: {} as never,
     webhookHandler: {} as never,
     bus,
-    pipeline: { requestStop: async () => undefined, requestStopAll: async () => ({ stoppedNow: 0 }), resumeAll: () => undefined },
+    pipeline: { requestStop: async () => undefined, requestStopAll: async () => ({ stoppedNow: 0 }), resumeAll: () => undefined, isBraked: () => false },
     modelHealth: async () => ({ model: "test", reachable: true }),
     verifyAppendOnly: async () => ({ enforced: true, role: "recovery_app" }),
     runtimeInfo: {
       model: "test",
       deadlineMs: 90_000,
       stepBudget: 6,
-      limits: { maxAttempts: 4, maxExposurePaise: 500000, cooldownHours: 6, minConfidence: 0.6 },
+      limits: { maxAttempts: 4, maxExposurePaise: 500000, cooldownHours: 6, minConfidence: 0.6, contactCooldownHours: 24 },
     },
     razorpayWebhookSecret: "whsec_room_stream_test",
     demoAccessToken: undefined,
@@ -99,6 +99,7 @@ describe("room-wide stream", () => {
         exposurePaise: 1_499_00,
         liveCases: 62,
         byLane: { RECOVERED: 41, ESCALATED: 18, WRITTEN_OFF: 2, INCOMING: 1 },
+        braked: false,
       });
     });
   });

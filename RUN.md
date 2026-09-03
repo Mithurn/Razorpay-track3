@@ -31,11 +31,12 @@ npm run dev
 
 Open **http://localhost:5173**. You'll see:
 
-- **Header scoreboard** — the batch result: agent ₹62,459 (68% recovered, 28% to a human) vs the
-  fixed day-1/3/5/7 schedule ₹42,972 (47%, 53% to a human). See the README for the full
-  three-arm table, including the rules-table baseline that beats both.
-- **Case flow** — 41 recovered, 17 escalated, 2 written off, plus two fresh cases:
-  `cust_live_demo` and `cust_over_cap`.
+- **Header scoreboard** — the batch result: agent ₹60,458 (70% recovered, 30% to a human) vs the
+  fixed day-1/3/5/7 schedule ₹41,972 (47%, 53% to a human). See the README for the full
+  three-arm table, including the rules-table baseline and the root-cause accuracy row — the
+  action-policy numbers are close, not a clean win, and that's stated plainly there.
+- **Case flow** — 42 recovered, 18 escalated, plus two fresh cases: `cust_live_demo` and
+  `cust_over_cap`.
 - **Waiting on you** — the risk-hold escalations, with working retry / send-link / write-off buttons.
 
 Click any recovered case to see the agent's recorded reasoning, the tools it called, the root
@@ -83,5 +84,5 @@ either way. There's no `n120` cache checked in, so `--size` other than 60 needs 
 ## Tests
 
 ```bash
-npm test        # 112 tests; needs docker compose up
+npm test        # 176 tests; needs docker compose up
 ```

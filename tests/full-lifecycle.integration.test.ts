@@ -18,6 +18,7 @@ import type { OutcomeResolver, OutcomeVerdict } from "../src/domain/ports.js";
 import type { GatewayOrder, GatewayPayment, GatewayPaymentLink, PaymentGateway } from "../src/domain/gateway.js";
 import type { RecoveryJob } from "../src/worker/queue.js";
 import { isRiskHold } from "../src/domain/case.js";
+import { LoggingNotifier } from "../src/execution/notifier.js";
 
 // The other integration tests each prove one seam works against real Postgres. This proves the
 // seams are actually wired together the way main.ts wires them: a full turn through the same
@@ -191,6 +192,7 @@ describe.runIf(adminUrl)("full backend lifecycle: investigate -> tools -> diagno
       events: eventLog,
       gateway,
       outcomeResolver: new ScriptedResolver([{ kind: "recovered", capturedPaise: 149900, paymentId: "pay_lc_1" }]),
+      notifier: new LoggingNotifier(eventLog),
       clock: { now: () => new Date() },
       riskHoldForCase: isRiskHold,
       runAgent,
@@ -218,7 +220,7 @@ describe.runIf(adminUrl)("full backend lifecycle: investigate -> tools -> diagno
         model: "test",
         deadlineMs: 90_000,
         stepBudget: 6,
-        limits: { maxAttempts: 4, maxExposurePaise: 500_000, cooldownHours: 6, minConfidence: 0.6 },
+        limits: { maxAttempts: 4, maxExposurePaise: 500_000, cooldownHours: 6, minConfidence: 0.6, contactCooldownHours: 24 },
       },
       razorpayWebhookSecret: "whsec_full_lifecycle_test",
       demoAccessToken: undefined,

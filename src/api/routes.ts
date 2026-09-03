@@ -4,6 +4,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { Queue } from "bullmq";
 import type { AttemptRepository, CaseRepository, EventLog } from "../domain/ports.js";
 import { IN_FLIGHT_LANES } from "../domain/case.js";
+import type { RecoveryAction } from "../domain/recovery-action.js";
 import type { RunRepository } from "../persistence/run-repository.js";
 import type { WebhookHandler } from "../execution/webhook-handler.js";
 import type { CaseEventBus } from "./event-bus.js";
@@ -34,6 +35,7 @@ export type RouteDeps = {
     requestStop(caseId: string, request: StopRequest): Promise<void>;
     requestStopAll(request: StopRequest): Promise<{ stoppedNow: number }>;
     resumeAll(): void;
+    isBraked(): boolean;
   };
   modelHealth: () => Promise<{ model: string; reachable: boolean; detail?: string }>;
   verifyAppendOnly: () => Promise<AuditVerifyResult>;
@@ -49,6 +51,17 @@ const decisionBody = z.object({
   redirectTo: z.enum(["RETRY_NOW", "PAYMENT_LINK", "CUSTOMER_NUDGE"]).optional(),
   note: z.string().max(500).optional(),
 });
+
+// The demo authenticates with one shared bearer token, so there is no per-person identity to
+// record. Named plainly rather than invented: a real deployment puts the signed-in reviewer here.
+const SHARED_TOKEN_APPROVER = "demo-operator (shared token)";
+
+function directedAction(body: z.infer<typeof decisionBody>): RecoveryAction {
+  const kind = body.decision === "approve" ? "RETRY_NOW" : (body.redirectTo ?? "RETRY_NOW");
+  if (kind === "PAYMENT_LINK") return { kind, rail: "card" };
+  if (kind === "CUSTOMER_NUDGE") return { kind, channel: "email" };
+  return { kind: "RETRY_NOW" };
+}
 
 function requireAccessToken(token: string | undefined) {
   return async (req: FastifyRequest, reply: FastifyReply) => {
@@ -77,7 +90,7 @@ export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Pro
   // Room-wide totals over live cases, computed fresh from recovery_cases on every call — cheap
   // aggregate SQL, no caching layer. Not the batch scoreboard: no recovery-rate/lift claim here,
   // because there is no live control arm to compare against, only the recorded batch run.
-  app.get("/metrics", async () => deps.cases.metrics());
+  app.get("/metrics", async () => ({ ...(await deps.cases.metrics()), braked: deps.pipeline.isBraked() }));
 
   app.get("/cases/:id", async (req, reply) => {
     const { id } = req.params as { id: string };
@@ -155,18 +168,36 @@ export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Pro
     if (!kase) return reply.code(404).send({ error: "not found" });
     if (kase.lane !== "ESCALATED") return reply.code(409).send({ error: "case is not awaiting a decision" });
 
+    if (body.data.decision === "write_off") {
+      await deps.events.append({
+        caseId: id,
+        type: "CASE_RESOLVED",
+        payload: { via: "human", ...body.data, activity: "outcome" },
+      });
+      await deps.cases.moveLane(id, "ESCALATED", "WRITTEN_OFF");
+      return { applied: body.data.decision };
+    }
+
+    // Recorded before the case moves, so the directive is durably in the audit trail before any
+    // worker can pick the case up. The next pipeline turn reads it, performs exactly this action
+    // instead of re-running the agent, and carries the authorization into the gate — which still
+    // runs, and still refuses a hard decline or an attempt past the cap.
+    const action = directedAction(body.data);
     await deps.events.append({
       caseId: id,
-      type: "CASE_RESOLVED",
-      payload: { via: "human", ...body.data, activity: "outcome" },
+      type: "HUMAN_DIRECTIVE",
+      payload: {
+        action,
+        approver: SHARED_TOKEN_APPROVER,
+        at: new Date().toISOString(),
+        note: body.data.note ?? null,
+        decision: body.data.decision,
+        activity: "outcome",
+      },
     });
-    if (body.data.decision === "write_off") {
-      await deps.cases.moveLane(id, "ESCALATED", "WRITTEN_OFF");
-    } else {
-      await deps.cases.moveLane(id, "ESCALATED", "RETRY_SCHEDULED");
-      await enqueueRecovery(deps.queue, id);
-    }
-    return { applied: body.data.decision };
+    await deps.cases.moveLane(id, "ESCALATED", "RETRY_SCHEDULED");
+    await enqueueRecovery(deps.queue, id);
+    return { applied: body.data.decision, action: action.kind };
   });
 
   // The room-wide feed: every durable event across every case, so the top bar and case lists can
@@ -183,7 +214,7 @@ export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Pro
     // Subscribe before the initial metrics read, so an event landing during that read is not
     // missed between the snapshot and the first live frame.
     const unsubscribe = deps.bus.subscribeRoom(send);
-    send({ type: "metrics", ...(await deps.cases.metrics()) });
+    send({ type: "metrics", ...(await deps.cases.metrics()), braked: deps.pipeline.isBraked() });
     const keepAlive = setInterval(() => reply.raw.write(": ping\n\n"), 15_000);
     req.raw.on("close", () => {
       clearInterval(keepAlive);

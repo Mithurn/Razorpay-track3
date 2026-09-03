@@ -140,8 +140,29 @@ describe("investigation tools", () => {
     expect(out.matched).toBe(true);
   });
 
-  it("does not match an unrelated bank's downtime", async () => {
+  it("does not match an unrelated bank's downtime on an unrelated method", async () => {
     const tools = buildTools(deps([downtime({ instrument: { issuer: "HDFC" }, method: "netbanking" })]));
+    const out = (await tools.check_bank_downtime.execute!({}, {} as never)) as { matched: boolean };
+    expect(out.matched).toBe(false);
+  });
+
+  // Regression: this used to match on method alone, so any card outage matched every card case.
+  it("does not match a downtime on the same method when the issuer differs", async () => {
+    const tools = buildTools(deps([downtime({ instrument: { issuer: "PUNB" }, method: "card" })], { instrumentHint: "HDFC" }));
+    const out = (await tools.check_bank_downtime.execute!({}, {} as never)) as {
+      matched: boolean;
+      activeDowntimes: unknown[];
+      methodWideOutages: unknown[];
+    };
+    expect(out.matched).toBe(false);
+    expect(out.activeDowntimes).toHaveLength(0);
+    expect(out.methodWideOutages).toHaveLength(1);
+  });
+
+  it("has no issuer to check against and so never matches on method alone", async () => {
+    const tools = buildTools(
+      deps([downtime({ instrument: { issuer: "BKID" }, method: "card" })], { instrumentHint: null }),
+    );
     const out = (await tools.check_bank_downtime.execute!({}, {} as never)) as { matched: boolean };
     expect(out.matched).toBe(false);
   });
@@ -150,5 +171,19 @@ describe("investigation tools", () => {
     const tools = buildTools(deps([downtime({ status: "resolved" })]));
     const out = (await tools.check_bank_downtime.execute!({}, {} as never)) as { matched: boolean };
     expect(out.matched).toBe(false);
+  });
+});
+
+describe("recovery playbook tool", () => {
+  it("returns the merchant's default move for every root cause, as data the model must ask for", async () => {
+    const tools = buildTools(deps([]));
+    const out = (await tools.get_recovery_playbook.execute!({}, {} as never)) as {
+      playbook: { rootCause: string; defaultAction: string }[];
+    };
+    const rootCauses = out.playbook.map((p) => p.rootCause).sort();
+    expect(rootCauses).toEqual(
+      ["bank_downtime", "hard_decline", "insufficient_funds", "risk_hold", "soft_decline", "technical", "unrecoverable"].sort(),
+    );
+    expect(out.playbook.find((p) => p.rootCause === "risk_hold")?.defaultAction).toBe("ESCALATE");
   });
 });

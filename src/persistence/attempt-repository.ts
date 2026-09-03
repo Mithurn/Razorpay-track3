@@ -2,10 +2,12 @@ import { randomUUID } from "node:crypto";
 import type { AttemptRepository } from "../domain/ports.js";
 import type { Attempt, AttemptRequest, AttemptStatus } from "../domain/attempt.js";
 import type { RecoveryAction } from "../domain/recovery-action.js";
+import type { RootCause } from "../domain/failure.js";
 import type { Db } from "./pool.js";
 
-const COLUMNS = `id, case_id, attempt_no, action, idempotency_key, razorpay_ref,
-  settled_payment_id, outcome, outcome_detail, recovered_paise, created_at`;
+const COLUMNS = `id, case_id, attempt_no, root_cause, action, agent_reasoning, idempotency_key,
+  razorpay_ref, settled_payment_id, clamped, clamp_reason, outcome, outcome_detail,
+  recovered_paise, created_at`;
 
 type Row = Record<string, unknown>;
 
@@ -14,12 +16,16 @@ function toAttempt(row: Row): Attempt {
     id: row.id as string,
     caseId: row.case_id as string,
     attemptNo: row.attempt_no as number,
+    rootCause: (row.root_cause as RootCause | null) ?? null,
     action: row.action as RecoveryAction["kind"],
+    reasoning: (row.agent_reasoning as string | null) ?? null,
     idempotencyKey: row.idempotency_key as string,
     razorpayRef: (row.razorpay_ref as string | null) ?? null,
     settledPaymentId: (row.settled_payment_id as string | null) ?? null,
     status: row.outcome as AttemptStatus,
     detail: (row.outcome_detail as string | null) ?? null,
+    clamped: row.clamped as boolean,
+    clampReason: (row.clamp_reason as string | null) ?? null,
     recoveredPaise: row.recovered_paise as number,
     createdAt: (row.created_at as Date).toISOString(),
   };
@@ -72,7 +78,12 @@ export class PostgresAttemptRepository implements AttemptRepository {
 
   async byRazorpayRef(ref: string): Promise<Attempt | null> {
     const { rows } = await this.db.query(`SELECT ${COLUMNS} FROM recovery_attempts WHERE razorpay_ref = $1`, [ref]);
-    return rows.length ? toAttempt(rows[0] as Row) : null;
+    if (rows.length === 0) return null;
+    // Asserted, not assumed — a duplicate here would be a silent wrong-case credit.
+    if (rows.length > 1) {
+      throw new Error(`razorpay_ref ${ref} matches ${rows.length} attempts — the unique index is missing or violated`);
+    }
+    return toAttempt(rows[0] as Row);
   }
 
   async byCaseAndNo(caseId: string, attemptNo: number): Promise<Attempt | null> {

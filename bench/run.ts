@@ -7,7 +7,7 @@ import { PostgresAttemptRepository } from "../src/persistence/attempt-repository
 import { PostgresEventLog } from "../src/persistence/event-log.js";
 import { RunRepository } from "../src/persistence/run-repository.js";
 import { RecoveryPipeline, agentRunnerFor, type AgentRunner } from "../src/worker/pipeline.js";
-import { isRiskHold } from "../src/domain/case.js";
+import { isRiskHold, isHardDecline } from "../src/domain/case.js";
 import { resolveModel } from "../src/agent/model.js";
 import { createBudget, guardModel } from "../src/agent/budget.js";
 import { RazorpayClient } from "../src/execution/razorpay-client.js";
@@ -18,6 +18,7 @@ import { fixedScheduleRunner } from "./fixed-arm.js";
 import { rulesRunner } from "./rules-arm.js";
 import { recordingRunner, replayRunner } from "./mock-agent.js";
 import { scoreArm, exceptionList, formatReport, type CaseRecord } from "./metrics.js";
+import { LoggingNotifier } from "../src/execution/notifier.js";
 
 const MAX_TURNS = 12;
 const CONCURRENCY = 10;
@@ -143,8 +144,10 @@ async function driveCase(c: CorpusCase, deps: ArmDeps): Promise<number | null> {
     events: deps.events,
     gateway: new BenchGateway(deps.downtimes),
     outcomeResolver: resolver,
+    notifier: new LoggingNotifier(deps.events),
     clock: { now: () => clock.current },
     riskHoldForCase: isRiskHold,
+    hardDeclineForCase: isHardDecline,
     similarCases: (kase, query) =>
       deps.cases.similarResolved(kase.failureReason, {
         method: query.method ?? null,

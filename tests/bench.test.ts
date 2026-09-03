@@ -30,13 +30,32 @@ describe("corpus", () => {
     }
   });
 
-  it("includes matched pairs: a generic decline whose issuer is in a downtime window", () => {
+  it("includes matched pairs on both generic-decline reasons: same code, an issuer actually in a downtime window", () => {
     const corpus = generateCorpus({ runId: "r", size: 120, seed: 1 });
     const downPairs = corpus.filter(
-      (c) => c.failureReason === "payment_failed" && c.groundTruth!.note.includes("downtime"),
+      (c) =>
+        (c.failureReason === "payment_failed" || c.failureReason === "card_declined") &&
+        c.groundTruth!.note.includes("downtime window"),
     );
-    expect(downPairs.length).toBeGreaterThan(0);
+    expect(downPairs.length).toBeGreaterThanOrEqual(6);
     for (const c of downPairs) expect(["BKID", "PUNB", "CNRB", "CITI"]).toContain(c.instrument!.issuer);
+    expect(downPairs.some((c) => c.failureReason === "card_declined")).toBe(true);
+    expect(downPairs.some((c) => c.failureReason === "payment_failed")).toBe(true);
+  });
+
+  it("gives the two insufficient_funds templates a genuinely different history, not just a different count", () => {
+    const corpus = generateCorpus({ runId: "r", size: 120, seed: 1 });
+    const funds = corpus.filter((c) => c.failureReason === "insufficient_funds");
+    const recoverable = funds.filter((c) => c.groundTruth!.recoverable);
+    const lost = funds.filter((c) => !c.groundTruth!.recoverable);
+    expect(recoverable.length).toBeGreaterThan(0);
+    expect(lost.length).toBeGreaterThan(0);
+
+    const failureRate = (c: (typeof funds)[number]) =>
+      c.customerHistory.filter((p) => p.status === "failed").length / c.customerHistory.length;
+    const meanFailureRate = (rows: typeof funds) => rows.reduce((s, c) => s + failureRate(c), 0) / rows.length;
+
+    expect(meanFailureRate(lost)).toBeGreaterThan(meanFailureRate(recoverable) + 0.1);
   });
 
   it("marks some recoverable cases as would-self-recover (the over-nudge control)", () => {
@@ -49,9 +68,9 @@ describe("GroundTruthResolver", () => {
   const epoch = Date.parse("2026-09-01T00:00:00.000Z");
   const clock = (hours: number) => ({ now: () => new Date(epoch + hours * 3_600_000) });
   const truth = new Map<string, GroundTruth>([
-    ["c1", { recoverable: true, via: "RETRY", atHour: 12, selfRecovers: false, note: "downtime clears" }],
-    ["c2", { recoverable: false, via: null, atHour: null, selfRecovers: false, note: "lost" }],
-    ["c3", { recoverable: true, via: "CUSTOMER_NUDGE", atHour: 24, selfRecovers: false, note: "needs a new card" }],
+    ["c1", { recoverable: true, via: "RETRY", atHour: 12, selfRecovers: false, trueCause: "bank_downtime", note: "downtime clears" }],
+    ["c2", { recoverable: false, via: null, atHour: null, selfRecovers: false, trueCause: "unrecoverable", note: "lost" }],
+    ["c3", { recoverable: true, via: "CUSTOMER_NUDGE", atHour: 24, selfRecovers: false, trueCause: "hard_decline", note: "needs a new card" }],
   ]);
 
   it("does not recover before the ground-truth hour", async () => {
@@ -184,7 +203,7 @@ describe("metrics", () => {
   const record = (over: Partial<CaseRecord>): CaseRecord => ({
     kase: { lane: "RECOVERED", recoveredPaise: 149900, amountPaise: 149900, failureReason: "card_declined", customerRef: "c", failedAt: "2026-09-01T00:00:00.000Z" } as never,
     attempts: [{ action: "RETRY_SCHEDULED", status: "RECOVERED" } as never],
-    groundTruth: { recoverable: true, via: "RETRY", atHour: 8, selfRecovers: false, note: "x" },
+    groundTruth: { recoverable: true, via: "RETRY", atHour: 8, selfRecovers: false, trueCause: "soft_decline", note: "x" },
     simHoursToResolution: 8,
     ...over,
   });
@@ -196,7 +215,7 @@ describe("metrics", () => {
       record({
         kase: { lane: "RECOVERED", recoveredPaise: 49900, amountPaise: 49900, failureReason: "x", customerRef: "e", failedAt: "2026-09-01T00:00:00.000Z" } as never,
         attempts: [{ action: "CUSTOMER_NUDGE", status: "RECOVERED" } as never],
-        groundTruth: { recoverable: true, via: "CUSTOMER_NUDGE", atHour: 1, selfRecovers: true, note: "would have paid" },
+        groundTruth: { recoverable: true, via: "CUSTOMER_NUDGE", atHour: 1, selfRecovers: true, trueCause: "hard_decline", note: "would have paid" },
       }),
     ]);
     expect(m.recovered).toBe(2);

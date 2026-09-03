@@ -9,6 +9,7 @@ import type { OutcomeResolver, OutcomeVerdict } from "../src/domain/ports.js";
 import type { AttemptRequest } from "../src/domain/attempt.js";
 import type { GatewayOrder, GatewayPayment, GatewayPaymentLink, PaymentGateway } from "../src/domain/gateway.js";
 import { GatewayUnavailableError } from "../src/domain/gateway.js";
+import { LoggingNotifier } from "../src/execution/notifier.js";
 
 const adminUrl = process.env.ADMIN_DATABASE_URL;
 
@@ -90,6 +91,7 @@ describe.runIf(adminUrl)("AttemptExecutor", () => {
       new PostgresEventLog(db),
       gateway,
       resolver,
+      new LoggingNotifier(new PostgresEventLog(db)),
     );
 
   beforeAll(async () => {
@@ -183,6 +185,27 @@ describe.runIf(adminUrl)("AttemptExecutor", () => {
     const retried = await exec.execute(request());
     expect(retried.status).toBe("AWAITING_RECONCILIATION");
     expect(gw.orderCreates).toBe(0);
+  });
+
+  it("does not append a new ATTEMPT_OUTCOME event when a re-check finds nothing has changed", async () => {
+    await seedCase();
+    const gw = new FakeGateway();
+    gw.nextCreateThrows = new GatewayUnavailableError("timeout");
+    const exec = build(gw, new ScriptedResolver([]));
+    const repo = new PostgresAttemptRepository(db);
+    const events = new PostgresEventLog(db);
+
+    await exec.execute(request());
+    const parked = await repo.byCaseAndNo(caseId, 1);
+    expect(parked!.status).toBe("AWAITING_RECONCILIATION");
+
+    // Three more sweep-style re-checks, each finding the same still-unresolved state.
+    await exec.settle(parked!, 149900, { kind: "RETRY_NOW" });
+    await exec.settle(parked!, 149900, { kind: "RETRY_NOW" });
+    await exec.settle(parked!, 149900, { kind: "RETRY_NOW" });
+
+    const tape = await events.forCase(caseId);
+    expect(tape.filter((e) => e.type === "ATTEMPT_OUTCOME")).toHaveLength(1);
   });
 
   it("settles a parked attempt once the gateway shows a capture, crediting the ledger once", async () => {

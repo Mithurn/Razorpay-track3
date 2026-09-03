@@ -13,7 +13,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run --exclude '**/*.integration.test.ts'",
-    "db:schema": "docker compose exec -T postgres psql -U recovery -d recovery -f /docker-entrypoint-initdb.d/init.sql",
+    "db:schema": "docker compose exec -T postgres psql -U recovery -d recovery -v ON_ERROR_STOP=1 < db/schema.sql",
     "web:build": "vite build --config web/vite.config.ts",
     "api": "tsx watch --env-file-if-exists=.env src/main.ts",
     "seed:room": "tsx --env-file-if-exists=.env bench/seed-room.ts"
@@ -25,7 +25,10 @@
     "ai": "^7.0.89",
     "bullmq": "^5.34.0",
     "fastify": "^5.2.0",
+    "geist": "^1.7.2",
     "ioredis": "^5.4.2",
+    "lucide-react": "^1.40.0",
+    "motion": "^13.2.0",
     "pg": "^8.13.1",
     "zod": "^3.25.76"
   },

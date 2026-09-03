@@ -14,10 +14,17 @@ How to work:
   "card_declined") can be a soft decline that clears on a retry, an expired card that needs the
   customer to act, or the issuing bank being down right now. The signal that separates them is in
   the history, the downtime feed and the prior attempts, not in the code string.
+- check_bank_downtime only reports a match when the exact issuing bank or VPA behind this payment
+  is degraded. A downtime on a different bank for the same method is not evidence about this
+  customer — do not treat "the method has an outage somewhere" as "this card is affected."
 - Lean on the merchant's actual recovery record. get_similar_resolved_cases shows what was tried
   on declines like this one and what actually recovered the money and how fast. Narrow it by rail
   when the customer's method matters, and let it move your choice: if links on another rail
   recover most of these, that is the move, whatever a generic rule would say.
+- Once you have a root-cause hypothesis, call get_recovery_playbook to see the merchant's default
+  move for it. Treat it as a starting point, not a verdict: deviate when the history, the downtime
+  feed, the similar-case record or the prior attempts give you a specific reason to, and say that
+  reason in your reasoning when you deviate.
 - Two to four tool calls is normal. Do not stop at one, and do not keep gathering once the
   evidence points one way.
 - You have a small step budget. On your final step you must call submit_proposal.
@@ -40,34 +47,21 @@ The moves:
 - ESCALATE: hand to a human.
 - WRITE_OFF: stop, the payment is not recoverable.
 
-Default move per root cause — this is the playbook, not a lookup table. Start here, then deviate
-when the history, the downtime feed, the similar-case record or the prior attempts give you a
-specific reason to:
-- soft_decline (clean-history customer, generic decline, no downtime): RETRY_SCHEDULED in 6-12h.
-  A recoverable payment — not a nudge, not an escalation.
-- insufficient_funds (a customer who normally pays fine): RETRY_SCHEDULED ~48-72h, timed toward
-  when they historically have money. Escalating this wastes a recoverable payment.
-- bank_downtime (issuer or method in the downtime feed): RETRY_SCHEDULED past the window (12-24h
-  if severity is high). Never a nudge — the customer did nothing wrong.
-- card_expired / hard_decline / blocked card: CUSTOMER_NUDGE. A retry is pointless; the customer
-  must act. If the merchant's record shows links on another rail recovering these, PAYMENT_LINK.
-- technical / issuer_technical_error: RETRY_NOW, or RETRY_SCHEDULED if a downtime window is open.
-- payment_failed with the original rail stuck: PAYMENT_LINK on another rail.
-- risk_hold (risk-flagged, or a fraud-shaped pattern): ESCALATE. Never auto-retry.
-- unrecoverable (thin or failing history, an account that never funds, a decline that will not
-  clear): WRITE_OFF.
-
 Only ESCALATE when the payment is risk-flagged, or when the evidence genuinely does not point
 anywhere. "Not sure between a retry and a link" is not that — pick the retry. Do not escalate a
-case just because it is the safe-looking option; the playbook above has a real move for every
-root cause.
+case just because it is the safe-looking option; the playbook has a real move for every root
+cause.
 
 Root causes to classify into: hard_decline, insufficient_funds, bank_downtime, soft_decline,
 risk_hold, technical, unrecoverable.`;
 
+// The customer's identifier is deliberately absent. Live it is their email or phone number
+// (webhook-handler.ts derives customerRef from the Razorpay payment), and none of the reasoning
+// needs it — the agent works from history, downtime, similar cases and prior attempts. Nothing
+// identifying a customer is sent to a third-party model.
 export function caseBrief(kase: RecoveryCase, priorAttempts: number): string {
   return [
-    `Failed payment for merchant ${kase.merchantRef}, customer ${kase.customerRef}.`,
+    `Failed payment for merchant ${kase.merchantRef}.`,
     `Amount: ${(kase.amountPaise / 100).toFixed(2)} ${kase.currency}.`,
     `Razorpay error code: ${kase.failureCode}. Error reason: ${kase.failureReason}.`,
     `Failed at: ${kase.failedAt}.`,

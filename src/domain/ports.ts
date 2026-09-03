@@ -10,6 +10,30 @@ export interface EventLog {
   forCase(caseId: string): Promise<StoredEvent[]>;
 }
 
+/**
+ * Outbound customer contact. The one port with no real adapter in this build: CUSTOMER_NUDGE
+ * records that a message was queued and returns a reference, but nothing is delivered. Kept as a
+ * port rather than an inline no-op so the seam a WhatsApp/email provider plugs into is explicit,
+ * and so the executor cannot silently do nothing — see LoggingNotifier.
+ */
+export interface NotificationPort {
+  send(input: {
+    caseId: string;
+    channel: "email" | "sms";
+    amountPaise: number;
+    currency: string;
+  }): Promise<{ messageRef: string; delivered: boolean }>;
+}
+
+/**
+ * Hands a case back to the worker for another turn. A port so the adapter layers never hold a
+ * queue type: the webhook handler ingests a failed payment and needs it worked, but has no
+ * business knowing BullMQ exists.
+ */
+export interface CaseEnqueuer {
+  enqueue(caseId: string, opts?: { delay?: number }): Promise<void>;
+}
+
 export interface WebhookInbox {
   /** Returns false when this Razorpay event id was already recorded — a duplicate delivery. */
   recordIfNew(eventId: string, event: string, payload: unknown): Promise<boolean>;
@@ -72,8 +96,12 @@ export type SimilarCaseSummary = {
 };
 
 export type RoomMetrics = {
-  // Summed from recovered_paise, real captures only, live cases only — not a projection.
+  // Total across both buckets below — live cases only, never a projection.
   recoveredPaise: number;
+  // A real Razorpay capture. The only figure shown as "recovered" without qualification.
+  recoveredLivePaise: number;
+  // Bench/demo settlement — never touched Razorpay. Always shown labelled as simulated.
+  recoveredSimulatedPaise: number;
   // Money still in play: amountPaise of live cases not yet in a terminal lane. Not a claim about
   // how much of it is recoverable — there is no live ground truth to honestly say that.
   exposurePaise: number;
@@ -84,6 +112,7 @@ export type RoomMetrics = {
 export interface CaseRepository {
   create(newCase: NewCase): Promise<RecoveryCase>;
   byId(id: string): Promise<RecoveryCase | null>;
+  byOriginalPaymentId(paymentId: string): Promise<RecoveryCase | null>;
   listByRun(runId: string): Promise<RecoveryCase[]>;
   listLive(): Promise<RecoveryCase[]>;
   listByLane(lane: Lane): Promise<RecoveryCase[]>;

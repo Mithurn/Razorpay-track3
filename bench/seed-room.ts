@@ -10,14 +10,16 @@ import { generateCorpus, type GroundTruth } from "./corpus.js";
 import { GroundTruthResolver } from "./ground-truth-resolver.js";
 import { BenchGateway } from "./bench-gateway.js";
 import { fixedScheduleRunner } from "./fixed-arm.js";
+import { rulesRunner } from "./rules-arm.js";
 import { replayRunner } from "./mock-agent.js";
 import { scoreArm, type CaseRecord } from "./metrics.js";
 import { randomUUID } from "node:crypto";
-import { isRiskHold } from "../src/domain/case.js";
+import { isRiskHold, isHardDecline } from "../src/domain/case.js";
+import { LoggingNotifier } from "../src/execution/notifier.js";
 
 // Populates the live Recovery Room from recorded agent turns (free, no model calls). Leaves ~60
-// real cases in their final lanes with full event tapes so the UI opens onto a working room,
-// and writes an agent-vs-fixed run pair for the scoreboard.
+// real cases in their final lanes with full event tapes, and writes an agent/fixed/rules run
+// triple for the scoreboard.
 
 const SEED = 42;
 const SIZE = 60;
@@ -46,12 +48,12 @@ async function main(): Promise<void> {
 
   const agentRunner = replayRunner(cachePath);
 
-  for (const arm of ["agent", "fixed"] as const) {
+  for (const arm of ["agent", "fixed", "rules"] as const) {
     const runId = randomUUID();
     await runs.create(runId, arm, `${arm} · room seed`, { seed: SEED, size: SIZE });
     const corpus = generateCorpus({ runId: arm === "agent" ? null : runId, size: SIZE, seed: SEED });
     const truth = new Map<string, GroundTruth>(corpus.map((c) => [c.id, c.groundTruth]));
-    const runner = arm === "agent" ? agentRunner : fixedScheduleRunner;
+    const runner = arm === "agent" ? agentRunner : arm === "fixed" ? fixedScheduleRunner : rulesRunner;
 
     const records: CaseRecord[] = [];
     for (const c of corpus) {
@@ -65,8 +67,10 @@ async function main(): Promise<void> {
         events,
         gateway: new BenchGateway(downtimes),
         outcomeResolver: resolver,
+        notifier: new LoggingNotifier(events),
         clock: { now: () => clock.current },
         riskHoldForCase: isRiskHold,
+        hardDeclineForCase: isHardDecline,
         similarCases: (kase, query) =>
           cases.similarResolved(kase.failureReason, {
             method: query.method ?? null,
