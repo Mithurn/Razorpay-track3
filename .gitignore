@@ -17,3 +17,7 @@ test-results/
 *.png
 .env.bak-session
 
+# local working notes, not for the public repo — origin unclear, kept local-only on purpose
+/PROJECT_REVIEW.md
+bench/.cache/pre-corpus-v2-backup/
+
