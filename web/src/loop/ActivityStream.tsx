@@ -69,7 +69,7 @@ function ActivityBlock({
   const Icon = ACTIVITY_ICON[a.kind];
   const Chevron = isOpen ? ChevronDown : ChevronRight;
   return (
-    <motion.li layout className={`act act--${a.tone} act--${a.status}`} {...blockIn}>
+    <motion.li layout="position" className={`act act--${a.tone} act--${a.status}`} {...blockIn}>
       <span className={"act__rail" + (a.status === "active" ? " act__rail--active" : "")} aria-hidden />
       <button className="act__head" onClick={canToggle ? onToggle : undefined} disabled={!canToggle} aria-expanded={isOpen}>
         <span className="act__icon" aria-hidden>
