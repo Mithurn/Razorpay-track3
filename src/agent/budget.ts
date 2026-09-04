@@ -6,8 +6,12 @@ import type { LanguageModel } from "ai";
 
 export type BudgetState = { calls: number; estUsd: number; capUsd: number; costPerCallUsd: number };
 
-// Conservative: ~4k input + ~500 output per call on gemini-2.5-flash ($0.30 / $2.50 per M).
-// Deliberately rounded up so the cap trips early rather than late.
+// Calibrated against the real measured cost, not a token estimate: a 60-case run against
+// google/gemini-3.6-flash ran ~500 model calls for $1.20-1.35 (README), ~$0.0024-0.0027/call.
+// $0.0025 sits inside that range rather than under it, so the cap still trips before real spend
+// outruns it. Re-check against a fresh measured run before trusting this after a model or
+// pricing change — gemini-3.6-flash is currently $0.75/$3.75 per M input/output tokens direct
+// from AI Studio, not the OpenRouter margin this constant otherwise has no visibility into.
 export function createBudget(capUsd: number, costPerCallUsd = 0.0025): BudgetState {
   return { calls: 0, estUsd: 0, capUsd, costPerCallUsd };
 }
