@@ -53,9 +53,6 @@ export type GateContext = {
   humanAuthorization: HumanAuthorization | null;
 };
 
-/** Vetoes a recorded human authorization is allowed to satisfy. Deliberately short. */
-export const HUMAN_SATISFIABLE_RULES: ReadonlySet<GuardrailRule> = new Set(["risk_hold", "exposure_cap"]);
-
 // A stable identifier for which guardrail fired — the "rule name" half of the audit record.
 // `detail` (below) carries the human-readable specifics (the actual numbers involved); the two
 // are deliberately separate fields, not one interpolated string, so a caller can group or filter
