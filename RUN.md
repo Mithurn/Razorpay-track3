@@ -31,12 +31,13 @@ npm run dev
 
 Open **http://localhost:5173**. You'll see:
 
-- **Header scoreboard** — the batch result: agent ₹60,458 (70% recovered, 30% to a human) vs the
-  fixed day-1/3/5/7 schedule ₹41,972 (47%, 53% to a human). See the README for the full
-  three-arm table, including the rules-table baseline and the root-cause accuracy row — the
-  action-policy numbers are close, not a clean win, and that's stated plainly there.
-- **Case flow** — 42 recovered, 18 escalated, plus two fresh cases: `cust_live_demo` and
-  `cust_over_cap`.
+- **Header scoreboard** — the batch result: agent ₹52,967 (55.0% recovered) vs the fixed
+  day-1/3/5/7 schedule ₹31,480 (33.3%). See the README for the full three-arm table, including the
+  rules-table baseline (which the agent does *not* cleanly beat on money) and the root-cause
+  accuracy row it cannot produce — the action-policy numbers are close, sometimes a loss, and
+  that's stated plainly there.
+- **Case flow** — 33 recovered, 23 escalated, 4 written off, plus two fresh cases: `cust_live_demo`
+  and `cust_over_cap`.
 - **Waiting on you** — the risk-hold escalations, with working retry / send-link / write-off buttons.
 
 Click any recovered case to see the agent's recorded reasoning, the tools it called, the root
@@ -47,19 +48,24 @@ cause, the safety gate's ruling, the attempt outcome, and the full audit tape.
 Two fresh cases sit in `INCOMING`, each showing a different part of the safety story:
 
 - **`cust_live_demo`** → **"work this case now"**. The agent runs for real: its reasoning
-  streams token by token, it calls its tools, and it concludes with a proposal. Then click
-  **"customer completes payment →"** — that fires a real HMAC-signed webhook through the same
-  handler a live Razorpay delivery hits, and the case flips to **RECOVERED**. This capture is
-  self-signed, not sent by Razorpay — see the README's Honest caveat for exactly what that does
-  and doesn't prove, and why.
+  streams token by token, it calls its tools, and it concludes with a proposal. Once a real order
+  or payment link exists, **"Customer pays (Razorpay Checkout)"** opens Razorpay's real hosted
+  widget against it — completing it fires a genuinely Razorpay-signed webhook (needs a public
+  tunnel pointed at `/webhooks/razorpay` and registered in the Razorpay test-mode dashboard). No
+  tunnel running, or want the offline fallback instead: **"Simulate payment (no real charge)"**
+  builds a self-signed webhook through the exact same handler — signature verification, dedupe,
+  settle and ledger code genuinely exercised, but the payment id is always prefixed `pay_sim_` so
+  it's never mistaken for a live capture. See the README's "What's real, what's stubbed, what's
+  simulated" section for the full picture.
 - **`cust_over_cap`** — a ₹6,499 case, over the ₹5,000 auto-recovery exposure cap. Whatever the
   agent proposes, the safety gate clamps it to `ESCALATE` before any Razorpay call is made. Worth
   running to see the gate actually bind, not just claim to.
 
 Check `GET /model-health` (or the model line in the runtime config the UI reads from `/config`)
-before recording a live run — the default model (`minimax/minimax-m3:free`) is free but can be
-rate-limited or produce a malformed proposal mid-run, in which case the agent degrades to a safe
-scheduled retry rather than crashing. For a run that reliably concludes:
+before recording a live run — the default model (`minimax/minimax-m3:free`) is free but degrades
+on the majority of cases without the merchant playbook's timing hints (measured: 86.7% degrade
+rate, 8.3% root-cause accuracy on this corpus — see the README). For the model the headline eval
+actually uses:
 
 ```bash
 AGENT_MODEL=google/gemini-3.6-flash npm run dev   # needs GOOGLE_GENERATIVE_AI_API_KEY, a few cents
@@ -72,17 +78,21 @@ $0.50).
 
 ```bash
 npm run bench -- --size 60 --mock     # replays the recorded run, ~1s, free — agent, fixed, rules
-npm run bench -- --size 60            # a real agent run (guarded by --cap-usd, default $0.30)
+AGENT_MODEL=google/gemini-3.6-flash npm run bench -- --size 60 --cap-usd 3.00   # a real agent run
 npm run bench -- --arm rules --size 60 --mock   # just the rules-table baseline, no cache needed
 ```
 
-`--mock` replays the agent's recorded turns from `bench/.cache/agent-turns-seed42-n60.json` —
-only the agent arm needs that cache; `fixed` and `rules` are pure functions and run for free
-either way. There's no `n120` cache checked in, so `--size` other than 60 needs a real run first
-(costs a small amount against `--cap-usd`, or is free with `--arm fixed`/`--arm rules`).
+The bare `--cap-usd` default (30 cents) is calibrated for the zero-cost model, not the headline
+one — a real run on `google/gemini-3.6-flash` costs roughly $1.20–1.35 (~500 model calls across 60
+cases), so pass `--cap-usd` explicitly or the run trips its own budget guard partway through.
+
+`--mock` replays the agent's recorded turns from `bench/.cache/agent-turns-seed<N>-n60-<model>.json`
+— the cache is keyed by model as well as seed and size, so a different `AGENT_MODEL` needs its own
+recording first. Only the agent arm needs a cache; `fixed` and `rules` are pure functions and run
+for free either way.
 
 ## Tests
 
 ```bash
-npm test        # 176 tests; needs docker compose up
+npm test        # 209 tests; needs docker compose up
 ```

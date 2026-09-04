@@ -178,3 +178,153 @@ the redelivered event instead of trusting the dedupe alone.
 settles it. General rule: event-id dedupe on a settlement webhook has to be paired with a check
 that the thing it settles actually reached a terminal state, or a redelivery becomes
 indistinguishable from "already handled" when it's really "never finished."
+
+---
+
+## Our own headline metric was inflated by our own fallback constant
+
+**Expected:** a degraded investigation — one that never reached a diagnosis — leaves the root
+cause unrecorded. `domain/recovery-action.ts` says exactly that in a comment: "null when the loop
+degraded... never guessed."
+**Actual:** `worker/pipeline.ts` wrote `proposal.diagnosisRootCause ?? "technical"` into the
+attempt row one file away from that comment. The database column was `NOT NULL`, so a degraded
+proposal silently became a fabricated diagnosis of `"technical"`. In the published batch, 7 of 60
+first turns degraded with no diagnosis at all; 2 of them happened to land on cases whose real
+cause the corpus marks as `technical`, so they scored as *correct* diagnoses in the eval. The
+published root-cause accuracy, 71.7%, was inflated by a fallback value the agent never produced.
+**Why it's dangerous:** it's exactly the failure mode the codebase's own rules forbid — "never a
+fabricated RootCause" — reintroduced by one default operator, in the one place a wrong number
+would flatter the headline claim rather than cost it. A hostile reviewer who read the domain
+comment and then the pipeline file would find this in under a minute.
+**How diagnosed:** a final self-audit before submission, re-reading `pipeline.ts` against the
+invariants stated in its own neighboring files rather than trusting that the code matched them.
+**Fix:** `root_cause` is nullable end to end — the schema column, the domain type, the repository
+mapping, the pipeline write. `bench/metrics.ts` scores a null first-attempt cause as *not
+correct*, denominator unchanged, rather than excluding it (which would have flattered the number a
+different way). The honest figure on the same recorded turns dropped 71.7% → 68.3%, published as
+such, before the corpus was hardened and the agent re-recorded on a better model — see below.
+**Safeguard:** `tests/pipeline.integration.test.ts` asserts a degraded proposal's attempt row has
+`root_cause IS NULL`, reading the raw column, not just the mapped domain type.
+
+## The escalation rail was a dead end
+
+**Expected:** a human resolving a "waiting on you" case (retry / redirect / write off) changes
+what happens to that case next.
+**Actual:** `POST /cases/:id/decision` validated `redirectTo` with Zod, wrote it into the audit
+payload, and never read it again. Approve and redirect both did the identical thing —
+`ESCALATED → RETRY_SCHEDULED`, re-enqueue — which re-ran the agent, which reached the same
+conclusion that escalated the case the first time, which the gate vetoed again for the same
+reason. A human could click three different buttons on a risk-hold case and change nothing; only
+write-off actually did anything.
+**Why it's dangerous:** the track's bar explicitly names "compliant escalation" as a graded
+clause. A control that visibly exists but silently does nothing is worse than not having it —
+it implies a human-in-the-loop safeguard that isn't there.
+**Fix:** the decision route now records a `HUMAN_DIRECTIVE` event — the chosen action, an
+approver identity, a timestamp — in the append-only log before moving the case. The pipeline reads
+the newest undischarged directive for a case, performs exactly that action instead of invoking the
+agent, and still runs it through the gate. The gate gained a `humanAuthorization` field that
+satisfies exactly two of nine rules (`risk_hold`, `exposure_cap` — the two that exist specifically
+to force a human decision) and never the two with regulatory weight (`hard_decline`, the attempt
+cap) or either cooldown. The stated invariant — no LLM path can lower caution — is now restated
+precisely rather than silently narrowed: *no agent-originated path* can lower caution; a recorded
+human decision can, over exactly two rules.
+**Safeguard:** `tests/safety-gate.test.ts` gained a full second dimension (`humanAuthorization`)
+proving the existing 4,608-context sweep is byte-identical with it absent, plus targeted
+properties for what authorization does and does not unlock. `tests/pipeline.integration.test.ts`
+drives a real directive end to end: the agent is never invoked, the directed action lands, and a
+hard-decline case still refuses an authorized reattempt.
+
+## The fix for the dead escalation rail had its own bug, found live
+
+**Expected:** a human's directive on a freshly-escalated case executes immediately.
+**Actual:** while proving the fix above by hand — escalate a risk hold, then immediately direct it
+to `PAYMENT_LINK` — the case went to `RETRY_SCHEDULED` instead, parked for 6 hours. The charge
+cooldown (`hoursSinceLastAttempt`) was computed from *any* non-`SKIPPED` attempt, and the ESCALATE
+attempt that had just fired — which never touches Razorpay — counted as "the last charge." A
+human's very next decision, on any case that had ever escalated, was silently rate-limited by an
+action that moved no money at all.
+**Why it's dangerous:** the concept "which actions move money" was defined three separate times
+(`attempt-executor.ts`, `safety-gate.ts`, and this cooldown filter), slightly differently each
+time. Two of the three were correct; the third — the one actually gating a human's authority —
+wasn't, and nothing would have caught it without exercising the real flow end to end.
+**How diagnosed:** running the fixed escalation rail live against a real case, not just the unit
+tests — the unit tests for `pendingDirective`/`applyGate` used fixtures that never modeled an
+ESCALATE attempt immediately preceding a directive, so they were green while the real flow was
+broken.
+**Fix:** one canonical `MOVES_MONEY` constant in `domain/recovery-action.ts`, used by the
+executor, the gate, and the cooldown filter — the three call sites that used to each define it.
+**Safeguard:** a regression test pins exactly this scenario: escalate, direct immediately, assert
+the directed action executes rather than getting parked.
+
+## The bench cache silently replayed a stale recording, with the truth printed right there in the log
+
+**Expected:** re-running the evaluation after changing the corpus and the prompt calls the model
+again and records fresh turns.
+**Actual:** `recordingRunner` keys its cache purely by `customerRef#attemptNo`, both stable across
+a corpus regeneration. After hardening the corpus and de-spoonfeeding the prompt, a same-seed,
+same-size re-run replayed every one of 106 cached turns from the *previous* corpus and prompt, and
+printed a complete, plausible-looking scoreboard — root-cause accuracy identical to the prior run
+down to the decimal. The only tell was one line above the table: `0 model calls, ~$0.000 est`.
+**Why it's dangerous:** the output was fully formed and internally consistent. Without reading the
+cost line, this would have shipped as "the re-recorded result" while the model was never actually
+called against the changes it was supposed to be measuring.
+**How diagnosed:** reading the run's own cost summary before trusting its scoreboard — the habit
+this project's earlier quota-probe safeguard already established, applied to a different failure
+shape.
+**Fix:** the cache path now includes the model id (`bench/run.ts`), not just seed and size. This
+also makes a same-corpus, cross-model comparison possible at all, rather than each run silently
+overwriting the last one's recording — which is what caught a second, real instance of the same
+class of bug seconds later, when a "clean" comparison run against the free-tier model also showed
+`0 model calls` because it had genuinely, correctly reused a recording from moments before.
+**Safeguard:** treat `N model calls, ~$X est` as part of the result, not incidental logging — a
+re-record that reports zero calls is not a result, it's a cache hit wearing a result's shape.
+
+---
+
+## Two guardrails were provably unfalsifiable, and a fair model comparison needed the same conditions
+
+Not a bug — a gap the final hardening pass closed deliberately, recorded here because it changed
+the published numbers. The over-nudge rate read 0.0% in every arm and could not structurally read
+anything else: every case where `CUSTOMER_NUDGE` was the right move had `selfRecovers: false` by
+construction, so a wrong nudge was unreachable. The exposure cap never fired in the measured batch
+either — the highest corpus amount sat below the cap. Added a self-recovering slice of
+`card_expired` (an issuer's own account-updater fixing the card before contact — a genuine,
+real-world unknowable, not an invented edge case) and a fifth amount tier above the cap. Both
+guardrails now fire in the batch itself: over-nudge rate reads 3.3–8.3% across seeds, and
+`exposure_cap` shows up in the per-rule firing counts alongside `risk_hold`, `contact_window`, and
+`write_off_unsupported`.
+
+Separately, the recovery playbook's own notes stated the corpus's ground truth as advice — "~48-72h
+out" against a true value of exactly 72 hours, "12-24h" for downtime against a true value of 12 or
+14. Stripped every timing number, left the mechanism-level guidance, and pointed at the tools that
+already carry the real signal (the customer's own payment cadence, the downtime feed's own
+window). Re-recorded on the harder corpus and the de-spoonfed prompt, root-cause accuracy held at
+71.7–75.0% across five seeds — the diagnosis capability survived losing the crutch. The action-
+policy money numbers, honestly, did not improve; they were never the row this project is staking
+its AI-judgment claim on. See the root-level README's "The number" section for the full table,
+including where the free-tier model, run under the identical harder conditions, collapses to
+8.3% root-cause accuracy and an 86.7% degrade rate — the size of the model-quality tax this
+project is not paying for its headline result.
+
+## The schema apply script silently ran a truncated file
+
+**Expected:** `npm run db:schema` applies the full `db/schema.sql`, GRANT statements included.
+**Actual:** `docker-compose.yml` bind-mounts `db/schema.sql` as a single file into the Postgres
+container. Editing the file (adding the nullable-`root_cause` migration) gave it a new inode; the
+mount kept serving a stale, truncated 97-line view of a 118-line file to a command run moments
+later — `psql -f /docker-entrypoint-initdb.d/init.sql` inside the container, reading through that
+stale mount. The GRANT statements enforcing append-only sit past line 97. On a fresh machine,
+running this exact command after any edit to `schema.sql` could apply a schema with the audit
+tables silently writable by the app role — the one invariant this project treats as
+non-negotiable — with no error, because everything before the truncation point ran cleanly.
+**Why it's dangerous:** it fails silently. `CREATE TABLE ... IF NOT EXISTS` and friends don't
+error on a short file; the command exits 0. The append-only test would eventually have caught it
+in CI, but a manual `npm run db:schema` during setup gives no signal at all.
+**How diagnosed:** a second `db:schema` run right after the first, expecting a clean re-apply,
+threw a syntax error mid-file — which only happens if the file being read doesn't match the file
+on disk, since the file itself has no syntax error.
+**Fix:** `db:schema` now pipes the file over stdin (`psql ... < db/schema.sql`) instead of naming
+a path inside the container — stdin reads exactly what the shell just opened, no bind-mount cache
+in between.
+**Safeguard:** never trust a bind-mounted file for a command run right after editing it in the
+same session; pipe it instead, or restart the mount.
