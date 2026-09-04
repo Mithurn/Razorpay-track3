@@ -11,28 +11,6 @@
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
 }
-.topbar__live {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: var(--text-2xs);
-  color: var(--text-faint);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-.topbar__live-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--text-faint);
-}
-.topbar__live--on {
-  color: var(--agent);
-}
-.topbar__live--on .topbar__live-dot {
-  background: var(--agent);
-  animation: pulse-dot 1.6s var(--ease-in-out) infinite;
-}
 .topbar__metrics {
   display: flex;
   align-items: stretch;
@@ -132,10 +110,6 @@
   font-size: var(--text-sm);
   color: var(--deny-strong);
 }
-.topbar__eval-toggle {
-  color: var(--text-faint);
-}
-
 .eval-panel {
   flex: 1 1 100%;
   display: flex;
@@ -165,12 +139,6 @@
 }
 .eval-panel__arm--dim {
   color: var(--text-faint);
-}
-.eval-panel__delta {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  color: var(--clear);
-  font-variant-numeric: tabular-nums;
 }
 
 /* ---- Buttons ---- */
@@ -394,15 +362,6 @@
   color: var(--info);
   border-color: var(--info-border);
   background: var(--info-surface);
-}
-.tool-row__live {
-  font-family: var(--font-mono);
-  font-size: var(--text-2xs);
-  color: var(--info);
-  border: 1px solid var(--info-border);
-  border-radius: var(--radius-xs);
-  padding: 0 4px;
-  flex: none;
 }
 .tool-row__summary {
   font-family: var(--font-mono);
@@ -655,8 +614,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .spin,
-  .topbar__live--on .topbar__live-dot {
+  .spin {
     animation: none;
   }
 }

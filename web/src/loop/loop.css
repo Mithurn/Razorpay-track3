@@ -106,18 +106,6 @@
   color: var(--clear);
   font-variant-numeric: tabular-nums;
 }
-.tl__ref {
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  overflow-wrap: anywhere;
-}
-.tl__reflabel {
-  color: var(--text-faint);
-  font-family: var(--font-mono);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-right: 4px;
-}
 
 /* ---- Loop graph (React Flow) ---- */
 .loop-graph {
