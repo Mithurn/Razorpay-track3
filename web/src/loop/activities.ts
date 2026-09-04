@@ -4,7 +4,8 @@
 // ConclusionCard / AuditTrail list) with one chronological list of collapsible activities.
 
 import { TOOL_LABELS } from "./useCaseLoopState.js";
-import { actLine, resultLine, resultFields } from "./toolLine.js";
+import { resultLine } from "./toolLine.js";
+import { rupees as sharedRupees } from "../ui/format.js";
 
 export type ActivityKind = "investigate" | "propose" | "gate" | "execute" | "outcome";
 export type Tone = "plain" | "clear" | "deny" | "wait" | "info";
@@ -46,8 +47,7 @@ function bool(v: unknown): boolean {
   return v === true;
 }
 function rupees(paise: unknown): string {
-  const n = num(paise) ?? 0;
-  return `₹${Math.round(n / 100).toLocaleString("en-IN")}`;
+  return sharedRupees(num(paise) ?? 0);
 }
 function durationMs(startIso: string, endIso: string | null): number | null {
   if (!endIso) return null;
@@ -185,13 +185,15 @@ function closeExecute(a: Activity, ev: RawEvent): void {
   const ref = str(p.razorpayRef);
   a.status = "done";
   a.endedAt = ev.at;
-  a.tone = status === "RECOVERED" ? "clear" : status === "FAILED" ? "deny" : "wait";
+  a.tone = status === "RECOVERED" || status === "COMPLETED" ? "clear" : status === "FAILED" ? "deny" : "wait";
   a.summary =
     status === "RECOVERED"
       ? `captured ${rupees(recoveredPaise)}${ref ? ` · ${ref}` : ""}`
-      : status === "FAILED"
-        ? `failed${p.detail ? ` — ${p.detail}` : ""}`
-        : `awaiting settlement${ref ? ` · ${ref}` : ""}`;
+      : status === "COMPLETED"
+        ? `completed${p.detail ? ` — ${p.detail}` : ""}`
+        : status === "FAILED"
+          ? `failed${p.detail ? ` — ${p.detail}` : ""}`
+          : `awaiting settlement${ref ? ` · ${ref}` : ""}`;
   a.detail.push({ label: "status", value: status });
   if (recoveredPaise > 0) a.detail.push({ label: "recovered", value: rupees(recoveredPaise) });
   if (ref) a.detail.push({ label: "razorpay ref", value: ref });
@@ -365,5 +367,3 @@ export function deriveActivities(events: RawEvent[]): Activity[] {
 export function activityDurationMs(a: Activity): number | null {
   return durationMs(a.startedAt, a.endedAt);
 }
-
-export { actLine, resultFields };

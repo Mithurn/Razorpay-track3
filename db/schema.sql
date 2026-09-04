@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS recovery_attempts (
   clamped         BOOLEAN NOT NULL DEFAULT false,
   clamp_reason    TEXT,
   outcome         TEXT NOT NULL DEFAULT 'PENDING' CHECK (outcome IN (
-                    'PENDING','RECOVERED','FAILED','SKIPPED','AWAITING_RECONCILIATION')),
+                    'PENDING','RECOVERED','FAILED','SKIPPED','AWAITING_RECONCILIATION','COMPLETED')),
   outcome_detail  TEXT,
   recovered_paise BIGINT NOT NULL DEFAULT 0,  -- this attempt's real capture; summed into the case
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -78,6 +78,12 @@ CREATE TABLE IF NOT EXISTS recovery_attempts (
 -- has to invent a cause to satisfy NOT NULL — which is what it used to do, and it scored as a
 -- correct diagnosis in the eval. Idempotent: safe to re-run.
 ALTER TABLE recovery_attempts ALTER COLUMN root_cause DROP NOT NULL;
+
+-- Widens the outcome CHECK for a table that already existed before COMPLETED was added — the
+-- inline CHECK above only applies to a table created fresh. Idempotent: safe to re-run.
+ALTER TABLE recovery_attempts DROP CONSTRAINT IF EXISTS recovery_attempts_outcome_check;
+ALTER TABLE recovery_attempts ADD CONSTRAINT recovery_attempts_outcome_check CHECK (outcome IN (
+  'PENDING','RECOVERED','FAILED','SKIPPED','AWAITING_RECONCILIATION','COMPLETED'));
 
 CREATE INDEX IF NOT EXISTS idx_attempts_case ON recovery_attempts (case_id, attempt_no);
 CREATE INDEX IF NOT EXISTS idx_attempts_due ON recovery_attempts (scheduled_for)

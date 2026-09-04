@@ -85,13 +85,14 @@ describe.runIf(adminUrl)("AttemptExecutor", () => {
     ...over,
   });
 
-  const build = (gateway: PaymentGateway, resolver: OutcomeResolver) =>
+  const build = (gateway: PaymentGateway, resolver: OutcomeResolver, opts: { reperformAfterMs?: number } = {}) =>
     new AttemptExecutor(
       new PostgresAttemptRepository(db),
       new PostgresEventLog(db),
       gateway,
       resolver,
       new LoggingNotifier(new PostgresEventLog(db)),
+      opts,
     );
 
   beforeAll(async () => {
@@ -196,13 +197,13 @@ describe.runIf(adminUrl)("AttemptExecutor", () => {
     const events = new PostgresEventLog(db);
 
     await exec.execute(request());
-    const parked = await repo.byCaseAndNo(caseId, 1);
+    const parked = (await repo.listByCase(caseId)).find((a) => a.attemptNo === 1);
     expect(parked!.status).toBe("AWAITING_RECONCILIATION");
 
     // Three more sweep-style re-checks, each finding the same still-unresolved state.
-    await exec.settle(parked!, 149900, { kind: "RETRY_NOW" });
-    await exec.settle(parked!, 149900, { kind: "RETRY_NOW" });
-    await exec.settle(parked!, 149900, { kind: "RETRY_NOW" });
+    await exec.settle(parked!, { amountPaise: 149900, currency: "INR" }, { kind: "RETRY_NOW" });
+    await exec.settle(parked!, { amountPaise: 149900, currency: "INR" }, { kind: "RETRY_NOW" });
+    await exec.settle(parked!, { amountPaise: 149900, currency: "INR" }, { kind: "RETRY_NOW" });
 
     const tape = await events.forCase(caseId);
     expect(tape.filter((e) => e.type === "ATTEMPT_OUTCOME")).toHaveLength(1);
@@ -216,12 +217,12 @@ describe.runIf(adminUrl)("AttemptExecutor", () => {
     const exec = build(gw, new ScriptedResolver([captured(149900), captured(149900)]));
 
     await exec.execute(request());
-    const parked = await repo.byCaseAndNo(caseId, 1);
+    const parked = (await repo.listByCase(caseId)).find((a) => a.attemptNo === 1);
 
-    const settled = await exec.settle(parked!, 149900, { kind: "RETRY_NOW" });
+    const settled = await exec.settle(parked!, { amountPaise: 149900, currency: "INR" }, { kind: "RETRY_NOW" });
     expect(settled.status).toBe("RECOVERED");
 
-    const again = await exec.settle(settled, 149900, { kind: "RETRY_NOW" });
+    const again = await exec.settle(settled, { amountPaise: 149900, currency: "INR" }, { kind: "RETRY_NOW" });
     expect(again.status).toBe("RECOVERED");
 
     const kase = await new PostgresCaseRepository(db).byId(caseId);
@@ -280,6 +281,63 @@ describe.runIf(adminUrl)("AttemptExecutor", () => {
     expect(attempt.status).toBe("FAILED");
     expect(attempt.detail).toBe("escalated_to_human");
     expect(gw.orderCreates).toBe(0);
+  });
+
+  it("re-performs a stale claimed-but-never-performed attempt exactly once", async () => {
+    await seedCase();
+    const gw = new FakeGateway();
+    const exec = build(gw, new ScriptedResolver([captured(149900)]), { reperformAfterMs: 0 });
+    const repo = new PostgresAttemptRepository(db);
+
+    const twoHoursAgo = new Date(Date.now() - 2 * 3_600_000).toISOString();
+    const { attempt, created } = await repo.claim(request({ createdAt: twoHoursAgo }), `${caseId}:1`);
+    expect(created).toBe(true);
+
+    const settled = await exec.settle(attempt, { amountPaise: 149900, currency: "INR" }, { kind: "RETRY_NOW" });
+    const again = await exec.settle(settled, { amountPaise: 149900, currency: "INR" }, { kind: "RETRY_NOW" });
+
+    expect(gw.orderCreates).toBe(1);
+    expect(settled.razorpayRef).toMatch(/^order_fake_/);
+    expect(settled.status).toBe("RECOVERED");
+    expect(again.razorpayRef).toBe(settled.razorpayRef);
+
+    const events = await new PostgresEventLog(db).forCase(caseId);
+    expect(events.map((e) => e.type)).toContain("ATTEMPT_REPERFORMED");
+  });
+
+  it("parks a fresh claimed-but-never-performed attempt instead of re-performing it", async () => {
+    await seedCase();
+    const gw = new FakeGateway();
+    const exec = build(gw, new ScriptedResolver([]));
+    const repo = new PostgresAttemptRepository(db);
+
+    const { attempt, created } = await repo.claim(request(), `${caseId}:1`);
+    expect(created).toBe(true);
+
+    const settled = await exec.settle(attempt, { amountPaise: 149900, currency: "INR" }, { kind: "RETRY_NOW" });
+    expect(gw.orderCreates).toBe(0);
+    expect(settled.status).toBe("PENDING");
+  });
+
+  it("closes a claimed-but-never-performed ESCALATE that a crash left pending", async () => {
+    await seedCase();
+    const gw = new FakeGateway();
+    const exec = build(gw, new ScriptedResolver([]));
+    const repo = new PostgresAttemptRepository(db);
+
+    const { attempt, created } = await repo.claim(
+      request({ action: { kind: "ESCALATE", reason: "risk hold" } }),
+      `${caseId}:1`,
+    );
+    expect(created).toBe(true);
+
+    const settled = await exec.settle(attempt, { amountPaise: 149900, currency: "INR" }, {
+      kind: "ESCALATE",
+      reason: "risk hold",
+    });
+    expect(gw.orderCreates).toBe(0);
+    expect(settled.status).toBe("FAILED");
+    expect(settled.detail).toBe("escalated_to_human");
   });
 
   it("writes a full event tape for one attempt under the case id", async () => {

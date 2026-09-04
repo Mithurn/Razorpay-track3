@@ -7,7 +7,13 @@ export interface Clock {
 
 export const systemClock: Clock = { now: () => new Date() };
 
-export type AttemptStatus = "PENDING" | "RECOVERED" | "FAILED" | "SKIPPED" | "AWAITING_RECONCILIATION";
+export type AttemptStatus =
+  | "PENDING"
+  | "RECOVERED"
+  | "FAILED"
+  | "SKIPPED"
+  | "AWAITING_RECONCILIATION"
+  | "COMPLETED";
 
 export type AttemptRequest = {
   caseId: string;

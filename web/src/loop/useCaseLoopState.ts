@@ -3,6 +3,8 @@
 // top for the in-flight portion the tape does not carry yet (tools firing, reasoning head,
 // finding count). No React, no I/O — unit-tested in loop.test.ts.
 
+import { RESOLVED_LANES } from "../types.js";
+
 export type StageId = "INCOMING" | "INVESTIGATE" | "PROPOSE" | "GATE" | "EXECUTE" | "OUTCOME";
 export type StageStatus = "idle" | "active" | "done" | "failed" | "vetoed";
 export type ToolStatus = "idle" | "firing" | "done";
@@ -58,7 +60,7 @@ export type LiveSignals = {
 };
 
 const REPLAN_LANES = new Set(["RETRY_SCHEDULED"]);
-const TERMINAL_LANES = new Set(["RECOVERED", "ESCALATED", "WRITTEN_OFF", "STOPPED"]);
+const TERMINAL_LANES = new Set<string>(RESOLVED_LANES);
 
 function str(v: unknown): string | undefined {
   return typeof v === "string" ? v : undefined;
@@ -177,7 +179,7 @@ export function deriveLoopState(events: LoopEvent[], live: LiveSignals = {}): Lo
       recoveredPaise: recPaise,
     };
     set("GATE", s.gate && s.gate.outcome !== "allow" ? "vetoed" : "done");
-    if (recStatus === "RECOVERED") set("EXECUTE", "done");
+    if (recStatus === "RECOVERED" || recStatus === "COMPLETED") set("EXECUTE", "done");
     else if (recStatus === "FAILED") set("EXECUTE", s.gate?.outcome === "clamp" ? "vetoed" : "failed");
     else set("EXECUTE", "active");
   } else if (s.gate?.outcome === "skip") {
@@ -201,7 +203,7 @@ export function deriveLoopState(events: LoopEvent[], live: LiveSignals = {}): Lo
   }
 
   // current animating edge — the frontier, or the replan loop after a failed attempt
-  s.currentEdge = pickCurrentEdge(s, { failedAndRetrying: recStatus === "FAILED" && !lane && s.replanCount >= 0 });
+  s.currentEdge = pickCurrentEdge(s, { failedAndRetrying: recStatus === "FAILED" && !lane });
 
   return s;
 }
