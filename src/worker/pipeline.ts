@@ -127,7 +127,6 @@ export class RecoveryPipeline {
     this.stopRegistry.resumeAll();
   }
 
-  // Whether the room-wide emergency brake is engaged right now.
   isBraked(): boolean {
     return this.stopRegistry.isBraked();
   }
@@ -253,11 +252,8 @@ export class RecoveryPipeline {
     return this.afterAttempt(kase, gate.action, attempt, attemptNo);
   }
 
-  /**
-   * The newest human directive that no attempt has acted on yet. Read from the append-only log
-   * rather than a mutable column: the authorization is an audit fact first, and the pipeline
-   * input is the same record. Null once an attempt has been made since the directive landed.
-   */
+  // Newest human directive no attempt has acted on yet. Read from the append-only log, not a
+  // mutable column: the authorization is an audit fact first, the pipeline input second.
   private async pendingDirective(caseId: string, prior: Attempt[]): Promise<HumanDirective | null> {
     const events = await this.deps.events.forCase(caseId);
     const latest = events.filter((e) => e.type === "HUMAN_DIRECTIVE").at(-1);

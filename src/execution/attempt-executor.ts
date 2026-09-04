@@ -150,12 +150,8 @@ export class AttemptExecutor {
     // pending: the row stays PENDING for a webhook or a later sweep.
   }
 
-  /**
-   * A nudge has no order, no link and no Razorpay ref, so no webhook or sweep can ever settle it.
-   * Left PENDING it re-checks every couple of hours forever. Once the message is away there is
-   * nothing further to observe, so the attempt ends here and the case falls to its next scheduled
-   * move — or to a human once the attempt cap is reached.
-   */
+  // A nudge has no Razorpay ref, so no webhook or sweep can ever settle it. Left PENDING it would
+  // re-check forever; once the message is away there is nothing more to observe, so it ends here.
   private async closeUnobservableNudge(attemptId: string, action: RecoveryAction): Promise<void> {
     if (action.kind !== "CUSTOMER_NUDGE") return;
     const current = await this.attempts.byId(attemptId);

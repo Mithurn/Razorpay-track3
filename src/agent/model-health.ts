@@ -1,9 +1,6 @@
 // A cheap liveness check for the model provider: one-token completion, short timeout. Used by
-// GET /model-health so a demo operator knows the agent path is up before starting a run.
-//
-// A "google/" model id goes to AI Studio directly, same split as agent/model.ts — this used to
-// always probe OpenRouter, so a room running on a google/ model reported unreachable while it was
-// actually fine (and reachable while the OpenRouter key it never checked was missing).
+// GET /model-health so a demo operator knows the agent path is up before starting a run. A
+// "google/" model id is probed against AI Studio directly, the same provider split as agent/model.ts.
 
 export async function checkModelHealth(
   keys: { openRouterApiKey: string | undefined; googleApiKey: string | undefined },

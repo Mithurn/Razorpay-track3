@@ -27,11 +27,8 @@ export function TopBar({
 }) {
   const recoveredLivePaise = metrics?.recoveredLivePaise ?? 0;
   const recoveredSimulatedPaise = metrics?.recoveredSimulatedPaise ?? 0;
-  // The batch total is the hero figure — it's the number Track 3's bar actually grades ("measured
-  // money recovered across a batch"), and it's what the whole evaluation section is about. A real
-  // live capture from working `cust_live_demo` on camera is genuine money too, just from a sample
-  // of one — shown as a ticking accent underneath, never blended into the batch total (the two
-  // are summed from clearly separate sources on purpose; see README's "What's real" section).
+  // The 60-case batch total is the hero figure — the number Track 3's bar grades. A live on-camera
+  // capture is real money too, shown as a separate accent, never blended into the batch total.
   const recoveredLive = useTweenedNumber(recoveredLivePaise);
   const exposure = useTweenedNumber(metrics?.exposurePaise ?? 0);
   const [benchOpen, setBenchOpen] = useState(false);

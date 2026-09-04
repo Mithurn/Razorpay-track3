@@ -4,14 +4,11 @@ import type { AgentRunner } from "../src/worker/pipeline.js";
 import type { ToolCall, ToolResult } from "../src/agent/recovery-agent.js";
 import type { AgentProposal } from "../src/domain/recovery-action.js";
 
-// Record real agent turns once, replay them for free. Keyed by the case's customerRef plus its
-// attempt number, so a re-plan on attempt 2 is a distinct recorded turn.
-//
-// Each recorded turn keeps the tool-call/result trace alongside the proposal, not just the
-// proposal itself — a replayed case that seeds the live room needs the same TOOL_CALLED /
-// TOOL_RESULT events a genuinely live run would produce, or "N signals checked" in the UI is a
-// claim with nothing behind it. A cache file recorded before this trace existed still replays
-// (as zero tool events); only a fresh recording carries the real trace.
+// Record real agent turns once, replay them for free. Keyed by customerRef plus attempt number,
+// so a re-plan on attempt 2 is a distinct recorded turn. Each turn keeps the tool-call/result
+// trace alongside the proposal, so a replayed case seeding the room fires the same
+// TOOL_CALLED/TOOL_RESULT events a live run would. Pre-trace cache files still replay, as zero
+// tool events.
 
 type ToolTraceEntry =
   | { type: "TOOL_CALLED"; payload: { name: string; callId: string; args: unknown } }
