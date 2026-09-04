@@ -1,0 +1,1223 @@
+{
+  "cust_1000#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 72
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.85,
+    "reasoning": "Customer history shows 6/6 successful payments on a median 31-day cycle, with the last success 29 days ago — the failure is right on schedule, indicating a transient liquidity gap rather than a chronic issue. The issuing bank is HDFC and check_bank_downtime shows no match on this instrument (the method-wide outages listed are on unrelated issuers: BKID, PUNB, CNRB, CITI, and per the policy those do not apply to this customer). The error reason insufficient_funds corroborates the balance hypothesis. No prior attempts exist, so I'm not repeating a failed move. The playbook default for insufficient_funds is RETRY_SCHEDULED, timed to when the customer historically has money. Their cadence is monthly and the failure was on the 1st of the month, so a ~72-hour delay gives the account time to receive a typical monthly credit before the retry. I did not switch to a payment link or nudge because this customer has a perfect record and the decline is clearly balance-driven, not card- or method-driven.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1009#1": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "sms"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.97,
+    "reasoning": "Evidence read in order:\n1) Customer history: 5 of 6 prior payments succeeded, last success 38 days ago on a ~29-day cycle — a long-running, reliable customer now overdue. The history does not point to insufficient funds or a behavioral problem; the issue is the instrument.\n2) Bank downtime feed: no match on the customer's issuing bank (ICIC). The method-wide outages on other issuers (BKID, PUNB, CNRB, CITI) are not evidence about this card, per the rules.\n3) Similar resolved cases: zero merchant history for `card_expired` — no evidence to override the textbook response.\n4) Prior attempts on this case: none, so no failed move to avoid.\n\nDiagnosis: the error reason `card_expired` is a hard, instrument-level decline. A retry against the same expired card will not clear; only a new payment method from the customer resolves it. The playbook for hard_decline recommends CUSTOMER_NUDGE, with PAYMENT_LINK as an alternative only when the merchant's similar-case record shows links recovering these — and here it does not. Therefore CUSTOMER_NUDGE is the correct move, and SMS is the appropriate channel for a time-sensitive subscription billing update.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1003#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.92,
+    "reasoning": "Root cause is bank_downtime. Three converging signals point to it: (1) the error is issuer_technical_error, which the playbook treats as issuer-side; (2) the downtime feed shows a direct match on the customer's card issuer BKID with a high-severity outage that started 2026-07-03 and is still active; (3) the customer is a 5/5 clean payer with no history of declines, so this is not a customer-side issue. No prior attempts have been made, so there is no failed retry to avoid repeating. The merchant has no resolved cases for this error reason, so I am relying on the playbook default, which for bank_downtime is RETRY_SCHEDULED timed to the outage clearing — and importantly the playbook explicitly says never to nudge, because the customer did nothing wrong. I considered PAYMENT_LINK on netbanking, but this customer has only ever paid by card and has no netbanking history on file, so a link on a rail they have never used is a weaker bet than a retry on the same card once BKID recovers. The BKID outage has already lasted ~60 days, which suggests it may be persistent rather than transient, so I am scheduling 48 hours out — long enough that there is a real chance the feed has updated, short enough that we do not leave a paying customer waiting if it has. If the next attempt also fails, the next move should be to re-check the downtime feed and reconsider switching rails or escalating.",
+    "toolCalls": 6,
+    "degraded": false
+  },
+  "cust_1001#1": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.65,
+    "reasoning": "Started with the customer's history: 4 payments on file, 2 succeeded, 2 failed, last success 156 days ago against a 25-day median cadence — a long lapse that, combined with prior card failures, makes an expired or replaced card more plausible than a transient soft decline. Checked downtime next: the issuing bank (ICIC) has no active outage, so bank_downtime is ruled out; the method-wide outages on BKID/PUNB/CNRB/CITI are not evidence about this customer's card and were ignored. Checked prior attempts on this case: none — first recovery attempt, so I'm not contradicting a failed move. Checked similar resolved cases for card_declined across all rails: zero records, so no merchant-specific precedent to override the playbook. With no downtime, no resolved-case guidance, and history pointing to a stale instrument, a retry on the same card is unlikely to clear — the customer needs to act. The playbook's hard_decline default is CUSTOMER_NUDGE, and that fits. Confidence is moderate (0.65) because card_declined is a generic code and a soft decline can't be fully ruled out, but the history skews the prior toward a hard decline.",
+    "toolCalls": 6,
+    "degraded": false
+  },
+  "cust_1005#1": {
+    "action": {
+      "kind": "ESCALATE",
+      "reason": "Risk system flagged the payment; merchant policy never auto-retries on risk_hold."
+    },
+    "diagnosisRootCause": "risk_hold",
+    "confidence": 0.85,
+    "reasoning": "Error reason `payment_risk_check_failed` is a Razorpay-side risk/fraud flag, which maps directly to root cause `risk_hold`. The merchant playbook for risk_hold is ESCALATE with an explicit \"never auto-retry\" note. Supporting evidence: no prior attempts to contradict, no bank downtime on the customer's issuer (SBIN) — the other card outages are on different banks and not evidence about this customer. Similar-cases query returned no resolved history for this error reason, so I have no empirical signal to deviate from the playbook (e.g., no evidence that PAYMENT_LINK on another rail recovers these). A retry or nudge risks re-tripping the same risk block or bypassing a legitimate hold. Escalating to a human is the correct move.",
+    "toolCalls": 6,
+    "degraded": false
+  },
+  "cust_1008#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 6
+    },
+    "diagnosisRootCause": "soft_decline",
+    "confidence": 0.72,
+    "reasoning": "Customer has 4/4 successful card payments, last success 93 days ago on a ~30-day cadence — this is a routine subscription renewal, not a struggling account. The decline reason \"card_declined\" with no other signals is generic. check_bank_downtime returned no match for ICIC (the card's issuer); the listed method-wide outages are on unrelated banks (BKID, PUNB, CNRB, CITI) and are not evidence about this card. With a 100% success rate, no card-specific reason in the error string, and no bank downtime, a hard_decline is unlikely — this reads as a soft decline (one-time issuer block, session/RBA hold, or transient authorization hiccup). The playbook's default for soft_decline is RETRY_SCHEDULED, and there is no prior attempt to contradict it. The customer's history shows reliable funding (no cash-flow warning), so a short delay of 6 hours is sufficient to let the soft signal clear without making the customer wait unnecessarily long for what is most likely a transient issue.",
+    "toolCalls": 6,
+    "degraded": false
+  },
+  "cust_1001#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.10 estimated over 41 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 2,
+    "degraded": true
+  },
+  "cust_1007#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.10 estimated over 42 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 5,
+    "degraded": true
+  },
+  "cust_1007#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.11 estimated over 43 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1004#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "soft_decline",
+    "confidence": 0.72,
+    "reasoning": "Customer has 3/3 successful card payments with a median 31-day cadence — a reliable payer, which makes a hard decline or expired card unlikely. The error code is a generic payment_failed with no specific issuer-side signal. Bank downtime feed shows no outage on this customer's issuing bank (ICIC); the listed outages on BKID/PUNB/CNRB/CITI are background context, not evidence about this card. No prior attempts on this case, and no resolved similar cases with this error reason exist to redirect the decision. This profile matches the playbook's soft_decline pattern exactly: clean-history customer, generic decline, no matching downtime. Following the playbook default of RETRY_SCHEDULED, I'm timing the retry to ~24 hours out — short enough to recover before the customer churns, and aligned with the historical monthly cadence rather than a longer arbitrary delay. Confidence is moderate rather than high because no similar resolved cases exist for direct validation; if this scheduled retry fails, the next step should be to re-check downtime and consider whether the decline is hardening (e.g., a real card expiry or issuer block, in which case CUSTOMER_NUDGE becomes appropriate).",
+    "toolCalls": 6,
+    "degraded": false
+  },
+  "cust_1004#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.11 estimated over 44 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1004#3": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.11 estimated over 45 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1004#4": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.12 estimated over 46 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1006#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 168
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.9,
+    "reasoning": "Error reason is explicitly insufficient_funds — the issuer rejected because the account lacked balance, not a transient tech issue. Customer history (3/4 success, last success 63 days ago, median 80-day gap) shows a reliable, clean payer currently within their normal pay cycle, so the gap is likely a timing-of-balance issue rather than a chronically unfunded account. Bank downtime check on this exact instrument (AXIS) returned no match — the listed method-wide outages are on unrelated issuers and don't bear on this card. No prior attempts on this case to learn from, and no similar resolved cases for insufficient_funds to guide toward a different rail. Playbook default for insufficient_funds is RETRY_SCHEDULED timed to when the customer historically has money. 7 days (168h) gives a realistic window for salary/top-up cycles to refill the account while not delaying so long that customer intent is at risk; deviating from a longer wait toward their median next-pay date because this customer's strong history makes a sooner retry reasonable.",
+    "toolCalls": 6,
+    "degraded": false
+  },
+  "cust_1006#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.12 estimated over 47 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1006#3": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.12 estimated over 48 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1006#4": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.12 estimated over 49 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1002#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (no proposal); falling back to a scheduled retry in 48h.",
+    "toolCalls": 5,
+    "degraded": true
+  },
+  "cust_1010#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.13 estimated over 50 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1014#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.13 estimated over 51 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1011#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.13 estimated over 52 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1012#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.13 estimated over 53 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1013#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.14 estimated over 54 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1017#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.14 estimated over 55 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1015#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.14 estimated over 56 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1018#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.14 estimated over 57 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1019#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.14 estimated over 58 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1016#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.15 estimated over 59 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1014#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.15 estimated over 60 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1011#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.15 estimated over 61 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1013#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.15 estimated over 62 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1018#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.16 estimated over 63 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1011#3": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.16 estimated over 64 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1013#3": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.16 estimated over 65 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1018#3": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.17 estimated over 66 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1011#4": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.17 estimated over 67 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1013#4": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.17 estimated over 68 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1018#4": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.17 estimated over 69 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1021#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.18 estimated over 70 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1020#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.18 estimated over 71 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1022#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.18 estimated over 72 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1028#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.18 estimated over 73 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1023#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.18 estimated over 74 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1025#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.19 estimated over 75 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1026#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.19 estimated over 76 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1027#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.19 estimated over 77 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1029#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.20 estimated over 78 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1024#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.20 estimated over 79 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1028#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.20 estimated over 80 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1020#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.20 estimated over 81 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1025#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.21 estimated over 82 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1027#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.21 estimated over 83 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1025#3": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.21 estimated over 84 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1020#3": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.21 estimated over 85 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1027#3": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.21 estimated over 86 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1025#4": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.22 estimated over 87 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1020#4": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.22 estimated over 88 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1027#4": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.22 estimated over 89 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1039#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.23 estimated over 90 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1033#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.23 estimated over 91 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1038#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.23 estimated over 92 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1034#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.23 estimated over 93 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1032#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.24 estimated over 94 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1037#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.24 estimated over 95 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1031#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.24 estimated over 96 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1036#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.24 estimated over 97 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1035#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.24 estimated over 98 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1030#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.25 estimated over 99 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1039#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.25 estimated over 100 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1034#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.25 estimated over 101 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1035#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.26 estimated over 102 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1039#3": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.26 estimated over 103 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1034#3": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.26 estimated over 104 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1039#4": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.26 estimated over 105 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1034#4": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.27 estimated over 106 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1049#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.27 estimated over 107 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1044#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.27 estimated over 108 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1041#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.27 estimated over 109 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1046#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.28 estimated over 110 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1047#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.28 estimated over 111 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1042#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.28 estimated over 112 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1048#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.28 estimated over 113 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1043#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.29 estimated over 114 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1040#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.29 estimated over 115 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1045#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.29 estimated over 116 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1046#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.29 estimated over 117 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1042#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.29 estimated over 118 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1041#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.30 estimated over 119 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1048#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.30 estimated over 120 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1046#3": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.30 estimated over 121 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1041#3": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.30 estimated over 122 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1048#3": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.31 estimated over 123 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1046#4": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.31 estimated over 124 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1048#4": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.31 estimated over 125 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1041#4": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.32 estimated over 126 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1059#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.32 estimated over 127 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1054#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.32 estimated over 128 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1050#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.32 estimated over 129 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1055#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.33 estimated over 130 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1051#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.33 estimated over 131 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1057#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.33 estimated over 132 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1058#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.33 estimated over 133 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1056#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.34 estimated over 134 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1053#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.34 estimated over 135 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1052#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.34 estimated over 136 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1053#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.34 estimated over 137 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1055#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.35 estimated over 138 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1053#3": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.35 estimated over 139 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1055#3": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.35 estimated over 140 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1055#4": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.35 estimated over 141 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  },
+  "cust_1053#4": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (error: model budget cap hit: ~$0.35 estimated over 142 calls (cap $0.1)); falling back to a scheduled retry in 48h.",
+    "toolCalls": 0,
+    "degraded": true
+  }
+}

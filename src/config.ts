@@ -13,7 +13,8 @@ const schema = z.object({
   OPENROUTER_API_KEY: optionalString,
   GOOGLE_GENERATIVE_AI_API_KEY: optionalString,
   // Default is a $0 free-tier model so an accidental run cannot spend. Override to
-  // google/gemini-2.5-flash for the headline eval (still free-tier; guard with --cap-usd).
+  // google/gemini-3.6-flash for the headline eval (guard with --cap-usd). gemini-2.5-flash and
+  // gemini-2.0-flash are both retired; Google's own API error names 3.6-flash as the successor.
   AGENT_MODEL: z.string().default("minimax/minimax-m3:free"),
   RAZORPAY_KEY_ID: z.string().min(1),
   RAZORPAY_KEY_SECRET: z.string().min(1),

@@ -23,7 +23,10 @@ import { LoggingNotifier } from "../src/execution/notifier.js";
 
 const SEED = 42;
 const SIZE = 60;
-const cachePath = `bench/.cache/agent-turns-seed${SEED}-n${SIZE}.json`;
+// Must match the published headline run's model — bench/run.ts keys its cache by model for
+// exactly this reason, so seeding the room can never silently pick up a different recording.
+const MODEL = "google_gemini-3.6-flash";
+const cachePath = `bench/.cache/agent-turns-seed${SEED}-n${SIZE}-${MODEL}.json`;
 
 async function main(): Promise<void> {
   const config = loadConfig();

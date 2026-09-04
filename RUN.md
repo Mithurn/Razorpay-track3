@@ -62,7 +62,7 @@ rate-limited or produce a malformed proposal mid-run, in which case the agent de
 scheduled retry rather than crashing. For a run that reliably concludes:
 
 ```bash
-AGENT_MODEL=google/gemini-2.5-flash npm run dev   # needs GOOGLE_GENERATIVE_AI_API_KEY, a few cents
+AGENT_MODEL=google/gemini-3.6-flash npm run dev   # needs GOOGLE_GENERATIVE_AI_API_KEY, a few cents
 ```
 
 Model spend for the whole server process is hard-capped by `AGENT_SESSION_CAP_USD` (default

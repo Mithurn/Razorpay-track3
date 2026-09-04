@@ -38,7 +38,13 @@ const { values } = parseArgs({
 
 const size = Number(values.size);
 const seed = Number(values.seed);
-const cachePath = `bench/.cache/agent-turns-seed${seed}-n${size}.json`;
+// Model in the path, not just seed/size: a bare seed+size cache silently replayed stale turns
+// after the corpus and prompt changed underneath it — recordingRunner reuses any existing key
+// regardless of what produced it, so a same-shaped rerun looked like 0 model calls and a real
+// result, when nothing had actually run. Also what makes a same-corpus model sweep possible: each
+// model gets its own file instead of overwriting the last one's recording.
+const modelSlug = (process.env.AGENT_MODEL ?? "minimax/minimax-m3:free").replace(/[^a-zA-Z0-9._-]/g, "_");
+const cachePath = `bench/.cache/agent-turns-seed${seed}-n${size}-${modelSlug}.json`;
 
 async function main(): Promise<void> {
   const config = loadConfig();

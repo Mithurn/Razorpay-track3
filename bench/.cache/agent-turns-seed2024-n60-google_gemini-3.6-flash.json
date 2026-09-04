@@ -1,0 +1,1080 @@
+{
+  "cust_1006#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 72
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.85,
+    "reasoning": "The error reason is insufficient_funds on an AXIS card. Bank downtime is negative (no downtime for AXIS). The customer has 1 successful payment on 2026-07-02. Based on standard playbook for insufficient_funds, scheduling a retry (typically 24 to 72 hours out, or around salary days / standard cycle) gives the customer time to replenish funds. We schedule a retry in 72 hours (or standard timing).",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1005#1": {
+    "action": {
+      "kind": "PAYMENT_LINK",
+      "rail": "netbanking"
+    },
+    "diagnosisRootCause": "risk_hold",
+    "confidence": 0.85,
+    "reasoning": "The payment failed due to BAD_REQUEST_ERROR / payment_risk_check_failed. Customer history shows 1 successful card payment 152 days ago and 1 failure. Bank downtime check shows no active downtime for SBIN (the card issuer). The failure is a risk hold / risk check flag on the card rail. Playbook for risk_hold recommends issuing a payment link via an alternate rail like netbanking or card with explicit authentication. Sending a netbanking PAYMENT_LINK avoids the flagged card risk block and allows the customer to complete payment securely.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1002#1": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.95,
+    "reasoning": "The payment failed with error code card_expired. Customer history shows 6 previous successful payments via card, with no prior failures. Check of bank downtime confirmed no active downtime on customer's issuing bank (ICICI). Since the card is expired, automated retries or payment links on the same expired instrument will not succeed. The standard recovery playbook and best practices for card expiry require prompting the customer to update their payment details. Therefore, CUSTOMER_NUDGE via email is the recommended recovery action.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1004#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "soft_decline",
+    "confidence": 0.85,
+    "reasoning": "The customer has a strong history of 3 successful card payments and 0 previous failures. The failure occurred with a generic payment_failed / BAD_REQUEST_ERROR code, and there is no active HDFC bank downtime reported. This points to a transient soft decline or temporary processing hold. Following standard playbook for soft decline, scheduling a retry in 24 hours.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1000#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.9,
+    "reasoning": "The customer has 6 successful prior payments out of 6 total attempts on file, showing strong intent and reliability. The payment failed on 2026-09-01 at 06:00:00 UTC with an explicit error of insufficient_funds on an HDFC card. No bank downtime was detected for HDFC. For salary and monthly income cycles (around the 1st to 5th of the month or early morning), funds are often deposited during the day. Scheduling a retry for 48 hours later (or similar reasonable delay like 24-48 hours) gives time for monthly payroll/deposit clearing. RETRY_SCHEDULED with a 48 hour delay is optimal.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1003#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.95,
+    "reasoning": "The payment failed due to GATEWAY_ERROR (issuer_technical_error). Customer history shows 5 successful prior payments with a 100% success rate on card payments. Active high-severity bank downtime was verified for the customer's card issuer (BKID). Per the recovery playbook for bank_downtime, we schedule a retry after 24 hours to allow the bank downtime window to resolve, without sending unnecessary customer nudges.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1007#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.9,
+    "reasoning": "The customer has a perfect prior payment history of 6 successful payments out of 6 total attempts, paying approximately every 30 days. The current failure at 2026-09-01T13:00:00.000Z is due to insufficient_funds on an HDFC card. HDFC has no active bank downtime. Per the merchant's recovery playbook for insufficient_funds, a scheduled retry is recommended to allow time for account re-funding / monthly salary deposit. Scheduling the retry for 48 hours (Sept 3, 2026) aligns with typical start-of-month salary settlement windows for regular subscription customers.",
+    "toolCalls": 6,
+    "degraded": false
+  },
+  "cust_1009#1": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.95,
+    "reasoning": "The payment failed due to BAD_REQUEST_ERROR with card_expired. Investigating customer history showed 4 prior successful card payments, but no bank downtime matches ICICI card. This is a hard decline caused by an expired card. Retrying the card will continue to fail. The customer must be nudged to update their payment details/card info. Following playbook for hard_decline, sending CUSTOMER_NUDGE via email is the recommended recovery action.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1001#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "soft_decline",
+    "confidence": 0.9,
+    "reasoning": "Investigation shows that the customer has a flawless prior payment history (4 out of 4 successful payments, 0 failures). The error 'card_declined' on an HDFC card is a generic decline without active bank downtime (matched: false). Following the recovery playbook for soft_decline with clean-history customers, this is a recoverable transient payment failure. We schedule a retry in 24 hours, aligned with the customer's monthly payment timing (1st of the month).",
+    "toolCalls": 6,
+    "degraded": false
+  },
+  "cust_1008#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "soft_decline",
+    "confidence": 0.85,
+    "reasoning": "The payment failed with card_declined (BAD_REQUEST_ERROR). Customer payment history shows 4 previous successful payments out of 4 total attempts, demonstrating high reliability and account standing. Bank downtime check confirms Axis Bank card has no active outage. Without an explicit hard decline or expired card indication, a generic card_declined on a previously successful customer points to a soft decline (e.g., temporary daily limit or temporary issuing bank processing hold). Scheduled retry is the appropriate move for soft decline.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1006#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": null,
+    "confidence": 0,
+    "reasoning": "Investigation did not conclude (malformed proposal); falling back to a scheduled retry in 48h.",
+    "toolCalls": 5,
+    "degraded": true
+  },
+  "cust_1007#2": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.88,
+    "reasoning": "The customer has a strong payment history of 6 successful card payments with 0 prior failures over a 30-day median billing cycle. Live downtime checks confirm HDFC card infrastructure is operational (no matched downtime). The payment failed due to insufficient_funds. Analysis of prior attempts shows attempt #1 was a RETRY_SCHEDULED that failed. Maintaining the root cause as insufficient_funds while avoiding repeating the failed RETRY_SCHEDULED action, we deviate from the default playbook move and propose a CUSTOMER_NUDGE via email to prompt the customer to replenish their account balance or update their payment method.",
+    "toolCalls": 6,
+    "degraded": false
+  },
+  "cust_1006#3": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.85,
+    "reasoning": "Investigation reveals that the root cause of the payment failure is insufficient_funds on an Axis Bank card. Bank downtime checks confirm no active downtime on Axis Bank. Two prior RETRY_SCHEDULED attempts have already been made and failed. While the default recovery playbook for insufficient_funds suggests RETRY_SCHEDULED, we deviate from this default because repeating another automated scheduled retry after two consecutive failures will not yield a different result without customer action. Therefore, we issue a CUSTOMER_NUDGE via email to prompt the customer to top up their account or update their payment method.",
+    "toolCalls": 6,
+    "degraded": false
+  },
+  "cust_1007#3": {
+    "action": {
+      "kind": "PAYMENT_LINK",
+      "rail": "netbanking"
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.85,
+    "reasoning": "The customer has 6 successful prior payments with zero past failures, indicating high account quality. The failure was caused by insufficient_funds on auto-debit via card. Two prior recovery attempts (RETRY_SCHEDULED and CUSTOMER_NUDGE) have already been attempted and failed. In accordance with recovery guidelines, failed moves must not be repeated. To recover the payment, sending a PAYMENT_LINK via netbanking rail provides the customer an alternative rail to pay directly from a different account.",
+    "toolCalls": 6,
+    "degraded": false
+  },
+  "cust_1006#4": {
+    "action": {
+      "kind": "PAYMENT_LINK",
+      "rail": "netbanking"
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.85,
+    "reasoning": "Investigated the failed payment of 999.00 INR for acme_subscriptions with error reason insufficient_funds. The customer's payment history shows 1 successful payment out of 4 total attempts, using an AXIS card, with no active bank downtime reported. Reviewing prior recovery attempts on this case shows two RETRY_SCHEDULED attempts and one CUSTOMER_NUDGE attempt, all of which failed. Following recovery guidelines, we retain the root cause as insufficient_funds and avoid repeating previously failed moves. To recover the payment, we issue a PAYMENT_LINK on the netbanking rail, offering the customer an alternative payment method to complete the transaction.",
+    "toolCalls": 6,
+    "degraded": false
+  },
+  "cust_1007#4": {
+    "action": {
+      "kind": "WRITE_OFF",
+      "reason": "All prior recovery channels (scheduled retry, customer nudge, payment link) have been attempted and failed, indicating an unrecoverable decline."
+    },
+    "diagnosisRootCause": "unrecoverable",
+    "confidence": 0.9,
+    "reasoning": "Investigated customer payment history: customer has 6 prior successful card payments with a 30-day cadence, but the 2026-09-01 payment failed with insufficient_funds. Checked live bank downtime for HDFC card: no active downtime found (matched: false). Checked prior attempts on this case: Attempt 1 (RETRY_SCHEDULED), Attempt 2 (CUSTOMER_NUDGE), and Attempt 3 (PAYMENT_LINK) have all failed. Per recovery guidelines, we must not repeat already failed recovery moves. Because scheduled retries, customer nudges, and alternative payment links have all proven unsuccessful, the decline is not clearing. Deviating from the default insufficient_funds action (RETRY_SCHEDULED) and classifying the root cause as unrecoverable, proposing WRITE_OFF.",
+    "toolCalls": 6,
+    "degraded": false
+  },
+  "cust_1014#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 8
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.9,
+    "reasoning": "Customer has 6 successful prior payments with 0 past failures. Error code is insufficient_funds on card (HDFC). No active bank downtime detected. Retrying scheduled at salary credit / month-beginning window or standard retry delay is optimal for insufficient funds.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1012#1": {
+    "action": {
+      "kind": "ESCALATE",
+      "reason": "Payment failed risk risk check (payment_risk_check_failed). Escalating for human review."
+    },
+    "diagnosisRootCause": "risk_hold",
+    "confidence": 0.95,
+    "reasoning": "The payment failed due to Razorpay error reason 'payment_risk_check_failed' (BAD_REQUEST_ERROR). Customer payment history shows 2 successful prior payments on file with no prior failures. No active bank downtime was detected for the customer's issuing bank (SBIN). Per the recovery playbook, failures caused by risk flags or fraud checks (risk_hold) must be escalated to a human investigator for manual review rather than subject to automated retry attempts or nudges.",
+    "toolCalls": 6,
+    "degraded": false
+  },
+  "cust_1019#1": {
+    "action": {
+      "kind": "ESCALATE",
+      "reason": "payment_risk_check_failed"
+    },
+    "diagnosisRootCause": "risk_hold",
+    "confidence": 0.9,
+    "reasoning": "The payment failed due to BAD_REQUEST_ERROR (payment_risk_check_failed), indicating a risk hold or fraud check failure on the transaction. There is no active bank downtime for SBIN card payments. Customer history shows 1 successful and 1 failed payment. Risk check failures require manual review/escalation as per merchant recovery policies for risk holds.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1013#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 72
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.85,
+    "reasoning": "Payment failed due to insufficient funds (BAD_REQUEST_ERROR / insufficient_funds) on an Axis card. Bank downtime check confirmed no active outages for Axis Bank. Payment history shows 2 successful and 2 failed payments previously. For insufficient funds root cause, standard recovery is RETRY_SCHEDULED timed to when the customer is expected to have funds (e.g. beginning of month/payday cycle or 72-120 hours). Scheduling retry for 72 hours out (3 days later on Sept 4).",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1017#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.95,
+    "reasoning": "The payment failed with GATEWAY_ERROR / issuer_technical_error on a card transaction. Live bank downtime feed confirms a high-severity active outage specifically for card issuer BKID (matched: true). The customer has 3 successful past payments on file. Per merchant recovery playbook and similar resolved cases, bank downtime issues should be handled with a scheduled retry once the outage clears, without customer friction or nudging. A retry is scheduled for 24 hours.",
+    "toolCalls": 6,
+    "degraded": false
+  },
+  "cust_1018#1": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "soft_decline",
+    "confidence": 0.85,
+    "reasoning": "Investigated customer payment history and bank downtime. Customer has 3 prior successful card payments, last on 2026-04-30. No active bank downtime detected for Axis Bank card. Generic payment_failed error suggests a card soft decline or insufficient funds / expired card. Checking playbook and submitting proposal.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1016#1": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.95,
+    "reasoning": "The payment failed with a card_expired error code (BAD_REQUEST_ERROR) on an ICICI card. Bank downtime check confirmed no active downtime affecting ICICI cards. The customer has a clean history of 6 successful payments. An expired card is a hard decline requiring customer action. Similar resolved cases for this failure reason demonstrate successful recovery via CUSTOMER_NUDGE via email.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1015#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.95,
+    "reasoning": "Customer has a perfect prior payment history with 4 successful card transactions and zero failures. Checking the bank downtime service reveals an active, high-severity downtime on the customer's card issuer, Punjab National Bank (PUNB). The generic 'card_declined' error is directly caused by this bank downtime. Following the recovery playbook for bank_downtime, we schedule a retry for 24 hours later to allow time for the bank outage to clear without bothering the customer.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1010#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 6
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.92,
+    "reasoning": "The customer has a clean payment history with 5 successful card payments out of 5 prior attempts. Bank downtime lookup confirmed an active high-severity outage for issuer BKID on the card method, matching the GATEWAY_ERROR (issuer_technical_error). Similar historical cases were successfully resolved using RETRY_SCHEDULED. Following the recovery playbook for bank_downtime, we schedule a retry in 6 hours to allow the issuing bank outage to clear.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1011#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "soft_decline",
+    "confidence": 0.85,
+    "reasoning": "The customer has a reliable history with 2 successful card payments out of 3 total records. The failure code (BAD_REQUEST_ERROR / payment_failed) is generic, and check_bank_downtime confirms no active downtime on AXIS card. Following the playbook for soft declines with clean history, we schedule a retry in 24 hours to allow temporary limits or processing holds to clear.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1013#2": {
+    "action": {
+      "kind": "PAYMENT_LINK",
+      "rail": "netbanking"
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.85,
+    "reasoning": "Initial error reason is insufficient_funds. A scheduled retry (RETRY_SCHEDULED) has already been attempted and failed with a payment decline. Repeating RETRY_SCHEDULED or RETRY_NOW is unlikely to succeed since auto-debit on this card has repeatedly failed for insufficient funds / decline. According to the recovery playbook for insufficient_funds, when prior retries fail or an alternative payment option is preferred, providing a payment link or customer nudge is appropriate. Sending a PAYMENT_LINK via netbanking allows the customer to pay using an alternate account or funds source directly.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1010#2": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "Investigation reveals the customer has a perfect payment history with 5 successful payments out of 5. The payment failed with error code GATEWAY_ERROR (issuer_technical_error). Bank downtime checks confirm a matched high-severity active downtime on the issuing bank (BKID card). A previous scheduled retry failed because the bank downtime remains unresolved. Following recovery guidelines for persistent bank downtime, we retain the bank_downtime root cause and schedule another retry 24 hours out to allow time for BKID systems to recover.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1018#2": {
+    "action": {
+      "kind": "PAYMENT_LINK",
+      "rail": "netbanking"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.85,
+    "reasoning": "Customer has 3 prior successful card payments, with last success 126 days ago. Downtime check for AXIS card returned matched: false. Prior recovery attempt 1 was CUSTOMER_NUDGE, which failed due to payment decline on the card rail. Retaining the root cause of hard_decline (expired or blocked card), we deviate from repeating CUSTOMER_NUDGE and instead issue a PAYMENT_LINK on netbanking as an alternative rail for the customer to complete payment.",
+    "toolCalls": 6,
+    "degraded": false
+  },
+  "cust_1013#3": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.85,
+    "reasoning": "The initial payment failed due to insufficient funds on an Axis Bank card. Prior recovery attempts included RETRY_SCHEDULED (attempt 1) and PAYMENT_LINK (attempt 2), both of which failed. Since automated retries and payment links have already failed, repeating those actions is ineffective. A customer nudge (via email) prompting the customer to update their payment method or ensure adequate account balance is the appropriate next step.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1011#2": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "soft_decline",
+    "confidence": 0.85,
+    "reasoning": "Investigation shows that Attempt #1 was a RETRY_SCHEDULED which failed with 'payment declined'. The customer's issuing bank (AXIS card) currently has no active downtime. While the default recovery playbook action for a soft decline is RETRY_SCHEDULED, we must not repeat a move that has already failed on this case. Since automated retry failed and the customer's last successful payment was 132 days ago, we deviate from the default playbook and send a CUSTOMER_NUDGE via email so the customer can update their card or authorize the payment.",
+    "toolCalls": 6,
+    "degraded": false
+  },
+  "cust_1013#4": {
+    "action": {
+      "kind": "WRITE_OFF",
+      "reason": "All automated recovery channels (RETRY_SCHEDULED, PAYMENT_LINK, CUSTOMER_NUDGE) have failed; writing off payment."
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.95,
+    "reasoning": "The initial failure reason is insufficient_funds for customer on AXIS card. Customer history shows 2 successes and 2 failures, with 117 days since the last successful payment. Checking bank downtime reveals no active outages matching the issuing bank/instrument. Reviewing this case's prior attempts shows that RETRY_SCHEDULED, PAYMENT_LINK, and CUSTOMER_NUDGE have all been attempted and failed. The playbook default for insufficient_funds is RETRY_SCHEDULED, but we must deviate from the playbook because repeating previously failed moves is forbidden and ineffective. With all automated recovery rails exhausted and no payment cleared after link and nudge attempts, the payment is deemed unrecoverable and should be written off.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1011#3": {
+    "action": {
+      "kind": "PAYMENT_LINK",
+      "rail": "netbanking"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.85,
+    "reasoning": "The customer experienced a generic payment_failed error on their AXIS card. Checking bank downtime confirms there is no active downtime for AXIS card (matched: false). Customer history shows 2 successful payments and 1 failed, with the last successful payment occurring 133 days ago. Investigation of prior recovery attempts reveals two failed attempts: Attempt 1 (RETRY_SCHEDULED) failed due to payment decline, and Attempt 2 (CUSTOMER_NUDGE) also failed. Because retrying the card and nudging the customer have already failed, repeating those moves would be ineffective. Classifying the root cause as hard_decline (persistent card failure/block), we deviate from the default CUSTOMER_NUDGE playbook action and propose sending a PAYMENT_LINK using the netbanking rail to allow the customer to complete the payment via an alternative instrument.",
+    "toolCalls": 6,
+    "degraded": false
+  },
+  "cust_1026#1": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "risk_hold",
+    "confidence": 0.85,
+    "reasoning": "The payment failed due to payment_risk_check_failed (risk_hold). Customer history shows 1 prior success 152 days ago with card. No bank downtime was detected for SBIN. For risk holds, customer nudge via email is recommended to verify details or update payment method.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1028#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.85,
+    "reasoning": "The customer experienced a failure due to insufficient funds on 2026-09-02 for a recurring subscription payment. Customer history shows 5 successful payments and 1 failed payment, indicating a reliable payer with a regular payment cycle. There is no active bank downtime for HDFC card. For insufficient_funds, scheduling a retry (RETRY_SCHEDULED) after a short delay (e.g. 48 hours or aligning with early month liquidity) gives time for funds to be added without prematurely disturbing the customer or risking immediate re-decline.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1027#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.85,
+    "reasoning": "The customer payment failed with insufficient_funds on an AXIS bank card. There is no bank downtime. For insufficient_funds, a scheduled retry timed towards when accounts are re-funded (e.g. standard 24-72h delay or start of month / salary days) is recommended. Scheduling a retry in 48 hours is optimal.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1020#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.85,
+    "reasoning": "Customer experienced a failure due to insufficient funds on an AXIS card. Bank downtime is negative (no downtime for AXIS card). The root cause is classified as insufficient_funds. Based on standard playbook and customer patterns, scheduling a retry (RETRY_SCHEDULED) after 48-72 hours allows time for customer account balance replenishment. Setting retryDelayHours to 48.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1029#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 72
+    },
+    "diagnosisRootCause": "soft_decline",
+    "confidence": 0.85,
+    "reasoning": "The customer has a history of 3 successful card payments. The failure reason 'card_declined' on an ICICI card with no active bank downtime indicates a soft decline or temporal limit issue rather than a hard decline or expired card. Looking at similar resolved cases for card_declined, RETRY_SCHEDULED successfully recovered cases within ~64-71 hours. Scheduling a retry in 72 hours allows time for temporary card limits/funds issues to reset.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1023#1": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.95,
+    "reasoning": "Customer payment failed due to card_expired (BAD_REQUEST_ERROR). The customer has a strong payment history with 6 successful payments. Check on bank downtime confirms no relevant bank outages. Prior cases with card_expired on this merchant were successfully recovered using CUSTOMER_NUDGE. As retrying an expired card directly will fail, asking the customer via email nudge to update their payment method is the optimal recovery action.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1024#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.95,
+    "reasoning": "The customer has a clean payment history with 5 out of 5 successful past payments. The current payment failed with 'issuer_technical_error', which aligns with an active high-severity downtime on the customer's issuing bank (BKID). Following the merchant recovery playbook for bank_downtime and evidence from similar resolved cases, we schedule a retry for 24 hours later to allow time for the issuer outage to resolve.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1021#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 72
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.9,
+    "reasoning": "The payment failed with insufficient_funds on an HDFC card. No bank downtime was active for HDFC. The customer has a strong history of 5 successful payments out of 6. For insufficient_funds, the optimal recovery action is RETRY_SCHEDULED to allow time for the customer to replenish funds in their account. Scheduling a retry in 72 hours (3 days) aligns with standard balance top-up windows and recurring payroll cycles.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1022#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 72
+    },
+    "diagnosisRootCause": "soft_decline",
+    "confidence": 0.9,
+    "reasoning": "Investigated failed card payment (499.00 INR, card_declined) for acme_subscriptions customer with clean payment history (4 successful payments out of 4, 100% success rate). Checked bank downtime feed: no active downtime on AXIS card. Similar cases with card_declined on card rail show RETRY_SCHEDULED recovered in ~64-71 hours. Classified root cause as soft_decline per playbook ('Clean-history customer, generic decline, no downtime'). Recommending RETRY_SCHEDULED with retryDelayHours of 72 to allow the transient issuer decline or balance window to clear.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1020#2": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.85,
+    "reasoning": "The initial payment failed due to insufficient funds on an Axis Bank card. A scheduled retry was already attempted (Attempt 1) and also failed with a payment decline. As per rule guidelines, when a previous attempt has already failed, we should not repeat the same move. Scheduled retries have proven ineffective here, and there is no active bank downtime. Therefore, nudging the customer via email to top up their account or update their payment method is the appropriate recovery strategy.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1027#2": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.85,
+    "reasoning": "The customer experienced a failure with error reason insufficient_funds on an AXIS card. Checking bank downtime shows no active downtime on AXIS card. Customer history shows 3 successful payments out of 4 prior records, indicating a valid recurring customer. However, a prior scheduled retry (Attempt #1) was already executed and failed. Per guidelines, we must not repeat a move that has already failed while keeping the original root cause hypothesis. Therefore, we transition from auto-retry to directly notifying the customer via email (CUSTOMER_NUDGE) so they can top up their account balance or use an alternate payment method.",
+    "toolCalls": 6,
+    "degraded": false
+  },
+  "cust_1025#1": {
+    "action": {
+      "kind": "PAYMENT_LINK",
+      "rail": "netbanking"
+    },
+    "diagnosisRootCause": "soft_decline",
+    "confidence": 0.9,
+    "reasoning": "Customer has a clean payment history with 3/3 past successful payments on card (median 31 days between payments, last success 124 days ago). Check on live bank downtime for SBIN card shows no active outages. This generic payment_failed error on a clean customer history with no downtime indicates a soft_decline. While the default playbook action for soft_decline is RETRY_SCHEDULED, historical resolved cases for card failures with payment_failed show that RETRY_SCHEDULED and CUSTOMER_NUDGE both failed, whereas PAYMENT_LINK was the only action that successfully recovered the funds. Deviating from the default playbook per merchant resolution data, we issue a PAYMENT_LINK using netbanking as an alternative rail.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1020#3": {
+    "action": {
+      "kind": "PAYMENT_LINK",
+      "rail": "netbanking"
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.85,
+    "reasoning": "The failure reason is insufficient_funds. Prior recovery attempts (RETRY_SCHEDULED and CUSTOMER_NUDGE) have already failed for this case. Repeating RETRY_SCHEDULED or CUSTOMER_NUDGE is unlikely to succeed. Sending a PAYMENT_LINK on netbanking provides an alternative payment rail for the customer to complete the payment.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1028#2": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.85,
+    "reasoning": "Customer has a good payment history (5 successful payments out of 6 total). The payment failed with error reason insufficient_funds on HDFC card, and live bank downtime check confirmed no active downtime on HDFC. A prior recovery attempt (Attempt 1) was already made using RETRY_SCHEDULED and failed. Per guidelines, we maintain the root cause as insufficient_funds, but we do not repeat RETRY_SCHEDULED after it already failed. We deviate from the default playbook action for insufficient_funds and instead send a CUSTOMER_NUDGE via email to prompt the customer to add funds or update their payment method.",
+    "toolCalls": 6,
+    "degraded": false
+  },
+  "cust_1020#4": {
+    "action": {
+      "kind": "WRITE_OFF",
+      "reason": "All recovery channels (scheduled retry, nudge, payment link) failed and history indicates unrecoverable decline."
+    },
+    "diagnosisRootCause": "unrecoverable",
+    "confidence": 0.92,
+    "reasoning": "The payment initially failed due to insufficient funds. Investigation reveals three prior recovery attempts have already been executed and failed: RETRY_SCHEDULED (Attempt 1), CUSTOMER_NUDGE (Attempt 2), and PAYMENT_LINK (Attempt 3). Customer payment history shows 2 failed payments out of 4 total with 76 days elapsed since the last success. Live downtime checks confirm no active issuer outages on Axis card. Because all viable recovery methods have been exhausted without success and the customer's account continues to fail, this decline will not clear. Following the merchant's playbook, this payment is classified as unrecoverable and recommended for WRITE_OFF.",
+    "toolCalls": 6,
+    "degraded": false
+  },
+  "cust_1027#3": {
+    "action": {
+      "kind": "PAYMENT_LINK",
+      "rail": "netbanking"
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.85,
+    "reasoning": "Customer history shows 3 successful payments out of 4 (75% success rate) on an AXIS card, with no active bank downtime. The payment failed due to insufficient_funds. Previous recovery attempts for this specific case were RETRY_SCHEDULED (Attempt 1) and CUSTOMER_NUDGE (Attempt 2), both of which failed. Per instructions, we must not repeat moves that have already failed. Although the default playbook for insufficient_funds suggests RETRY_SCHEDULED, we deviate because both RETRY_SCHEDULED and CUSTOMER_NUDGE were already exhausted. We keep the root cause as insufficient_funds and move to PAYMENT_LINK on the netbanking rail so the customer can complete payment using an alternate bank account.",
+    "toolCalls": 6,
+    "degraded": false
+  },
+  "cust_1028#3": {
+    "action": {
+      "kind": "PAYMENT_LINK",
+      "rail": "netbanking"
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.85,
+    "reasoning": "The customer failed a 999.00 INR subscription payment due to insufficient_funds on their HDFC card. Customer history shows a strong record with 5 successful payments out of 6 total payments (last success 24 days ago). Live downtime checks confirm HDFC card infrastructure is healthy (matched: false). \n\nPrior recovery attempts on this case reveal that Attempt 1 (RETRY_SCHEDULED) and Attempt 2 (CUSTOMER_NUDGE) both failed. While the recovery playbook default for insufficient_funds is RETRY_SCHEDULED, we must deviate from the default because both RETRY_SCHEDULED and CUSTOMER_NUDGE have already failed on this payment. Repeating either failed move is explicitly prohibited. \n\nGiven the customer's reliable track record, writing off or escalating is premature. Providing a PAYMENT_LINK on the netbanking rail allows the customer an alternative payment mechanism to settle the charge from another account.",
+    "toolCalls": 6,
+    "degraded": false
+  },
+  "cust_1027#4": {
+    "action": {
+      "kind": "WRITE_OFF",
+      "reason": "Exhausted all recovery moves (scheduled retry, customer nudge, payment link); decline will not clear."
+    },
+    "diagnosisRootCause": "unrecoverable",
+    "confidence": 0.9,
+    "reasoning": "The initial transaction failed with insufficient_funds. Investigation of prior attempts reveals that three recovery attempts have already been made and failed: RETRY_SCHEDULED (Attempt 1), CUSTOMER_NUDGE (Attempt 2), and PAYMENT_LINK (Attempt 3). No active downtime is affecting the issuing bank. Because all standard recovery avenues have failed and guidelines prohibit repeating failed moves, the decline will not clear and the root cause is classified as unrecoverable. Per the recovery playbook, WRITE_OFF is proposed.",
+    "toolCalls": 6,
+    "degraded": false
+  },
+  "cust_1028#4": {
+    "action": {
+      "kind": "WRITE_OFF",
+      "reason": "All recovery attempts (RETRY_SCHEDULED, CUSTOMER_NUDGE, PAYMENT_LINK) have already failed for this payment."
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.9,
+    "reasoning": "Investigated failed payment of 999.00 INR for merchant acme_subscriptions with Razorpay error reason 'insufficient_funds'. Customer payment history shows 5 successful payments out of 6, but bank downtime check for the customer's card (HDFC) confirmed no active downtime (matched: false). Checking prior recovery attempts on this case reveals that 3 attempts have already been made and failed: Attempt 1 (RETRY_SCHEDULED), Attempt 2 (CUSTOMER_NUDGE), and Attempt 3 (PAYMENT_LINK). Per system guidelines, previously failed moves must not be repeated. Although the merchant playbook default for 'insufficient_funds' is RETRY_SCHEDULED, we must deviate because RETRY_SCHEDULED, CUSTOMER_NUDGE, and PAYMENT_LINK have all been exhausted and failed, indicating the decline will not clear. Therefore, the payment is written off.",
+    "toolCalls": 6,
+    "degraded": false
+  },
+  "cust_1034#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 72
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.9,
+    "reasoning": "The customer failed payment due to insufficient_funds on an AXIS card. Bank downtime check confirms no active downtime on AXIS card. Customer has 3 prior successful card payments. For insufficient funds, a scheduled retry timed around standard salary/pay cycles or typical delay allows time for funds to be replenished. Playbook recommends RETRY_SCHEDULED.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1033#1": {
+    "action": {
+      "kind": "PAYMENT_LINK",
+      "rail": "netbanking"
+    },
+    "diagnosisRootCause": "risk_hold",
+    "confidence": 0.85,
+    "reasoning": "Customer payment failed with error payment_risk_check_failed on card instrument SBIN. Customer history shows 2 previous successful payments via card, though the last success was 164 days ago. Bank downtime check indicates SBIN card system is operational (no matching downtime). This is a risk hold issue. Retrying or nudging card won't bypass risk check flags on card rails. Offering an alternative payment rail like netbanking via a payment link allows the customer to complete the payment via bank direct authentication.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1035#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 72
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.9,
+    "reasoning": "The customer's payment history reveals 6 previous successful payments with 0 prior failures. The current failure code is insufficient_funds on an HDFC card, with no active bank downtime. According to standard payment recovery logic and playbook strategies for transient insufficient funds on loyal customers, a scheduled retry (RETRY_SCHEDULED) timed 72 hours later allows time for the customer to replenish account funds.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1032#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.9,
+    "reasoning": "The customer has a clean history of 3 successful card payments. Bank downtime verification confirms an active high-severity downtime matching the issuer (CNRB) for card payments. Per the recovery playbook for bank downtime, we schedule a retry after 24 hours without prompting the customer, as the failure stems from bank outage rather than customer action.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1037#1": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.95,
+    "reasoning": "The payment failed with BAD_REQUEST_ERROR due to card_expired. Analysis of customer history shows 6 prior successful payments and 0 failures. Bank downtime check confirms no active bank outage for ICICI card. Similar resolved cases for card_expired failures consistently show recovery via CUSTOMER_NUDGE (100% success rate). Per the recovery playbook for hard_decline (card_expired), retrying is ineffective as the card details must be updated by the customer. Therefore, a CUSTOMER_NUDGE via email is proposed.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1031#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.95,
+    "reasoning": "The customer has a clean 5/5 payment history on file. Verification via bank downtime feed confirms an active high-severity outage for the issuing bank (BKID). Similar resolved cases with issuer technical errors show successful recovery using RETRY_SCHEDULED. Following the merchant playbook for bank downtime, we schedule a automated retry in 24 hours to allow the bank outage to clear.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1036#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": "soft_decline",
+    "confidence": 0.9,
+    "reasoning": "Customer has a clean payment history with 4 successful past payments and 0 failed payments. The generic card_declined error without active bank downtime for issuer KKBK indicates a temporary soft decline. Similar resolved cases on card declines were successfully recovered using RETRY_SCHEDULED (resolving in 43-71 hours). Following the playbook for soft declines with a clean customer history, we schedule a retry in 48 hours.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1030#1": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.95,
+    "reasoning": "The payment failed due to BAD_REQUEST_ERROR with reason card_expired. The customer has a solid payment history of 6 successful payments and 0 failures. Bank downtime checks confirmed no relevant active outages. Similar resolved cases for card_expired under acme_subscriptions show that CUSTOMER_NUDGE successfully recovered all cases in 49-70 hours. Following the recovery playbook for hard_decline (card_expired), sending an email nudge to prompt the customer to update their payment method is the recommended action.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1038#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.95,
+    "reasoning": "Investigation summary:\n1. Customer Payment History: The customer has 5 prior successful payments out of 5 total payments with zero failures, demonstrating excellent payment reliability.\n2. Bank Downtime: A check against Razorpay's live downtime feed returned a direct match (`matched: true`) for the customer's instrument (BKID card) experiencing an active high-severity issuer downtime (`down_T8xxbch1uvYaeg`). This confirms the root cause of the `issuer_technical_error` decline is `bank_downtime`.\n3. Similar Cases: Past resolved cases for `issuer_technical_error` on cards demonstrate successful recovery using `RETRY_SCHEDULED`.\n4. Recovery Playbook: Playbook specifies `RETRY_SCHEDULED` for `bank_downtime` without nudging the customer, as the failure is entirely issuer-side.\n\nProposal: Schedule a retry in 24 hours to allow time for BKID issuing bank services to normalize.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1039#1": {
+    "action": {
+      "kind": "PAYMENT_LINK",
+      "rail": "netbanking"
+    },
+    "diagnosisRootCause": "soft_decline",
+    "confidence": 0.9,
+    "reasoning": "Investigated payment failure for merchant acme_subscriptions (amount 6499.00 INR, error payment_failed / BAD_REQUEST_ERROR). The customer has 3 successful past payments out of 3 total, indicating a clean payment history. Bank downtime check for the customer's SBIN card shows no active outages matching this instrument. No prior recovery attempts exist for this payment. Based on clean customer history and generic error code without bank downtime, the root cause is classified as soft_decline. While the recovery playbook's default move for soft_decline is RETRY_SCHEDULED, checking similar resolved cases for this merchant on card payments with payment_failed shows that RETRY_SCHEDULED failed while PAYMENT_LINK recovered all cases. Therefore, deviating from the playbook default to send a PAYMENT_LINK via netbanking rail is the optimal recovery action.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1034#2": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.9,
+    "reasoning": "The transaction failed due to insufficient_funds on an AXIS card. Bank downtime feed confirms no active outage for AXIS cards. The customer has a reliable history with 3 successful payments out of 4 on file. Prior attempts reveal that attempt #1 was a RETRY_SCHEDULED that failed with 'payment declined'. While the root cause remains insufficient_funds (as failing a scheduled retry does not contradict the root cause), repeating RETRY_SCHEDULED is avoided per guidelines ('do not repeat the same move and expect a different result'). Therefore, we deviate from the playbook's default RETRY_SCHEDULED move and issue a CUSTOMER_NUDGE via email to prompt the customer to top up funds or update their payment details.",
+    "toolCalls": 6,
+    "degraded": false
+  },
+  "cust_1034#3": {
+    "action": {
+      "kind": "PAYMENT_LINK",
+      "rail": "netbanking"
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.8,
+    "reasoning": "The payment failed with insufficient_funds on an Axis card. Customer payment history shows 3 successful payments out of 4 total, indicating a reliable customer. Bank downtime check shows no active outage for Axis. However, two prior recovery attempts on this case have already failed: attempt 1 (RETRY_SCHEDULED) and attempt 2 (CUSTOMER_NUDGE). To avoid repeating previously failed moves, we maintain the root cause as insufficient_funds but deviate from the default playbook move by issuing a PAYMENT_LINK on the netbanking rail. This allows the customer to pay from an alternative bank account.",
+    "toolCalls": 6,
+    "degraded": false
+  },
+  "cust_1034#4": {
+    "action": {
+      "kind": "WRITE_OFF",
+      "reason": "agent did not give a reason"
+    },
+    "diagnosisRootCause": "unrecoverable",
+    "confidence": 0.92,
+    "reasoning": "The payment failed due to insufficient_funds. A review of the customer's payment history shows 3 successful payments and 1 failed payment out of 4, with 64 days since the last success. Bank downtime check confirms no active outages for the issuing bank (AXIS). Checking prior recovery attempts on this specific case reveals that three distinct recovery attempts have already been tried and failed: Attempt 1 (RETRY_SCHEDULED), Attempt 2 (CUSTOMER_NUDGE), and Attempt 3 (PAYMENT_LINK). Since all primary automated recovery avenues (scheduled retry, customer nudge, payment link) have been exhausted without success, repeating a failed move is prohibited. This indicates the decline will not clear through automated channels. Following the recovery playbook for unrecoverable declines, the appropriate action is WRITE_OFF.",
+    "toolCalls": 6,
+    "degraded": false
+  },
+  "cust_1047#1": {
+    "action": {
+      "kind": "ESCALATE",
+      "reason": "agent did not give a reason"
+    },
+    "diagnosisRootCause": "risk_hold",
+    "confidence": 0.9,
+    "reasoning": "Customer payment failed due to payment_risk_check_failed. No bank downtime or transient technical issue was detected. The root cause is risk_hold. According to standard risk mitigation protocols, transactions flagged for risk check failure require manual review/escalation rather than automated retries or direct payment links.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1049#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.95,
+    "reasoning": "Customer has a strong history of 6 consecutive successful card payments with zero prior failures. The bank is HDFC with no active downtime reported. For insufficient_funds, scheduling a retry aligns with similar resolved cases and playbook guidance. Retrying in 48 hours provides time for funds to be available/salary cycle alignment.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1040#1": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "risk_hold",
+    "confidence": 0.9,
+    "reasoning": "The error reason 'payment_risk_check_failed' corresponds to a risk hold where automated charging was blocked by risk evaluation. Customer history shows 2 previous successful payments via card, with no prior bank downtime or previous retry attempts. Nudging the customer via email asking them to re-authenticate or update their payment details is the appropriate recovery move according to standard playbook guidelines for risk_hold.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1041#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.9,
+    "reasoning": "Customer failed due to insufficient_funds on an AXIS card. No active downtime is present. Historical pattern shows RETRY_SCHEDULED successfully recovers similar cases. Scheduling retry for 36-48 hours out (e.g. 48 hours) to allow funds to be deposited.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1044#1": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.95,
+    "reasoning": "The payment failed with error code BAD_REQUEST_ERROR (card_expired), indicating a hard decline due to an expired card. Customer payment history shows 6 previous successful payments, confirming a reliable payer whose card has recently expired. Bank downtime check for ICICI card payments confirms no bank-side outage. Similar resolved cases for card_expired show 100% recovery using CUSTOMER_NUDGE. Adhering to the merchant recovery playbook for hard_decline, sending a CUSTOMER_NUDGE via email is the optimal move.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1045#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.95,
+    "reasoning": "Initial check on customer history revealed 5/5 successful past payments with no previous failures. Checking bank downtime confirmed an active high-severity downtime for card payments on the customer's specific issuing bank (BKID). Similar resolved cases with issuer_technical_error indicate strong recovery rates via scheduled retries. In accordance with the merchant playbook for bank_downtime, we schedule a retry for 24 hours later to allow the issuing bank downtime to clear.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1042#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.9,
+    "reasoning": "The payment failed due to insufficient_funds on an HDFC card. Customer has 6 prior successful payments and 0 failures, showing a solid payment history. Bank downtime check confirms HDFC card services are operating normally. Similar resolved cases for insufficient_funds on card payments show recovery via RETRY_SCHEDULED in about 37 hours. Scheduling a retry in 48 hours allows time for salary/funds credit at the beginning of the month.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1048#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.9,
+    "reasoning": "Investigation of failed payment for acme_subscriptions (1499.00 INR):\n1. Customer payment history reveals 1 success out of 4 payments, with the last successful payment occurring on 2026-06-28.\n2. Bank downtime check confirmed no active downtime for the issuing bank (Axis Bank) or card rail.\n3. Similar resolved cases for insufficient funds on cards demonstrate that RETRY_SCHEDULED is the effective recovery mechanism (~37 hours to resolution).\n4. The playbook recommends RETRY_SCHEDULED for insufficient_funds to align with customer liquidity windows.\n5. Given the current failure on Sept 3, scheduling a retry in 48 hours gives the customer time to top up their account or receive monthly salary credits.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1043#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": "soft_decline",
+    "confidence": 0.9,
+    "reasoning": "The customer has a perfect payment record with 4 prior successful payments and zero failures. The error code is a generic card_declined (BAD_REQUEST_ERROR) without active downtime on Kotak Mahindra Bank (KKBK). Similar resolved card decline cases for this merchant were successfully recovered via RETRY_SCHEDULED in ~43-71 hours. Following the playbook for soft_decline on a clean-history customer, a scheduled retry in 48 hours is recommended.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1046#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "soft_decline",
+    "confidence": 0.85,
+    "reasoning": "The customer has a clean history of 2 successful card payments out of 3 total records. Checking bank downtime for the card issuer (KKBK) shows no active outages. Similar resolved cases with generic card declines recover successfully via RETRY_SCHEDULED. Following the playbook for soft_decline, we schedule a retry after 24 hours.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1042#2": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.9,
+    "reasoning": "The payment failed due to insufficient_funds. The customer has a strong payment history with 6 successful payments and 0 previous failures. A scheduled retry was already attempted (Attempt 1) and failed. Following the directive not to repeat a failed recovery action, we maintain the root cause diagnosis of insufficient_funds but pivot from RETRY_SCHEDULED to a CUSTOMER_NUDGE via email to notify the customer to top up their account or provide alternative payment details.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1049#2": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.9,
+    "reasoning": "The customer has a solid history of 6 successful payments out of 6 total attempts on card with no previous failures. The payment failed due to insufficient_funds, and bank downtime checks confirm that HDFC is operational with no active downtime. The recovery playbook default for insufficient_funds is RETRY_SCHEDULED; however, prior attempt logs show that a RETRY_SCHEDULED move has already been tried and failed. Following policy not to repeat an action that already failed, we retain the root cause of insufficient_funds but deviate from the default move to CUSTOMER_NUDGE via email to alert the customer to fund their account.",
+    "toolCalls": 6,
+    "degraded": false
+  },
+  "cust_1048#2": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.85,
+    "reasoning": "The customer experienced a failure due to insufficient_funds on card. A previous attempt (RETRY_SCHEDULED) was executed and failed. Per guidelines, we must not repeat the same failed move (RETRY_SCHEDULED). Maintaining the root cause as insufficient_funds, the appropriate next step is to send a CUSTOMER_NUDGE via email to prompt the customer to update their payment method or add funds.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1046#2": {
+    "action": {
+      "kind": "PAYMENT_LINK",
+      "rail": "netbanking"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.88,
+    "reasoning": "Initial card transaction failed with payment_failed. Checking bank downtime revealed no active outages for Kotak Mahindra Bank (KKBK). A prior recovery attempt (RETRY_SCHEDULED) was already executed and failed due to payment declined, ruling out a transient soft decline and pointing to a persistent hard decline (such as an expired or blocked card). The playbook default for hard_decline is CUSTOMER_NUDGE, but past merchant cases show that PAYMENT_LINK successfully recovered 100% of resolved cases for this error reason on card, while CUSTOMER_NUDGE failed. Therefore, we deviate from the default nudge and issue a PAYMENT_LINK on netbanking to allow the customer to complete the payment via an alternative rail.",
+    "toolCalls": 6,
+    "degraded": false
+  },
+  "cust_1042#3": {
+    "action": {
+      "kind": "PAYMENT_LINK",
+      "rail": "netbanking"
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.85,
+    "reasoning": "The customer has a strong payment history with 6 successful payments and 0 prior failures. The initial decline reason was insufficient_funds, and no active bank downtime is affecting their issuer (HDFC). Two prior recovery attempts have already failed for this case: Attempt 1 (RETRY_SCHEDULED) and Attempt 2 (CUSTOMER_NUDGE). Following recovery guidelines, we must not repeat a failed action. Keeping the diagnosis of insufficient_funds while pivoting from retries/nudges, sending a PAYMENT_LINK on an alternative rail (netbanking) allows the customer to directly complete payment using another account or bank rail where funds are available.",
+    "toolCalls": 6,
+    "degraded": false
+  },
+  "cust_1049#3": {
+    "action": {
+      "kind": "PAYMENT_LINK",
+      "rail": "netbanking"
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.85,
+    "reasoning": "The payment failed due to 'insufficient_funds'. The customer has a strong payment history of 6 successful payments with no prior failures before this billing cycle. Investigation shows that two recovery attempts have already been made on this case: Attempt 1 (RETRY_SCHEDULED) and Attempt 2 (CUSTOMER_NUDGE), both of which failed. Per recovery guidelines, we must not repeat moves that have already failed. Maintaining the root cause as 'insufficient_funds', we deviate from the standard playbook retry by offering a PAYMENT_LINK on the netbanking rail, giving the loyal customer an alternate mechanism to complete the payment from a different bank account.",
+    "toolCalls": 6,
+    "degraded": false
+  },
+  "cust_1048#3": {
+    "action": {
+      "kind": "PAYMENT_LINK",
+      "rail": "netbanking"
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.85,
+    "reasoning": "Investigation indicates payment failure due to insufficient_funds on the customer's registered card. Checking live downtime shows no active matched downtime on AXIS card. Reviewing this case's prior attempts reveals Attempt 1 (RETRY_SCHEDULED) and Attempt 2 (CUSTOMER_NUDGE) both failed. Following the constraint not to repeat previously attempted moves, we deviate from the default retry schedule and move to PAYMENT_LINK on the netbanking rail to enable the customer to settle the 1499.00 INR payment using an alternative payment rail.",
+    "toolCalls": 6,
+    "degraded": false
+  },
+  "cust_1042#4": {
+    "action": {
+      "kind": "WRITE_OFF",
+      "reason": "agent did not give a reason"
+    },
+    "diagnosisRootCause": "unrecoverable",
+    "confidence": 0.95,
+    "reasoning": "The initial failure was due to insufficient_funds. However, this case has already had 3 prior recovery attempts: a scheduled retry (Attempt 1), a customer nudge (Attempt 2), and an alternative payment link (Attempt 3), all of which failed. Per recovery guidelines, we must not repeat moves that have already failed. Since all automated recovery mechanisms (retries, nudges, payment links) have been exhausted without success, this payment decline will not clear and is now unrecoverable. Therefore, writing off this payment is the appropriate action.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1048#4": {
+    "action": {
+      "kind": "WRITE_OFF",
+      "reason": "Three distinct recovery attempts (scheduled retry, customer nudge, payment link) have all failed, and the customer has a failing history with only 1 success in 70 days."
+    },
+    "diagnosisRootCause": "unrecoverable",
+    "confidence": 0.92,
+    "reasoning": "Customer history shows only 1 successful payment out of 4 total attempts, with the last success occurring 70 days ago (2026-06-28). Bank downtime check confirms no active downtime for the issuing bank (AXIS). Investigation of prior recovery attempts reveals that three separate moves have already been attempted and failed: Attempt 1 (RETRY_SCHEDULED), Attempt 2 (CUSTOMER_NUDGE), and Attempt 3 (PAYMENT_LINK). Since all primary automated recovery rails have been exhausted without success and the customer's payment history indicates a persistent inability to fund the account, the decline will not clear. Per the merchant playbook, this is classified as unrecoverable and recommended for WRITE_OFF.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1049#4": {
+    "action": {
+      "kind": "ESCALATE",
+      "reason": "All automated recovery attempts (scheduled retry, customer nudge, payment link) have failed; escalating to human agent for manual outreach."
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.9,
+    "reasoning": "The customer has a strong payment history with 6 successful past payments out of 6. The original decline was due to insufficient_funds, and bank downtime check confirms HDFC card services are operating normally. Three prior recovery moves have already been attempted on this case: RETRY_SCHEDULED (attempt 1), CUSTOMER_NUDGE (attempt 2), and PAYMENT_LINK (attempt 3), all of which failed. Repeating any of these failed automated moves is prohibited. Since immediate retry is not applicable for non-technical declines and all automated recovery rails are exhausted, escalating to human support is necessary to resolve the payment with this reliable customer.",
+    "toolCalls": 6,
+    "degraded": false
+  },
+  "cust_1054#1": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "risk_hold",
+    "confidence": 0.85,
+    "reasoning": "Payment failed with BAD_REQUEST_ERROR and payment_risk_check_failed on an SBIN card. Customer history shows 1 successful payment 188 days ago and no bank downtime active on SBIN. Historical cases for risk check failure indicate a risk hold / risk flag on this card or transaction. Per standard playbook for risk_hold, retrying the charge immediately or on schedule will continue to fail risk checks. Recommending CUSTOMER_NUDGE via email so the customer can update their payment method or clear security flags.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1059#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.95,
+    "reasoning": "Customer has 5 prior successful payments and 0 failures. Bank downtime check confirmed an active high-severity downtime for the customer's card issuer (BKID) causing issuer_technical_error. Similar resolved cases show high recovery rates with RETRY_SCHEDULED. Following the playbook for bank_downtime, we schedule a retry in 24 hours to allow the bank outage to resolve without bothering the customer.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1051#1": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.95,
+    "reasoning": "Investigation reveals 6 prior successful payments and 0 failures for this subscription customer. The error reason is card_expired, and bank downtime is not a factor. Similar resolved cases for card_expired with this merchant were 100% recovered via CUSTOMER_NUDGE. Following the merchant playbook for hard_decline due to an expired card, we propose sending a customer nudge via email to update payment details.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1050#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.95,
+    "reasoning": "Investigation of customer payment history shows 3 past successful payments on file. The error code card_declined coincides with an active high-severity downtime on CITI card instruments (matched: true). Similar resolved cases for card failures show successful recovery via RETRY_SCHEDULED. Following the merchant playbook for bank_downtime, we schedule a retry for 24 hours later to allow the bank outage to resolve.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1058#1": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "hard_decline",
+    "confidence": 0.95,
+    "reasoning": "The payment failed with card_expired error code. Investigation shows the customer has 6 successful prior payments with zero failed attempts. Bank downtime check confirmed no active downtime on ICICI card. Similar resolved cases with card_expired failures demonstrate 100% recovery using CUSTOMER_NUDGE. Following the merchant recovery playbook for hard_decline caused by an expired card, we propose sending a CUSTOMER_NUDGE via email requesting the customer to update their payment method.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1056#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.9,
+    "reasoning": "Investigation Findings:\n1. Customer History: The customer has 6 prior payments, all successful (0 failures) with a median cadence of 30 days. Their last successful payment was on 2026-07-30. This demonstrates strong payment intent and reliability.\n2. Downtime Check: The instrument (HDFC card) shows no active bank downtime (matched=false).\n3. Root Cause: The Razorpay error code indicates 'insufficient_funds'.\n4. Similar Resolved Cases & Playbook: Similar past cases with 'insufficient_funds' were successfully recovered via RETRY_SCHEDULED with an average resolution time of ~37 hours. The recovery playbook recommends scheduling a retry for insufficient funds to allow time for account replenishment.\n\nDecision:\nPropose RETRY_SCHEDULED with a retryDelayHours of 48 hours, providing sufficient time for the customer to top up their account/receive funds while capitalizing on their strong historical reliability.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1052#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 24
+    },
+    "diagnosisRootCause": "bank_downtime",
+    "confidence": 0.95,
+    "reasoning": "The payment failed due to 'issuer_technical_error'. Inspection of the bank downtime feed confirms an active high-severity downtime for the customer's card issuing bank (BKID). Customer has a flawless history of 5 successful prior payments on file. Similar resolved cases for card technical/issuer errors demonstrate that RETRY_SCHEDULED yields high recovery rates once the bank outage resolves. In alignment with the playbook for bank_downtime root cause, we propose scheduling a retry in 24 hours.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1055#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 240
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.92,
+    "reasoning": "Investigation steps and findings:\n1. Customer Payment History: The customer has a solid history with 3 successful payments out of 4 total attempts, with card as the payment method. Days since last successful payment is 67 days, and the median days between payments is 77 days.\n2. Bank Downtime: Active downtime check for the instrument (AXIS card) returned no match (matched: false). Method-wide outages on other issuers (BKID, PUNB, CNRB, CITI) do not affect this customer's AXIS card.\n3. Similar Resolved Cases: Historical cases with insufficient_funds on card payments were successfully recovered using RETRY_SCHEDULED.\n4. Prior Attempts: No prior recovery attempts exist for this failed payment.\n5. Recovery Playbook: Playbook default for insufficient_funds is RETRY_SCHEDULED, timing the retry toward when the customer historically has funds based on payment history.\n\nCadence Calculation:\nWith medianDaysBetweenPayments = 77 days and daysSinceLastSuccess = 67 days, the remaining time to the customer's usual payment window is 10 days (77 - 67 = 10 days = 240 hours).\n\nConclusion: Classifying root cause as insufficient_funds and scheduling retry in 240 hours (10 days).",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1057#1": {
+    "action": {
+      "kind": "RETRY_SCHEDULED",
+      "atHoursFromNow": 48
+    },
+    "diagnosisRootCause": "soft_decline",
+    "confidence": 0.9,
+    "reasoning": "Investigation shows the customer has a solid payment history (3 successful out of 4 total payments). The error code is a generic card_declined on an ICIC card, and bank downtime checks confirm ICIC card services are operating normally. Prior cases with card_declined on card payments show 100% recovery using RETRY_SCHEDULED within 29-71 hours. Following the recovery playbook for soft_decline on a clean-history customer with no downtime, we schedule a retry in 48 hours.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1053#1": {
+    "action": {
+      "kind": "PAYMENT_LINK",
+      "rail": "netbanking"
+    },
+    "diagnosisRootCause": "soft_decline",
+    "confidence": 0.88,
+    "reasoning": "The customer encountered a generic payment_failed error on an ICICI card with no active issuing bank downtime, indicating a soft_decline. Although the recovery playbook specifies RETRY_SCHEDULED as the default action for soft declines, analysis of similar resolved cases for this merchant reveals that RETRY_SCHEDULED failed in 2 out of 3 attempts (66% failure rate), whereas PAYMENT_LINK achieved a 100% recovery rate (3/3 cases). Therefore, we deviate from the playbook default and propose sending a PAYMENT_LINK on the netbanking rail to maximize recovery likelihood.",
+    "toolCalls": 5,
+    "degraded": false
+  },
+  "cust_1055#2": {
+    "action": {
+      "kind": "CUSTOMER_NUDGE",
+      "channel": "email"
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.85,
+    "reasoning": "The customer has 3 successful prior payments out of 4 total, showing a solid payment history with Acme Subscriptions. Bank downtime check confirms no active outages for AXIS card. A prior RETRY_SCHEDULED attempt already failed. Per recovery guidelines, we retain the root cause of insufficient_funds but do not repeat the failed RETRY_SCHEDULED move. Instead, we escalate to CUSTOMER_NUDGE via email so the customer can top up their account or update payment details.",
+    "toolCalls": 6,
+    "degraded": false
+  },
+  "cust_1055#3": {
+    "action": {
+      "kind": "PAYMENT_LINK",
+      "rail": "netbanking"
+    },
+    "diagnosisRootCause": "insufficient_funds",
+    "confidence": 0.85,
+    "reasoning": "The payment failed due to insufficient funds on the customer's card. Earlier recovery attempts included RETRY_SCHEDULED and CUSTOMER_NUDGE, both of which were unsuccessful. Per system guidelines, we must not repeat a move that has already failed. Providing a PAYMENT_LINK on the netbanking rail enables the customer to complete the transaction using an alternative bank account.",
+    "toolCalls": 6,
+    "degraded": false
+  },
+  "cust_1055#4": {
+    "action": {
+      "kind": "WRITE_OFF",
+      "reason": "All automated recovery avenues (scheduled retry, customer nudge, and payment link) have been attempted and failed. The decline will not clear and is unrecoverable."
+    },
+    "diagnosisRootCause": "unrecoverable",
+    "confidence": 0.92,
+    "reasoning": "The customer had 3 successful payments historically, but their last success was 78 days ago. The initial failure was due to insufficient_funds on an Axis card with no active downtime. However, reviewing prior attempts on this case reveals that 3 recovery actions have already been attempted and failed: Attempt 1 (RETRY_SCHEDULED), Attempt 2 (CUSTOMER_NUDGE), and Attempt 3 (PAYMENT_LINK). Per system guidelines, previously failed moves must not be repeated. Because all primary automated recovery mechanisms have been exhausted without success, this decline is persistent and unrecoverable. Consequently, we update the root cause to unrecoverable and propose WRITE_OFF.",
+    "toolCalls": 6,
+    "degraded": false
+  }
+}
