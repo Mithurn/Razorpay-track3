@@ -46,21 +46,25 @@ function describeDowntime(d: Downtime) {
 }
 
 // Data, not prose in the system prompt — the model must call get_recovery_playbook to see it.
+// Timing is deliberately absent: get_customer_payment_history already exposes the customer's own
+// cadence (medianDaysBetweenPayments, daysSinceLastSuccess) and check_bank_downtime exposes when
+// a window opened — the playbook naming an hour count would just be handing back the corpus's own
+// ground truth as advice. Judge the delay from those tools, not from a number here.
 const PLAYBOOK: { rootCause: string; defaultAction: string; note: string }[] = [
   {
     rootCause: "soft_decline",
     defaultAction: "RETRY_SCHEDULED",
-    note: "6-12h out. Clean-history customer, generic decline, no downtime — a recoverable payment, not a nudge or an escalation.",
+    note: "Clean-history customer, generic decline, no downtime — a recoverable payment. Time the retry from the customer's own payment cadence.",
   },
   {
     rootCause: "insufficient_funds",
     defaultAction: "RETRY_SCHEDULED",
-    note: "~48-72h out, timed toward when the customer historically has money. Escalating this wastes a recoverable payment.",
+    note: "Time it toward when the customer historically has money — read that from their payment history, not a fixed guess.",
   },
   {
     rootCause: "bank_downtime",
     defaultAction: "RETRY_SCHEDULED",
-    note: "Past the downtime window (12-24h if severity is high). Never a nudge — the customer did nothing wrong.",
+    note: "Time it to when the downtime feed shows the window clearing. Never a nudge — the customer did nothing wrong.",
   },
   {
     rootCause: "hard_decline",

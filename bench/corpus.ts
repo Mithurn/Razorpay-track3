@@ -101,9 +101,15 @@ const TEMPLATES: Template[] = [
     reason: "card_expired",
     code: "BAD_REQUEST_ERROR",
     method: "card",
-    build: () => ({
+    // A real card network sometimes auto-updates an expired card (issuer account-updater
+    // services) before the merchant ever contacts the customer — genuinely unknowable in
+    // advance, same as a self-recovering soft decline. Nudging one is not wrong, just wasted:
+    // the false-positive cost the over-nudge rate exists to measure. Without this, every
+    // CUSTOMER_NUDGE case has selfRecovers: false by construction and the metric can only read
+    // 0.0%, which is not a measured number, it is a property of the corpus.
+    build: (rng) => ({
       instrument: { issuer: ISSUERS_UP[1]! },
-      gt: { recoverable: true, via: "CUSTOMER_NUDGE", atHour: 24, selfRecovers: false, trueCause: "hard_decline", note: "needs a new card" },
+      gt: { recoverable: true, via: "CUSTOMER_NUDGE", atHour: 24, selfRecovers: rng() < 0.2, trueCause: "hard_decline", note: "needs a new card" },
       historyCount: 6,
     }),
   },
@@ -166,7 +172,11 @@ export function generateCorpus(opts: CorpusOptions): CorpusCase[] {
   for (let i = 0; i < size; i++) {
     const template = TEMPLATES[i % TEMPLATES.length]!;
     const built = template.build(rng);
-    const base = [49900, 99900, 149900, 249900][Math.floor(rng() * 4)]!;
+    // ₹6,499 is over safety-gate.ts's DEFAULT_LIMITS.maxExposurePaise (₹5,000) — the same figure
+    // the live demo's cust_over_cap uses. Without it, the exposure cap is proven only by a unit
+    // test and the demo's one seeded case, never by the measured batch.
+    const AMOUNTS = [49900, 99900, 149900, 249900, 649900];
+    const base = AMOUNTS[Math.floor(rng() * AMOUNTS.length)]!;
 
     let isDownPair = false;
     if (GENERIC_DECLINE_REASONS.has(template.reason)) {

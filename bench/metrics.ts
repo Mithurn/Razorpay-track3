@@ -55,7 +55,9 @@ function firstAttemptRootCause(r: CaseRecord): string | null {
 export function scoreArm(arm: string, records: CaseRecord[]): ArmMetrics {
   const recovered = records.filter((r) => r.kase.lane === "RECOVERED");
   const escalated = records.filter((r) => r.kase.lane === "ESCALATED");
-  const contacted = records.filter((r) => r.attempts.some((a) => a.action === "CUSTOMER_NUDGE"));
+  // A payment link is outreach too — the customer is asked to act, same false-positive exposure
+  // as a nudge. Counting only CUSTOMER_NUDGE understated who was actually contacted.
+  const contacted = records.filter((r) => r.attempts.some((a) => a.action === "CUSTOMER_NUDGE" || a.action === "PAYMENT_LINK"));
 
   const attemptsToRecovery = recovered.map((r) => r.attempts.filter(moneyMoves).length);
   const hoursToRecovery = recovered
