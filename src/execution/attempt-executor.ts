@@ -256,7 +256,7 @@ export class AttemptExecutor {
     const current = await this.attempts.byId(attemptId);
     if (current?.status !== "PENDING") return;
     await this.attempts.resolve(attemptId, {
-      status: "FAILED",
+      status: "COMPLETED",
       detail: "nudge queued; delivery and customer response are not observable in this build",
     });
   }

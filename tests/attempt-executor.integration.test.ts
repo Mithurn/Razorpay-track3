@@ -272,6 +272,18 @@ describe.runIf(adminUrl)("AttemptExecutor", () => {
     expect(attempt.razorpayRef).toMatch(/^plink_fake_/);
   });
 
+  it("resolves a nudge as COMPLETED, not FAILED — delivery just isn't observable", async () => {
+    await seedCase();
+    const gw = new FakeGateway();
+    const attempt = await build(gw, new ScriptedResolver([])).execute(
+      request({ action: { kind: "CUSTOMER_NUDGE", channel: "email" } }),
+    );
+    expect(attempt.status).toBe("COMPLETED");
+    expect(attempt.detail).toBe("nudge queued; delivery and customer response are not observable in this build");
+    expect(gw.orderCreates).toBe(0);
+    expect(gw.linkCreates).toBe(0);
+  });
+
   it("resolves ESCALATE without touching the gateway", async () => {
     await seedCase();
     const gw = new FakeGateway();
