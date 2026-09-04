@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { activityDurationMs, fmtDuration, resultFields, type Activity, type ToolEntry } from "./activities.js";
+import { activityDurationMs, fmtDuration, type Activity, type ToolEntry } from "./activities.js";
+import { resultFields } from "./toolLine.js";
 import { ACTIVITY_ICON, Check, ChevronDown, ChevronRight } from "../ui/icons.js";
 import { motion, AnimatePresence, blockIn, Spinner, StreamingText } from "../ui/motion.js";
 

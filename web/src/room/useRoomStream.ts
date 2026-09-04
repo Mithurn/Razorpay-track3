@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { metrics as fetchMetrics, streamRoom } from "../api.js";
 import type { RoomMetrics } from "../types.js";
+import { runReconnectingStream } from "../loop/reconnectingStream.js";
 
 // Drives the top bar and the case lanes from the canonical room-wide event stream, the same
 // PublishingEventLog fan-out every durable backend event already passes through — never a
@@ -40,34 +41,26 @@ export function useRoomStream(): RoomLiveState {
       }, METRICS_DEBOUNCE_MS);
     };
 
-    (async () => {
-      for (let attempt = 0; !cancelled; attempt++) {
-        if (attempt > 0) {
-          const delay = Math.min(RECONNECT_BASE_MS * 2 ** (attempt - 1), RECONNECT_MAX_MS);
-          await new Promise((resolve) => setTimeout(resolve, delay));
-          if (cancelled) return;
+    void runReconnectingStream(
+      controller.signal,
+      (signal) => streamRoom(signal),
+      (ev) => {
+        if (ev.type === "metrics") {
+          const { type: _type, ...snapshot } = ev;
+          void _type;
+          setMetrics(snapshot);
+        } else if (ev.type === "audit") {
+          setVersion((n) => n + 1);
+          refreshMetrics();
         }
-        try {
-          for await (const ev of streamRoom(controller.signal)) {
-            if (cancelled) return;
-            attempt = 0;
-            setConnected(true);
-            if (ev.type === "metrics") {
-              const { type: _type, ...snapshot } = ev;
-              void _type;
-              setMetrics(snapshot);
-            } else if (ev.type === "audit") {
-              setVersion((n) => n + 1);
-              refreshMetrics();
-            }
-          }
-        } catch {
-          /* dropped connection or abort; loop reconnects unless cancelled */
-        }
-        if (cancelled) return;
-        setConnected(false);
-      }
-    })();
+      },
+      {
+        baseMs: RECONNECT_BASE_MS,
+        maxMs: RECONNECT_MAX_MS,
+        onConnected: () => setConnected(true),
+        onDisconnected: () => setConnected(false),
+      },
+    );
 
     return () => {
       cancelled = true;

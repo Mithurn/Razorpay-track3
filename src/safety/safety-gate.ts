@@ -81,7 +81,7 @@ export const CONTACT_WINDOW_START_HOUR_IST = 8;
 export const CONTACT_WINDOW_END_HOUR_IST = 19;
 const IST_OFFSET_MIN = 330; // UTC+5:30, no DST
 
-export function istMinutesOfDay(date: Date): number {
+function istMinutesOfDay(date: Date): number {
   return (date.getUTCHours() * 60 + date.getUTCMinutes() + IST_OFFSET_MIN) % 1440;
 }
 

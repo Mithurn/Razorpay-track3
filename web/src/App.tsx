@@ -8,12 +8,13 @@ import { deriveLoopState, type StageId } from "./loop/useCaseLoopState.js";
 import { useLiveRun } from "./loop/useLiveRun.js";
 import { ActivityStream } from "./loop/ActivityStream.js";
 import { deriveActivities, type RawEvent } from "./loop/activities.js";
+import { rupees } from "./ui/format.js";
 import { TopBar } from "./room/TopBar.js";
 import { Sidebar } from "./room/Sidebar.js";
 import { CustomerPanel } from "./room/CustomerPanel.js";
 import { RazorpayCheckout } from "./room/RazorpayCheckout.js";
 import { useRoomStream } from "./room/useRoomStream.js";
-import type { CaseDetail, Lane, RecoveryCase, RunSummary } from "./types.js";
+import { RESOLVED_LANES, type CaseDetail, type Lane, type RecoveryCase, type RunSummary } from "./types.js";
 import type { RuntimeConfig } from "./api.js";
 import {
   caseDetail,
@@ -32,9 +33,7 @@ import { Spinner } from "./ui/motion.js";
 import { Modal } from "./ui/Modal.js";
 import { Drawer } from "./ui/Drawer.js";
 
-const TERMINAL: Lane[] = ["RECOVERED", "ESCALATED", "WRITTEN_OFF", "STOPPED"];
 
-const rupees = (paise: number) => `₹${Math.round(paise / 100).toLocaleString("en-IN")}`;
 
 export function App() {
   const [cases, setCases] = useState<RecoveryCase[]>([]);
@@ -185,7 +184,7 @@ function Stage({
   const [showCustomer, setShowCustomer] = useState(false);
   const [showGraph, setShowGraph] = useState(false);
   const [confirmingStop, setConfirmingStop] = useState(false);
-  const [tick, setTick] = useState(0);
+  const [elapsedMs, setElapsedMs] = useState(0);
   const run = useLiveRun(caseId);
   const limits = cfg?.limits ?? DEFAULT_LIMITS;
 
@@ -207,11 +206,16 @@ function Stage({
   }, [caseId]);
 
   useEffect(() => {
-    if (!run.live) return;
-    const t = setInterval(() => setTick((n) => n + 1), 400);
+    if (!run.live || !run.startedAt) {
+      setElapsedMs(0);
+      return;
+    }
+    const startedAt = run.startedAt;
+    const update = () => setElapsedMs(Date.now() - startedAt);
+    update();
+    const t = setInterval(update, 400);
     return () => clearInterval(t);
-  }, [run.live]);
-  void tick;
+  }, [run.live, run.startedAt]);
 
   if (!caseId) {
     return (
@@ -251,10 +255,10 @@ function Stage({
   const rawEvents = fromLive.length > fromEvents.length ? fromLive : fromEvents;
   const activities = deriveActivities(rawEvents);
   const liveStepStatus = run.live
-    ? { step: run.tools.length + (run.proposal ? 1 : 0), budget: cfg?.stepBudget ?? 6, elapsedMs: run.startedAt ? Date.now() - run.startedAt : 0 }
+    ? { step: run.tools.length + (run.proposal ? 1 : 0), budget: cfg?.stepBudget ?? 6, elapsedMs }
     : null;
 
-  const canStop = kase && !TERMINAL.includes(kase.lane);
+  const canStop = kase && !RESOLVED_LANES.includes(kase.lane);
 
   return (
     <section className="stage">
@@ -319,7 +323,7 @@ function Stage({
               caseId={caseId}
               keyId={cfg.razorpayKeyId}
               customerRef={kase.customerRef}
-              onPaid={() => setTick((n) => n + 1)}
+              onPaid={() => caseDetail(caseId).then(setDetail).catch(() => undefined)}
             />
           )}
           {kase?.lane === "ATTEMPTING" && attempt?.status === "PENDING" && attempt.razorpayRef && (

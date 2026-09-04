@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { decide } from "../api.js";
 import { Play, PanelLeftClose, PanelLeftOpen, LayoutList, Inbox, RotateCw } from "../ui/icons.js";
 import type { Lane, RecoveryCase } from "../types.js";
+import { rupees } from "../ui/format.js";
 
 const LANE_ORDER: Lane[] = [
   "INCOMING",
@@ -24,7 +25,6 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: "STOPPED", label: "Stopped" },
 ];
 
-const rupees = (paise: number) => `₹${Math.round(paise / 100).toLocaleString("en-IN")}`;
 
 const LANE_DOT: Partial<Record<Lane, string>> = {
   RECOVERED: "clear",

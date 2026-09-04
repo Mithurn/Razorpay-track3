@@ -9,6 +9,8 @@ export type Lane =
   | "WRITTEN_OFF"
   | "STOPPED";
 
+export const RESOLVED_LANES: readonly Lane[] = ["RECOVERED", "ESCALATED", "WRITTEN_OFF", "STOPPED"];
+
 export type RecoveryCase = {
   id: string;
   merchantRef: string;

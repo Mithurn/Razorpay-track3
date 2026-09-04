@@ -2,6 +2,7 @@ import { useEffect, useReducer } from "react";
 import { streamCase } from "../api.js";
 import type { AuditEvent, ProposalEvent, StreamEvent, ToolResultEvent } from "../types.js";
 import { actLine, resultLine } from "./toolLine.js";
+import { runReconnectingStream } from "./reconnectingStream.js";
 
 // One line in the live commentary. `think` lines are the model's own staccato narration;
 // `act`/`result` come from the tool events.
@@ -137,34 +138,19 @@ export function useLiveRun(caseId: string | null): LiveRun {
     dispatch({ type: "__reset" });
     if (!caseId) return;
     const controller = new AbortController();
-    let cancelled = false;
-    let done = false;
 
     // Only a `done` event means the run is over; any other stream end gets a bounded reconnect.
-    (async () => {
-      for (let attempt = 0; !cancelled && !done && attempt <= MAX_RECONNECT_ATTEMPTS; attempt++) {
-        if (attempt > 0) {
-          const delay = Math.min(RECONNECT_BASE_MS * 2 ** (attempt - 1), RECONNECT_MAX_MS);
-          await new Promise((resolve) => setTimeout(resolve, delay));
-          if (cancelled) return;
-        }
-        try {
-          for await (const ev of streamCase(caseId, controller.signal)) {
-            if (cancelled) return;
-            if (ev.type === "done") done = true;
-            attempt = 0;
-            dispatch(ev);
-          }
-        } catch {
-          /* dropped connection or abort; loop reconnects unless cancelled or done */
-        }
-      }
-    })();
+    void runReconnectingStream(
+      controller.signal,
+      (signal) => streamCase(caseId, signal),
+      (ev) => {
+        dispatch(ev);
+        return ev.type === "done";
+      },
+      { baseMs: RECONNECT_BASE_MS, maxMs: RECONNECT_MAX_MS, maxAttempts: MAX_RECONNECT_ATTEMPTS },
+    );
 
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
+    return () => controller.abort();
   }, [caseId]);
 
   return state;

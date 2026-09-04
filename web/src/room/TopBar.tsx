@@ -3,15 +3,14 @@ import { stopAll, resumeAll } from "../api.js";
 import { useTweenedNumber } from "./useTweenedNumber.js";
 import { Square, ChevronDown, ChevronRight, X } from "../ui/icons.js";
 import { Spinner } from "../ui/motion.js";
-import type { Lane, RoomMetrics, RunSummary } from "../types.js";
+import { RESOLVED_LANES, type Lane, type RoomMetrics, type RunSummary } from "../types.js";
+import { rupees } from "../ui/format.js";
 
-const rupees = (paise: number) => `₹${Math.round(paise / 100).toLocaleString("en-IN")}`;
 const pct = (n: number) => `${Math.round(n * 100)}%`;
 
 const ACTIVE_LANES: Lane[] = ["INCOMING", "DIAGNOSING", "DECIDING", "ATTEMPTING", "RETRY_SCHEDULED"];
-const RESOLVED_LANES: Lane[] = ["RECOVERED", "ESCALATED", "WRITTEN_OFF", "STOPPED"];
 
-function count(m: RoomMetrics | null, lanes: Lane[]): number {
+function count(m: RoomMetrics | null, lanes: readonly Lane[]): number {
   if (!m) return 0;
   return lanes.reduce((sum, lane) => sum + (m.byLane[lane] ?? 0), 0);
 }
