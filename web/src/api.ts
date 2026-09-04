@@ -23,18 +23,19 @@ async function readError(res: Response, path: string): Promise<Error> {
   return new Error(detail ?? `${path}: ${res.status}`);
 }
 
-const authHeaders = (): Record<string, string> =>
-  DEMO_ACCESS_TOKEN ? { authorization: `Bearer ${DEMO_ACCESS_TOKEN}` } : {};
-
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, { headers: authHeaders() });
+  const res = await fetch(`${BASE}${path}`);
   if (!res.ok) throw await readError(res, path);
   return res.json() as Promise<T>;
 }
 
-// Every caller of post() hits a route gated by DEMO_ACCESS_TOKEN on the server; the token is
-// exposed to the client under the VITE_ prefix Vite requires for env vars reaching the browser.
+// Every caller of post(), and the one GET route below that mutates state, hits a route gated by
+// DEMO_ACCESS_TOKEN on the server; the token is exposed to the client under the VITE_ prefix Vite
+// requires for env vars reaching the browser.
 const DEMO_ACCESS_TOKEN = import.meta.env.VITE_DEMO_ACCESS_TOKEN as string | undefined;
+
+const authHeaders = (): Record<string, string> =>
+  DEMO_ACCESS_TOKEN ? { authorization: `Bearer ${DEMO_ACCESS_TOKEN}` } : {};
 
 async function post<T>(path: string, body?: unknown): Promise<T> {
   const headers: Record<string, string> = { ...authHeaders() };
@@ -44,6 +45,14 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
   });
+  if (!res.ok) throw await readError(res, path);
+  return res.json() as Promise<T>;
+}
+
+// /cases/:id/audit/verify is the one GET route still gated by the token — it runs a live UPDATE
+// probe against the DB role.
+async function getAuthed<T>(path: string): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, { headers: authHeaders() });
   if (!res.ok) throw await readError(res, path);
   return res.json() as Promise<T>;
 }
@@ -60,7 +69,7 @@ export const scoreboard = () =>
 
 export const runtimeConfig = () => get<RuntimeConfig>("/config");
 export const payInfo = (id: string) => get<PayInfo>(`/cases/${id}/pay`);
-export const verifyAudit = (id: string) => get<AuditVerify>(`/cases/${id}/audit/verify`);
+export const verifyAudit = (id: string) => getAuthed<AuditVerify>(`/cases/${id}/audit/verify`);
 export const metrics = () => get<RoomMetrics>("/metrics");
 
 export async function recover(id: string): Promise<void> {
@@ -95,10 +104,7 @@ export async function resumeAll(): Promise<void> {
 
 // SSE reader as an async generator: fetch -> reader -> split on \n\n -> JSON.parse the data line.
 async function* readSse<T>(path: string, signal: AbortSignal): AsyncGenerator<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    signal,
-    headers: { accept: "text/event-stream", ...authHeaders() },
-  });
+  const res = await fetch(`${BASE}${path}`, { signal, headers: { accept: "text/event-stream" } });
   if (!res.body) return;
   const reader = res.body.getReader();
   const decoder = new TextDecoder();

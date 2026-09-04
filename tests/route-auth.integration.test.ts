@@ -109,7 +109,7 @@ describe("mutating case routes require the demo access token", () => {
   });
 });
 
-describe("read and stream routes require the demo access token", () => {
+describe("read and stream routes stay open on purpose", () => {
   let app: FastifyInstance | undefined;
 
   afterEach(async () => {
@@ -117,41 +117,30 @@ describe("read and stream routes require the demo access token", () => {
     app = undefined;
   });
 
-  for (const route of ["/stream", "/cases/x/stream", "/cases/x", "/events?caseId=00000000-0000-4000-8000-000000000000", "/cases/x/audit/verify"]) {
-    it(`rejects ${route} with no Authorization header`, async () => {
-      app = await buildApp("real-token");
-      const res = await app.inject({ method: "GET", url: route });
-      expect(res.statusCode).toBe(401);
-    });
+  it("audit/verify requires the demo access token", async () => {
+    app = await buildApp("real-token");
+    const res = await app.inject({ method: "GET", url: "/cases/x/audit/verify" });
+    expect(res.statusCode).toBe(401);
+  });
 
-    it(`rejects ${route} with the wrong token`, async () => {
-      app = await buildApp("real-token");
-      const res = await app.inject({
-        method: "GET",
-        url: route,
-        headers: { authorization: "Bearer wrong-token" },
-      });
-      expect(res.statusCode).toBe(401);
-    });
-
-    it(`rejects ${route} whatever the header when no token is configured`, async () => {
-      app = await buildApp(undefined);
-      const res = await app.inject({
-        method: "GET",
-        url: route,
-        headers: { authorization: "Bearer anything" },
-      });
-      expect(res.statusCode).toBe(401);
-    });
-  }
-
-  it("passes the auth gate with the correct bearer token and reaches the handler", async () => {
+  it("audit/verify passes with the correct token", async () => {
     app = await buildApp("real-token");
     const res = await app.inject({
       method: "GET",
-      url: "/cases/x",
+      url: "/cases/x/audit/verify",
       headers: { authorization: "Bearer real-token" },
     });
-    expect(res.statusCode).toBe(404);
+    expect(res.statusCode).toBe(200);
   });
+
+  // /stream and /cases/:id/stream never resolve their HTTP response (SSE keeps the connection
+  // open), so they aren't exercised here with inject() — stream-route.integration.test.ts and
+  // room-stream.integration.test.ts cover them against a real listening server instead.
+  for (const route of ["/cases/x", "/events?caseId=00000000-0000-4000-8000-000000000000"]) {
+    it(`serves ${route} with no Authorization header, even when a token is configured`, async () => {
+      app = await buildApp("real-token");
+      const res = await app.inject({ method: "GET", url: route });
+      expect(res.statusCode).not.toBe(401);
+    });
+  }
 });

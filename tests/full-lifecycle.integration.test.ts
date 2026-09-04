@@ -119,10 +119,7 @@ async function readSse(
   onOpen: (drain: () => Promise<Frame[]>) => Promise<void>,
 ) {
   const controller = new AbortController();
-  const res = await fetch(url, {
-    signal: controller.signal,
-    headers: { authorization: "Bearer test-token" },
-  });
+  const res = await fetch(url, { signal: controller.signal });
   const reader = res.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -279,7 +276,7 @@ describe.runIf(adminUrl)(
           razorpayKeyId: "rzp_test_stub",
         },
         razorpayWebhookSecret: "whsec_full_lifecycle_test",
-        demoAccessToken: "test-token",
+        demoAccessToken: undefined,
       });
       const address = await app.listen({ port: 0, host: "127.0.0.1" });
       return { app, address };

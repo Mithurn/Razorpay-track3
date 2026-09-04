@@ -105,7 +105,7 @@ export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Pro
   // because there is no live control arm to compare against, only the recorded batch run.
   app.get("/metrics", async () => ({ ...(await deps.cases.metrics()), braked: deps.pipeline.isBraked() }));
 
-  app.get("/cases/:id", requireAuth, async (req, reply) => {
+  app.get("/cases/:id", async (req, reply) => {
     const id = parseIdParam(req, reply);
     if (id === null) return;
     const kase = await deps.cases.byId(id);
@@ -151,7 +151,7 @@ export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Pro
     return { cases: await deps.cases.listByRun(id) };
   });
 
-  app.get("/events", requireAuth, async (req, reply) => {
+  app.get("/events", async (req, reply) => {
     const q = z.object({ caseId: z.string().uuid() }).safeParse(req.query);
     if (!q.success) return reply.code(400).send({ error: "caseId required" });
     return { events: await deps.events.forCase(q.data.caseId) };
@@ -244,7 +244,7 @@ export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Pro
 
   // The room-wide feed: every durable event across every case, so the top bar and case lists can
   // update from the same canonical stream instead of a 2s poll of the full case list.
-  app.get("/stream", requireAuth, async (req, reply) => {
+  app.get("/stream", async (req, reply) => {
     openSse(
       req,
       reply,
@@ -254,7 +254,7 @@ export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Pro
     );
   });
 
-  app.get("/cases/:id/stream", requireAuth, async (req, reply) => {
+  app.get("/cases/:id/stream", async (req, reply) => {
     const id = parseIdParam(req, reply);
     if (id === null) return;
     openSse(
