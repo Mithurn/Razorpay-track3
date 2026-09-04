@@ -49,8 +49,10 @@ export interface AttemptRepository {
    */
   claim(request: AttemptRequest, idempotencyKey: string): Promise<{ attempt: Attempt; created: boolean }>;
   byId(id: string): Promise<Attempt | null>;
-  byCaseAndNo(caseId: string, attemptNo: number): Promise<Attempt | null>;
   listByCase(caseId: string): Promise<Attempt[]>;
+  /** The one PENDING attempt with a real (non-simulated) razorpayRef, if any — what a genuine
+   * Razorpay Checkout can be offered against right now. */
+  payableAttempt(caseId: string): Promise<Attempt | null>;
   recordRazorpayRef(id: string, ref: string): Promise<void>;
   /** For non-recovery ends (failed, escalated, awaiting reconciliation). Never moves money. */
   resolve(id: string, patch: { status: Exclude<AttemptStatus, "RECOVERED">; detail?: string | null }): Promise<void>;

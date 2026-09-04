@@ -3,6 +3,7 @@ import type { AttemptRepository } from "../domain/ports.js";
 import type { Attempt, AttemptRequest, AttemptStatus } from "../domain/attempt.js";
 import type { RecoveryAction } from "../domain/recovery-action.js";
 import type { RootCause } from "../domain/failure.js";
+import { isSimulatedRazorpayRef } from "../domain/simulated-payment.js";
 import type { Db } from "./pool.js";
 
 const COLUMNS = `id, case_id, attempt_no, root_cause, action, agent_reasoning, idempotency_key,
@@ -86,12 +87,11 @@ export class PostgresAttemptRepository implements AttemptRepository {
     return toAttempt(rows[0] as Row);
   }
 
-  async byCaseAndNo(caseId: string, attemptNo: number): Promise<Attempt | null> {
-    const { rows } = await this.db.query(
-      `SELECT ${COLUMNS} FROM recovery_attempts WHERE case_id = $1 AND attempt_no = $2`,
-      [caseId, attemptNo],
+  async payableAttempt(caseId: string): Promise<Attempt | null> {
+    const attempts = await this.listByCase(caseId);
+    return (
+      attempts.find((a) => a.status === "PENDING" && a.razorpayRef && !isSimulatedRazorpayRef(a.razorpayRef)) ?? null
     );
-    return rows.length ? toAttempt(rows[0] as Row) : null;
   }
 
   async listByCase(caseId: string): Promise<Attempt[]> {

@@ -75,8 +75,6 @@ export interface PaymentGateway {
     notes?: Record<string, string>;
   }): Promise<GatewayPaymentLink>;
 
-  getPayment(paymentId: string): Promise<GatewayPayment | null>;
-
   /** The reconciliation read after an ambiguous create: did the order land anyway? */
   findOrderByIdempotencyKey(idempotencyKey: string): Promise<GatewayOrder | null>;
 

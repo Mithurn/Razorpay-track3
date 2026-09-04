@@ -1,6 +1,7 @@
 import type { CaseRepository, NewCase, RoomMetrics, SimilarCaseSummary } from "../domain/ports.js";
 import type { Lane, RecoveryCase } from "../domain/case.js";
 import { recoveryCase, TERMINAL_LANES } from "../domain/case.js";
+import { simulatedPaymentIdLikePatterns } from "../domain/simulated-payment.js";
 import type { Db } from "./pool.js";
 
 const COLUMNS = `id, run_id, merchant_ref, customer_ref, original_payment_id, amount_paise,
@@ -124,21 +125,21 @@ export class PostgresCaseRepository implements CaseRepository {
           WHERE run_id IS NULL
           GROUP BY lane`,
       ),
-      // `sim_`/`pay_sim_` settled_payment_id never touched Razorpay; everything else is a real capture.
+      // isSimulatedPaymentId's own patterns, so this split can never drift from the predicate
+      // used everywhere else the marker matters.
       this.db.query(
         `SELECT
            coalesce(sum(a.recovered_paise) FILTER (
              WHERE a.settled_payment_id IS NOT NULL
-               AND a.settled_payment_id NOT LIKE 'sim\\_%' ESCAPE '\\'
-               AND a.settled_payment_id NOT LIKE 'pay\\_sim\\_%' ESCAPE '\\'
+               AND NOT (a.settled_payment_id LIKE ANY ($1::text[]))
            ), 0)::bigint AS live,
            coalesce(sum(a.recovered_paise) FILTER (
-             WHERE a.settled_payment_id LIKE 'sim\\_%' ESCAPE '\\'
-                OR a.settled_payment_id LIKE 'pay\\_sim\\_%' ESCAPE '\\'
+             WHERE a.settled_payment_id LIKE ANY ($1::text[])
            ), 0)::bigint AS simulated
          FROM recovery_attempts a
          JOIN recovery_cases c ON c.id = a.case_id
         WHERE c.run_id IS NULL AND a.outcome = 'RECOVERED'`,
+        [simulatedPaymentIdLikePatterns()],
       ),
     ]);
 
