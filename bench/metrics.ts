@@ -108,7 +108,13 @@ export function exceptionList(records: CaseRecord[]): ExceptionRow[] {
     }));
 }
 
-export function formatReport(agent: ArmMetrics, fixed: ArmMetrics, exceptions: ExceptionRow[], rules?: ArmMetrics): string {
+export function formatReport(
+  agent: ArmMetrics,
+  fixed: ArmMetrics,
+  exceptions: ExceptionRow[],
+  rules?: ArmMetrics,
+  exceptionArm?: string,
+): string {
   const rupees = (p: number) => `₹${(p / 100).toLocaleString("en-IN")}`;
   const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
   const arms = [agent, fixed, ...(rules ? [rules] : [])];
@@ -134,7 +140,7 @@ export function formatReport(agent: ArmMetrics, fixed: ArmMetrics, exceptions: E
     row("root-cause accuracy", (m) => (m.rootCauseAccuracy === null ? "— (no diagnosis)" : pct(m.rootCauseAccuracy))),
     row("undiagnosed (degraded)", (m) => (m.rootCauseAccuracy === null ? "—" : `${m.undiagnosed}/${m.cases}`)),
     "",
-    `exceptions (${exceptions.length}):`,
+    exceptionArm ? `exceptions — ${exceptionArm} arm (${exceptions.length}):` : "exceptions (no arm ran):",
     ...exceptions.slice(0, 40).map((e) => `  ${e.customerRef}  ${e.failureReason}  ${e.lane}  — ${e.groundTruthNote}`),
   ];
   return lines.join("\n");

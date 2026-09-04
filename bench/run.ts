@@ -6,7 +6,8 @@ import { PostgresCaseRepository } from "../src/persistence/case-repository.js";
 import { PostgresAttemptRepository } from "../src/persistence/attempt-repository.js";
 import { PostgresEventLog } from "../src/persistence/event-log.js";
 import { RunRepository } from "../src/persistence/run-repository.js";
-import { RecoveryPipeline, agentRunnerFor, type AgentRunner } from "../src/worker/pipeline.js";
+import { RecoveryPipeline, type AgentRunner } from "../src/worker/pipeline.js";
+import { runRecoveryAgent } from "../src/agent/recovery-agent.js";
 import { isRiskHold, isHardDecline } from "../src/domain/case.js";
 import { resolveModel } from "../src/agent/model.js";
 import { createBudget, guardModel } from "../src/agent/budget.js";
@@ -78,17 +79,22 @@ async function main(): Promise<void> {
     : values.mock
       ? replayRunner(cachePath)
       : recordingRunner(
-          agentRunnerFor({
-            model: guardModel(
-              resolveModel(config.AGENT_MODEL, {
-                openRouterApiKey: config.OPENROUTER_API_KEY,
-                googleApiKey: config.GOOGLE_GENERATIVE_AI_API_KEY,
-              }),
-              budget,
+          (deps, events) =>
+            runRecoveryAgent(
+              deps,
+              {
+                model: guardModel(
+                  resolveModel(config.AGENT_MODEL, {
+                    openRouterApiKey: config.OPENROUTER_API_KEY,
+                    googleApiKey: config.GOOGLE_GENERATIVE_AI_API_KEY,
+                  }),
+                  budget,
+                ),
+                stepBudget: config.AGENT_STEP_BUDGET,
+                deadlineMs: config.AGENT_TIMEOUT_MS,
+              },
+              events,
             ),
-            stepBudget: config.AGENT_STEP_BUDGET,
-            deadlineMs: config.AGENT_TIMEOUT_MS,
-          }),
           cachePath,
         );
   const results: Record<string, CaseRecord[]> = {};
@@ -117,8 +123,11 @@ async function main(): Promise<void> {
   const agentM = results.agent ? scoreArm("agent", results.agent) : blank("agent");
   const fixedM = results.fixed ? scoreArm("fixed", results.fixed) : blank("fixed");
   const rulesM = results.rules ? scoreArm("rules", results.rules) : undefined;
-  const exceptions = exceptionList(results.agent ?? results.fixed ?? []);
-  console.log(formatReport(agentM, fixedM, exceptions, rulesM));
+  // The exception section names the arm it came from — falling back to another arm's records
+  // would silently change what the list means.
+  const exceptionArm = results.agent ? "agent" : results.fixed ? "fixed" : null;
+  const exceptions = exceptionArm ? exceptionList(results[exceptionArm as "agent" | "fixed"]!) : [];
+  console.log(formatReport(agentM, fixedM, exceptions, rulesM, exceptionArm ?? undefined));
 
   await pool.end();
 }
