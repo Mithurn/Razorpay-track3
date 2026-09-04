@@ -54,8 +54,8 @@
 }
 
 /* Recovery Room — near-black ground, tiny elevation steps, hairline alpha borders, one
-   restrained accent. Measured from linear.app (see context/design.md), oklch-matched rather
-   than pasted, so it holds together with our own status colors. */
+   restrained accent. oklch-matched rather than pasted, so it holds together with our own
+   status colors. */
 [data-surface="room"] {
   /* Elevation ladder — depth from surface steps + borders, never shadow or gradient.
      L0 root · L1 panels · L2 cards/interactive · L3 selected/active/overlay. */

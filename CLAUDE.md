@@ -1,33 +1,19 @@
 # Recovery Room — Engineering Rules
 
-An AI agent that recovers failed payments, for the **Razorpay AI Buildathon, Track 3**.
-Read `context/PROJECT.md` in full before writing any code — it is the product brief and the
-3-day plan. `context/` is gitignored (internal notes); never commit it.
+An AI agent that recovers failed payments. Built on Razorpay test-mode APIs.
 
-Deadline: **5 September 2026.** Ship fast, but the repo must read like production code:
-clean, layered, SOLID, every value real, every failure path handled and tested.
+Ship fast, but the repo must read like production code: clean, layered, SOLID, every value
+real, every failure path handled and tested.
 
-## The goal — keep this in view at all times
+## The bar
 
-This is a hiring filter. The only thing that matters is: **would a Razorpay engineer look at
-this repo, this 5-minute video, and this architecture and want to hire the person who built
-it.** Every decision — scope, framework, what to polish, what to cut — is judged against that,
-not against "is it done."
+1. **Problem taste** — the thing being built should actually matter to a Razorpay merchant.
+2. **Build quality** — it runs, it's structured, you'd trust it.
+3. **AI judgment** — the right tool in the right place, *and where a model was deliberately not used*.
+4. **Failure recovery** — what broke, and what was done about it.
 
-What Razorpay grades (their words):
-1. **Problem taste** — did you pick something that actually matters to a Razorpay merchant.
-2. **Build quality** — does it run, is it structured, would you trust it.
-3. **AI judgment** — the right tool in the right place, *and where you chose not to use one*.
-4. **Failure recovery** — what broke, and what you did about it.
-
-Track 3 bar (verbatim): *"Don't just identify the problem. Show measured money recovered across
-a batch, with compliant escalation, stopping rules, and an audit trail."*
-
-The application form has 12 fields; the last is *"What broke, and how you got out"* — *"the one
-we read first."* Treat `context/BREAKS.md` as a graded deliverable, not internal hygiene.
-
-Full track briefs and the rubric are in `context/website.md`. Re-read them whenever a scope or
-design question comes up.
+The scope is deliberate: *measured money recovered across a batch, with compliant escalation,
+stopping rules, and an audit trail.* `BREAKS.md` is a real deliverable, not internal hygiene.
 
 ## Push back — do not be a yes-machine
 
@@ -36,27 +22,24 @@ change, and you think it is wrong or risky:
 
 - **Say so, before doing it.** State the concern plainly, give the trade-off, and recommend an
   alternative. Ask the question you need answered.
-- Do not silently comply with a decision that will hurt the submission, and do not pad a real
+- Do not silently comply with a decision that will hurt the project, and do not pad a real
   objection with "yes, and…". A short, direct "I think this is the wrong call because X — here's
   what I'd do instead. Which do you want?" is what's wanted.
-- The user has explicitly asked for this. Agreeing to be agreeable wastes their time and the
-  three days. Their actual instruction is: build the thing Razorpay will want — if a request
-  works against that, flag it.
+- The user has explicitly asked for this. Agreeing to be agreeable wastes their time. If a
+  request works against a well-built, honest result, flag it.
 - Once the user has heard the objection and still decides, follow the decision and move on.
 
 ## How to work
 
-- **Load this file's rules before writing any code**, every time. This is the contract; the
-  product brief and plan are `context/PROJECT.md`.
-- **Every feature must serve a specific rubric criterion or a phrase in the Track 3 bar.** Before
-  building something, say which. If it serves none, don't build it — say so.
+- **Load this file's rules before writing any code**, every time. This is the contract.
+- **Every feature must serve the bar above or a phrase in the scope.** Before building
+  something, say which. If it serves none, don't build it — say so.
 - **When the user flags something as wrong, or asks a question: stop and resolve it before
   continuing.** Do not proceed on an assumption around a flagged concern.
 - **When a decision is genuinely ambiguous or a fork in the road: ask.** Don't guess and don't
   quietly pick. A one-line question now beats an hour of the wrong direction.
 - **No rabbit-holes.** If a task isn't working after ~2 focused hours, stop, say so, and propose
-  cutting scope or the Track 4 fallback (`context/PROJECT.md §9`). Momentum matters more than any
-  one feature over three days.
+  cutting scope. Momentum matters more than any one feature.
 - **End each working block with an honest status** against the plan — what's done, what's
   blocked, what changed. Re-plan if behind.
 
@@ -77,19 +60,19 @@ a **hand-rolled bounded agent loop** on the Vercel AI SDK (`ai` v7) — no agent
 Razorpay test-mode APIs · React + Vite (thin UI) · Docker Compose · Vitest · `pg` +
 hand-written SQL (no ORM).
 
-Two of these were changed on 2026-09-02 after probing the live APIs; see `context/BREAKS.md`.
-**Mastra was dropped** — the step budget, deadline, forced conclusion and degrade-to-safe are
-the thing we are judged on, so they must be legible code we own, not framework configuration.
-**Gemini was dropped** — the key in `.env` is capped at ~20 requests/day (proven by burst test),
-Google billing signup fails with `OR_BACR2_44`, the $300 trial credit explicitly cannot be spent
-on the Gemini API, and Tier 1 needs a $10 minimum prepay. OpenRouter has no minimum and needs no
-cloud billing account. The model id is **always** an env override, never a constant.
+**No agent framework.** The step budget, deadline, forced conclusion and degrade-to-safe are
+the core of what this project is judged on, so they must be legible code we own, not framework
+configuration.
+
+**Model provider.** OpenRouter has no minimum spend and needs no cloud billing account. The
+model id is **always** an env override, never a constant. See `BREAKS.md` for why Gemini's
+direct API was dropped.
 
 These are not frozen. If you hit a wall, or find a genuinely better tool for a specific job:
 **say so, with the reason and the trade-off, and get the user's OK before switching.** Do not
 swap a framework or add a dependency mid-feature, and do not churn — a "better" tool that costs
-half a day to integrate is not better with three days on the clock. State what problem any new
-dependency solves and why the current stack can't.
+half a day to integrate is not better on a tight clock. State what problem any new dependency
+solves and why the current stack can't.
 
 ## Repository structure — keep it this shape
 
@@ -207,25 +190,20 @@ dependency failures, and unknown external outcomes. Never log secrets or custome
 
 ## BREAKS.md discipline
 
-The moment something breaks, hangs, or exposes a wrong assumption, add an entry to
-`context/BREAKS.md`: expected · actual · why · how diagnosed · how fixed · the permanent
-safeguard. The submission form asks "what broke, and how you got out" and reads it first. Never
-reconstruct failures at the end.
-
-## Decision log
-
-Any material decision (stack, architecture, scope cut) → a dated entry in `context/NOTES.md`.
+The moment something breaks, hangs, or exposes a wrong assumption, add an entry to `BREAKS.md`:
+expected · actual · why · how diagnosed · how fixed · the permanent safeguard. Never reconstruct
+failures at the end.
 
 ## Git
 
 Never commit, push, or open PRs unless asked. **Author is the repository Git identity only — no
 `Co-Authored-By` trailers, no "Claude" / AI attribution, no session links, ever.** Concise commit
-messages: what changed and how. No em dashes. One logical change per commit. `context/` and
-`.env` are gitignored — keep it that way.
+messages: what changed and how. No em dashes. One logical change per commit. `.env` is
+gitignored — keep it that way.
 
 ## Definition of done (per task)
 
 Follows the layering + the agent/safety/executor boundary. External inputs Zod-validated.
 Failure paths handled with tests. Relevant invariants have tests. No LLM path to money. No mocks
 in production paths, no scaffolding left behind. `npm run typecheck` clean. Targeted tests pass.
-`context/BREAKS.md` updated if anything broke. The diff is small and reviewable.
+`BREAKS.md` updated if anything broke. The diff is small and reviewable.

@@ -1,8 +1,6 @@
 # What broke, and how we got out
 
-Kept as a live log during the build, not reconstructed at the end. Full internal version
-(including the pre-pivot authorization-layer project this one replaced) is in
-`context/BREAKS.md`, gitignored; this is the Recovery Room subset that matters to a reader.
+Kept as a live log during the build, not reconstructed at the end.
 
 ---
 

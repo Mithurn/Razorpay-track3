@@ -7,7 +7,7 @@ dist/
 .env
 .env.local
 
-# internal planning / competition notes — not for the public repo
+# local working notes
 context/
 
 # test + build artifacts
@@ -17,7 +17,7 @@ test-results/
 *.png
 .env.bak-session
 
-# local working notes, not for the public repo — origin unclear, kept local-only on purpose
+# local-only working files
 /PROJECT_REVIEW.md
 bench/.cache/pre-corpus-v2-backup/
 

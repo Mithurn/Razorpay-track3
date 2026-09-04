@@ -29,7 +29,7 @@ describe.runIf(keyId && keySecret)("RazorpayClient against test mode", () => {
     expect(order.amountPaise).toBe(149900);
   });
 
-  // Pins the race in context/BREAKS.md 2026-09-02: the order list index lags the write, so a
+  // Pins the race in BREAKS.md 2026-09-02: the order list index lags the write, so a
   // reconciliation read taken with no delay can miss an order that definitely exists. This test
   // deliberately does not sleep — sleeping would test a system production never runs.
   it("cannot be trusted to find a just-created order — absence here means unknown", async () => {
@@ -66,7 +66,7 @@ describe.runIf(keyId && keySecret)("RazorpayClient against test mode", () => {
       });
     } catch (e) {
       // Test mode caps payment links at 30 per business and throttles creation; when that hits
-      // there is nothing to test here. See context/BREAKS.md.
+      // there is nothing to test here. See BREAKS.md.
       if (e instanceof GatewayUnavailableError) return;
       throw e;
     }
@@ -88,7 +88,7 @@ describe.runIf(keyId && keySecret)("RazorpayClient against test mode", () => {
     if (duplicate instanceof GatewayUnavailableError) return;
     expect(RazorpayClient.isDuplicateReference(duplicate)).toBe(true);
     // Not asserting the immediate reference_id lookup: like the order receipt index, the
-    // payment-link list index lags the write by minutes (context/BREAKS.md).
+    // payment-link list index lags the write by minutes (BREAKS.md).
   });
 
   it("lists payments for a fresh order as empty rather than throwing", async () => {
