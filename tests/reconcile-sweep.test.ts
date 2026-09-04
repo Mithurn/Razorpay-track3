@@ -91,6 +91,6 @@ describe("reconcile sweep", () => {
     const [, data, opts] = add.mock.calls[0] as unknown[];
     expect((data as { caseId: string }).caseId).toBe("c1");
     expect((data as { reclaim?: boolean }).reclaim).toBe(true);
-    expect((opts as { jobId: string }).jobId).toBe("c1");
+    expect((opts as { deduplication?: { id: string } }).deduplication?.id).toBe("c1");
   });
 });

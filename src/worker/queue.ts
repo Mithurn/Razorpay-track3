@@ -17,21 +17,26 @@ export function recoveryQueue(connection: ConnectionOptions): Queue<RecoveryJob>
       attempts: 4,
       backoff: { type: "exponential", delay: 10_000 },
       // Drop completed jobs immediately so a case can be re-queued later; keeping the id in the
-      // completed set would make jobId-based dedup permanently block the next run.
+      // completed set would make dedupe permanently block the next run.
       removeOnComplete: true,
       removeOnFail: 200,
     },
   });
 }
 
-// One job per case at a time: while a job for this case is waiting, delayed or active, a second
-// add with the same id is a no-op. This is what stops two concurrent turns for one case.
+// One job per case at a time, without dropping a turn that arrives mid-turn: a duplicate
+// deduplication id on a waiting/delayed job is a no-op, but on an active job BullMQ stores the
+// latest request and materializes it as a new job the moment the active one finishes.
 export async function enqueueRecovery(
   queue: Queue<RecoveryJob>,
   caseId: string,
   opts: { delay?: number; reclaim?: boolean } = {},
 ): Promise<void> {
-  await queue.add(RECOVERY_QUEUE, { caseId, reclaim: opts.reclaim }, { jobId: caseId, delay: opts.delay });
+  await queue.add(
+    RECOVERY_QUEUE,
+    { caseId, reclaim: opts.reclaim },
+    { deduplication: { id: caseId, keepLastIfActive: true }, delay: opts.delay },
+  );
 }
 
 export function recoveryWorker(
