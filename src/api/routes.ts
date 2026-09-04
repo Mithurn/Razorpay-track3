@@ -4,7 +4,6 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { Queue } from "bullmq";
 import type { AttemptRepository, CaseRepository, EventLog } from "../domain/ports.js";
 import { IN_FLIGHT_LANES } from "../domain/case.js";
-import type { RecoveryAction } from "../domain/recovery-action.js";
 import type { RunRepository } from "../persistence/run-repository.js";
 import type { WebhookHandler } from "../execution/webhook-handler.js";
 import type { CaseEventBus } from "./event-bus.js";
@@ -14,6 +13,8 @@ import type { AuditVerifyResult } from "../persistence/audit-verify.js";
 import type { SafetyLimits } from "../safety/safety-gate.js";
 import type { StopRequest } from "../worker/stop-registry.js";
 import type { PaymentGateway } from "../domain/gateway.js";
+import { openSse } from "./sse.js";
+import { directedAction, SHARED_TOKEN_APPROVER } from "../worker/human-directive.js";
 
 export type RuntimeInfo = {
   model: string;
@@ -63,15 +64,16 @@ const decisionBody = z.object({
   note: z.string().max(500).optional(),
 });
 
-// The demo authenticates with one shared bearer token, so there is no per-person identity to
-// record. Named plainly rather than invented: a real deployment puts the signed-in reviewer here.
-const SHARED_TOKEN_APPROVER = "demo-operator (shared token)";
+// Every `/:id`-shaped route parses its param through this instead of an unchecked `as` cast.
+const idParams = z.object({ id: z.string().min(1) });
 
-function directedAction(body: z.infer<typeof decisionBody>): RecoveryAction {
-  const kind = body.decision === "approve" ? "RETRY_NOW" : (body.redirectTo ?? "RETRY_NOW");
-  if (kind === "PAYMENT_LINK") return { kind, rail: "card" };
-  if (kind === "CUSTOMER_NUDGE") return { kind, channel: "email" };
-  return { kind: "RETRY_NOW" };
+function parseIdParam(req: FastifyRequest, reply: FastifyReply): string | null {
+  const parsed = idParams.safeParse(req.params);
+  if (!parsed.success) {
+    reply.code(400).send({ error: "invalid id parameter" });
+    return null;
+  }
+  return parsed.data.id;
 }
 
 function requireAccessToken(token: string | undefined) {
@@ -103,8 +105,9 @@ export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Pro
   // because there is no live control arm to compare against, only the recorded batch run.
   app.get("/metrics", async () => ({ ...(await deps.cases.metrics()), braked: deps.pipeline.isBraked() }));
 
-  app.get("/cases/:id", async (req, reply) => {
-    const { id } = req.params as { id: string };
+  app.get("/cases/:id", requireAuth, async (req, reply) => {
+    const id = parseIdParam(req, reply);
+    if (id === null) return;
     const kase = await deps.cases.byId(id);
     if (!kase) return reply.code(404).send({ error: "not found" });
     const [attempts, events] = await Promise.all([deps.attempts.listByCase(id), deps.events.forCase(id)]);
@@ -115,14 +118,12 @@ export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Pro
   // a real Razorpay order or payment link, never a bench/seeded one. The frontend uses this to
   // decide whether to offer a real Checkout.js button or fall back to the simulated capture.
   app.get("/cases/:id/pay", async (req, reply): Promise<PayInfo> => {
-    const { id } = req.params as { id: string };
+    const id = parseIdParam(req, reply);
+    if (id === null) return { payable: false };
     const kase = await deps.cases.byId(id);
     if (!kase) return reply.code(404).send({ payable: false });
 
-    const attempts = await deps.attempts.listByCase(id);
-    const pending = attempts.find(
-      (a) => a.status === "PENDING" && a.razorpayRef && !a.razorpayRef.includes("_bench_"),
-    );
+    const pending = await deps.attempts.payableAttempt(id);
     if (!pending?.razorpayRef) return { payable: false };
 
     if (pending.action === "RETRY_NOW" || pending.action === "RETRY_SCHEDULED") {
@@ -137,25 +138,28 @@ export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Pro
   });
 
   app.get("/runs/:id", async (req, reply) => {
-    const { id } = req.params as { id: string };
+    const id = parseIdParam(req, reply);
+    if (id === null) return;
     const run = await deps.runs.byId(id);
     if (!run) return reply.code(404).send({ error: "not found" });
     return run;
   });
 
-  app.get("/runs/:id/cases", async (req) => {
-    const { id } = req.params as { id: string };
+  app.get("/runs/:id/cases", async (req, reply) => {
+    const id = parseIdParam(req, reply);
+    if (id === null) return;
     return { cases: await deps.cases.listByRun(id) };
   });
 
-  app.get("/events", async (req, reply) => {
+  app.get("/events", requireAuth, async (req, reply) => {
     const q = z.object({ caseId: z.string().uuid() }).safeParse(req.query);
     if (!q.success) return reply.code(400).send({ error: "caseId required" });
     return { events: await deps.events.forCase(q.data.caseId) };
   });
 
   app.post("/cases/:id/recover", requireAuth, async (req, reply) => {
-    const { id } = req.params as { id: string };
+    const id = parseIdParam(req, reply);
+    if (id === null) return;
     if (!(await deps.cases.byId(id))) return reply.code(404).send({ error: "not found" });
     await enqueueRecovery(deps.queue, id);
     return reply.code(202).send({ queued: true });
@@ -167,7 +171,8 @@ export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Pro
   // actively investigating settles at its next checkpoint (up to the agent's own deadline); an
   // idle or scheduled-but-not-yet-running case resolves to STOPPED immediately.
   app.post("/cases/:id/stop", requireAuth, async (req, reply) => {
-    const { id } = req.params as { id: string };
+    const id = parseIdParam(req, reply);
+    if (id === null) return;
     const body = stopBody.safeParse(req.body ?? {});
     if (!body.success) return reply.code(400).send({ error: body.error.issues });
     if (!(await deps.cases.byId(id))) return reply.code(404).send({ error: "not found" });
@@ -194,10 +199,11 @@ export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Pro
 
   // Proves the append-only guarantee rather than asserting it: connects as the app DB role and
   // tries to UPDATE recovery_events, expecting the database to refuse.
-  app.get("/cases/:id/audit/verify", async () => deps.verifyAppendOnly());
+  app.get("/cases/:id/audit/verify", requireAuth, async () => deps.verifyAppendOnly());
 
   app.post("/cases/:id/decision", requireAuth, async (req, reply) => {
-    const { id } = req.params as { id: string };
+    const id = parseIdParam(req, reply);
+    if (id === null) return;
     const body = decisionBody.safeParse(req.body);
     if (!body.success) return reply.code(400).send({ error: body.error.issues });
     const kase = await deps.cases.byId(id);
@@ -238,55 +244,40 @@ export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Pro
 
   // The room-wide feed: every durable event across every case, so the top bar and case lists can
   // update from the same canonical stream instead of a 2s poll of the full case list.
-  app.get("/stream", async (req, reply) => {
-    reply.raw.writeHead(200, {
-      "content-type": "text/event-stream",
-      "cache-control": "no-cache",
-      connection: "keep-alive",
-    });
-    const send = (event: unknown) => reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
-    send({ type: "open" });
-
-    // Subscribe before the initial metrics read, so an event landing during that read is not
-    // missed between the snapshot and the first live frame.
-    const unsubscribe = deps.bus.subscribeRoom(send);
-    send({ type: "metrics", ...(await deps.cases.metrics()), braked: deps.pipeline.isBraked() });
-    const keepAlive = setInterval(() => reply.raw.write(": ping\n\n"), 15_000);
-    req.raw.on("close", () => {
-      clearInterval(keepAlive);
-      unsubscribe();
-    });
+  app.get("/stream", requireAuth, async (req, reply) => {
+    openSse(
+      req,
+      reply,
+      { type: "open" },
+      (send) => deps.bus.subscribeRoom(send),
+      async (send) => send({ type: "metrics", ...(await deps.cases.metrics()), braked: deps.pipeline.isBraked() }),
+    );
   });
 
-  app.get("/cases/:id/stream", async (req, reply) => {
-    const { id } = req.params as { id: string };
-    reply.raw.writeHead(200, {
-      "content-type": "text/event-stream",
-      "cache-control": "no-cache",
-      connection: "keep-alive",
-    });
-    const send = (event: unknown) => reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
-    send({ type: "open", caseId: id });
-
-    // Subscribe before reading the lane, so a run starting during the read is not missed. The
-    // status that follows says whether a worker is actually holding this case: without it a
-    // client cannot tell a live run from a finished one it has merely opened, and every
-    // historical case looks like an agent stuck mid-investigation.
-    const unsubscribe = deps.bus.subscribe(id, send);
-    const kase = await deps.cases.byId(id);
-    if (kase) send({ type: "status", lane: kase.lane, active: IN_FLIGHT_LANES.includes(kase.lane) });
-    const keepAlive = setInterval(() => reply.raw.write(": ping\n\n"), 15_000);
-    req.raw.on("close", () => {
-      clearInterval(keepAlive);
-      unsubscribe();
-    });
+  app.get("/cases/:id/stream", requireAuth, async (req, reply) => {
+    const id = parseIdParam(req, reply);
+    if (id === null) return;
+    openSse(
+      req,
+      reply,
+      { type: "open", caseId: id },
+      (send) => deps.bus.subscribe(id, send),
+      // The status frame says whether a worker is actually holding this case: without it a
+      // client cannot tell a live run from a finished one it has merely opened, and every
+      // historical case looks like an agent stuck mid-investigation.
+      async (send) => {
+        const kase = await deps.cases.byId(id);
+        if (kase) send({ type: "status", lane: kase.lane, active: IN_FLIGHT_LANES.includes(kase.lane) });
+      },
+    );
   });
 
   // Demo aid: stands in for the customer completing payment on Razorpay's mock bank page. Builds
   // a real signed webhook for the pending order and runs it through the same handler a real
   // Razorpay delivery hits — the settle and ledger code paths are genuinely exercised.
   app.post("/cases/:id/simulate-capture", requireAuth, async (req, reply) => {
-    const { id } = req.params as { id: string };
+    const id = parseIdParam(req, reply);
+    if (id === null) return;
     const kase = await deps.cases.byId(id);
     if (!kase) return reply.code(404).send({ error: "not found" });
     const attempt = (await deps.attempts.listByCase(id)).find((a) => a.status === "PENDING" && a.razorpayRef);
@@ -316,7 +307,12 @@ export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Pro
     if (typeof signature !== "string" || typeof eventId !== "string") {
       return reply.code(400).send({ error: "missing signature headers" });
     }
-    const rawBody = (req as { rawBody?: string }).rawBody ?? JSON.stringify(req.body);
+    // A re-serialized body can never verify against Razorpay's HMAC (key order, whitespace,
+    // number formatting all differ) — the raw bytes the signature was computed over must survive
+    // to here or the compare is meaningless. A missing rawBody is a hook wiring bug, not a
+    // legitimate request state.
+    const rawBody = (req as { rawBody?: string }).rawBody;
+    if (rawBody === undefined) return reply.code(500).send({ error: "rawBody unavailable" });
     const result = await deps.webhookHandler.handle({ rawBody, signature, eventId });
     const code = result.status === "invalid_signature" ? 401 : result.status === "malformed" ? 400 : 200;
     return reply.code(code).send(result);

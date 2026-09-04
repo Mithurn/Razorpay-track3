@@ -23,8 +23,11 @@ async function readError(res: Response, path: string): Promise<Error> {
   return new Error(detail ?? `${path}: ${res.status}`);
 }
 
+const authHeaders = (): Record<string, string> =>
+  DEMO_ACCESS_TOKEN ? { authorization: `Bearer ${DEMO_ACCESS_TOKEN}` } : {};
+
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`);
+  const res = await fetch(`${BASE}${path}`, { headers: authHeaders() });
   if (!res.ok) throw await readError(res, path);
   return res.json() as Promise<T>;
 }
@@ -34,9 +37,8 @@ async function get<T>(path: string): Promise<T> {
 const DEMO_ACCESS_TOKEN = import.meta.env.VITE_DEMO_ACCESS_TOKEN as string | undefined;
 
 async function post<T>(path: string, body?: unknown): Promise<T> {
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { ...authHeaders() };
   if (body !== undefined) headers["content-type"] = "application/json";
-  if (DEMO_ACCESS_TOKEN) headers.authorization = `Bearer ${DEMO_ACCESS_TOKEN}`;
   const res = await fetch(`${BASE}${path}`, {
     method: "POST",
     headers,
@@ -93,7 +95,10 @@ export async function resumeAll(): Promise<void> {
 
 // SSE reader as an async generator: fetch -> reader -> split on \n\n -> JSON.parse the data line.
 async function* readSse<T>(path: string, signal: AbortSignal): AsyncGenerator<T> {
-  const res = await fetch(`${BASE}${path}`, { signal, headers: { accept: "text/event-stream" } });
+  const res = await fetch(`${BASE}${path}`, {
+    signal,
+    headers: { accept: "text/event-stream", ...authHeaders() },
+  });
   if (!res.body) return;
   const reader = res.body.getReader();
   const decoder = new TextDecoder();

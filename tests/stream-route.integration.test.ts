@@ -47,7 +47,7 @@ async function openingFrames(lane: Lane | null): Promise<StreamFrame[]> {
       razorpayKeyId: "rzp_test_stub",
     },
     razorpayWebhookSecret: "whsec_stream_test",
-    demoAccessToken: undefined,
+    demoAccessToken: "test-token",
   });
 
   const address = await app.listen({ port: 0, host: "127.0.0.1" });
@@ -55,6 +55,7 @@ async function openingFrames(lane: Lane | null): Promise<StreamFrame[]> {
   try {
     const res = await fetch(`${address}/cases/c1/stream`, {
       signal: controller.signal,
+    headers: { authorization: "Bearer test-token" },
     });
     const reader = res.body!.getReader();
     const decoder = new TextDecoder();

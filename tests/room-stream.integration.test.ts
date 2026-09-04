@@ -56,13 +56,16 @@ async function withRoomStream(
       razorpayKeyId: "rzp_test_stub",
     },
     razorpayWebhookSecret: "whsec_room_stream_test",
-    demoAccessToken: undefined,
+    demoAccessToken: "test-token",
   });
 
   const address = await app.listen({ port: 0, host: "127.0.0.1" });
   const controller = new AbortController();
   try {
-    const res = await fetch(`${address}/stream`, { signal: controller.signal });
+    const res = await fetch(`${address}/stream`, {
+      signal: controller.signal,
+      headers: { authorization: "Bearer test-token" },
+    });
     const reader = res.body!.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
