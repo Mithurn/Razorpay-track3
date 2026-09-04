@@ -5,7 +5,7 @@
 
 import { TOOL_LABELS } from "./useCaseLoopState.js";
 import { resultLine } from "./toolLine.js";
-import { rupees as sharedRupees } from "../ui/format.js";
+import { rupees } from "../ui/format.js";
 
 export type ActivityKind = "investigate" | "propose" | "gate" | "execute" | "outcome";
 export type Tone = "plain" | "clear" | "deny" | "wait" | "info";
@@ -45,9 +45,6 @@ function num(v: unknown): number | undefined {
 }
 function bool(v: unknown): boolean {
   return v === true;
-}
-function rupees(paise: unknown): string {
-  return sharedRupees(num(paise) ?? 0);
 }
 function durationMs(startIso: string, endIso: string | null): number | null {
   if (!endIso) return null;
