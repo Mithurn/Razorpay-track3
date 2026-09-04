@@ -2,10 +2,6 @@ import type { OutcomeResolver, OutcomeVerdict } from "../domain/ports.js";
 import type { RecoveryAction } from "../domain/recovery-action.js";
 import type { PaymentGateway } from "../domain/gateway.js";
 
-// The live lane's verdict: read the real payments behind the order or link. A payment only
-// counts as recovered when Razorpay reports it captured; anything else is pending or failed,
-// never assumed.
-
 export class RazorpayOutcomeResolver implements OutcomeResolver {
   constructor(private readonly gateway: PaymentGateway) {}
 

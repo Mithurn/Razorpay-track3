@@ -4,9 +4,6 @@ import type { PaymentGateway } from "../domain/gateway.js";
 import type { SimilarCaseSummary } from "../domain/ports.js";
 import type { AgentDeps, SimilarCasesQuery } from "../agent/tools.js";
 
-// Razorpay names the instrument differently per rail (issuer / bank / vpa_handle); the case
-// carries whichever applies. This is what lets the agent line a card decline up against a
-// downtime on that exact issuer.
 export function instrumentHint(kase: RecoveryCase): string | null {
   if (!kase.instrument) return null;
   return kase.instrument.issuer ?? kase.instrument.bank ?? kase.instrument.vpa_handle ?? null;

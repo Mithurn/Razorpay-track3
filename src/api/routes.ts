@@ -21,8 +21,6 @@ export type RuntimeInfo = {
   deadlineMs: number;
   stepBudget: number;
   limits: SafetyLimits;
-  // The publishable key — this is what it's for; Checkout.js needs it client-side to open the
-  // real Razorpay widget. The secret key never leaves the server.
   razorpayKeyId: string;
 };
 
@@ -35,14 +33,11 @@ export type RouteDeps = {
   cases: CaseRepository;
   attempts: AttemptRepository;
   events: EventLog;
-  // Narrowed to the one read the pay route needs — resolving a payment link's real URL.
   gateway: Pick<PaymentGateway, "getPaymentLink">;
   runs: RunRepository;
   queue: Queue<RecoveryJob>;
   webhookHandler: WebhookHandler;
   bus: CaseEventBus;
-  // Narrowed to just the stop surface — routes have no business touching the rest of the
-  // pipeline's API.
   pipeline: {
     requestStop(caseId: string, request: StopRequest): Promise<void>;
     requestStopAll(request: StopRequest): Promise<{ stoppedNow: number }>;
@@ -53,8 +48,7 @@ export type RouteDeps = {
   verifyAppendOnly: () => Promise<AuditVerifyResult>;
   runtimeInfo: RuntimeInfo;
   razorpayWebhookSecret: string;
-  // Gates the mutating case routes. Not Razorpay's webhook route, which is HMAC-verified on its
-  // own terms — a bearer-token hook must never be applied there or real deliveries would 401.
+  // Never applied to the Razorpay webhook route — that's HMAC-verified, not bearer-token gated.
   demoAccessToken: string | undefined;
 };
 
@@ -64,7 +58,6 @@ const decisionBody = z.object({
   note: z.string().max(500).optional(),
 });
 
-// Every `/:id`-shaped route parses its param through this instead of an unchecked `as` cast.
 const idParams = z.object({ id: z.string().min(1) });
 
 function parseIdParam(req: FastifyRequest, reply: FastifyReply): string | null {
@@ -100,9 +93,6 @@ export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Pro
 
   app.get("/scoreboard", async () => deps.runs.latestByArm());
 
-  // Room-wide totals over live cases, computed fresh from recovery_cases on every call — cheap
-  // aggregate SQL, no caching layer. Not the batch scoreboard: no recovery-rate/lift claim here,
-  // because there is no live control arm to compare against, only the recorded batch run.
   app.get("/metrics", async () => ({ ...(await deps.cases.metrics()), braked: deps.pipeline.isBraked() }));
 
   app.get("/cases/:id", async (req, reply) => {
@@ -114,9 +104,6 @@ export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Pro
     return { case: kase, attempts, events };
   });
 
-  // What the customer would actually see right now, if there is a genuinely payable attempt —
-  // a real Razorpay order or payment link, never a bench/seeded one. The frontend uses this to
-  // decide whether to offer a real Checkout.js button or fall back to the simulated capture.
   app.get("/cases/:id/pay", async (req, reply): Promise<PayInfo> => {
     const id = parseIdParam(req, reply);
     if (id === null) return { payable: false };
@@ -167,9 +154,7 @@ export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Pro
 
   const stopBody = z.object({ note: z.string().max(500).optional() });
 
-  // Never aborts a call already in flight to Razorpay or the model — see StopRegistry. A case
-  // actively investigating settles at its next checkpoint (up to the agent's own deadline); an
-  // idle or scheduled-but-not-yet-running case resolves to STOPPED immediately.
+  // Never aborts a call already in flight to Razorpay or the model — see StopRegistry.
   app.post("/cases/:id/stop", requireAuth, async (req, reply) => {
     const id = parseIdParam(req, reply);
     if (id === null) return;
@@ -180,9 +165,6 @@ export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Pro
     return { stopped: true };
   });
 
-  // The emergency brake: no case anywhere in the room starts a new step until /resume. Live
-  // idle/parked cases resolve to STOPPED immediately; the response's stoppedNow count is exactly
-  // how many. In-flight cases catch it at their own next checkpoint.
   app.post("/stop", requireAuth, async (req, reply) => {
     const body = stopBody.safeParse(req.body ?? {});
     if (!body.success) return reply.code(400).send({ error: body.error.issues });
@@ -190,15 +172,12 @@ export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Pro
     return { stopped: true, ...result };
   });
 
-  // Lifts the emergency brake only — does not touch any per-case stop, and does not revive a
-  // case already resolved to STOPPED.
   app.post("/resume", requireAuth, async () => {
     deps.pipeline.resumeAll();
     return { resumed: true };
   });
 
-  // Proves the append-only guarantee rather than asserting it: connects as the app DB role and
-  // tries to UPDATE recovery_events, expecting the database to refuse.
+  // Proves the append-only guarantee rather than asserting it — attempts a real UPDATE.
   app.get("/cases/:id/audit/verify", requireAuth, async () => deps.verifyAppendOnly());
 
   app.post("/cases/:id/decision", requireAuth, async (req, reply) => {
@@ -220,10 +199,7 @@ export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Pro
       return { applied: body.data.decision };
     }
 
-    // Recorded before the case moves, so the directive is durably in the audit trail before any
-    // worker can pick the case up. The next pipeline turn reads it, performs exactly this action
-    // instead of re-running the agent, and carries the authorization into the gate — which still
-    // runs, and still refuses a hard decline or an attempt past the cap.
+    // Recorded before the case moves, so the directive is durable before any worker can pick it up.
     const action = directedAction(body.data);
     await deps.events.append({
       caseId: id,
@@ -242,8 +218,6 @@ export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Pro
     return { applied: body.data.decision, action: action.kind };
   });
 
-  // The room-wide feed: every durable event across every case, so the top bar and case lists can
-  // update from the same canonical stream instead of a 2s poll of the full case list.
   app.get("/stream", async (req, reply) => {
     openSse(
       req,
@@ -262,9 +236,7 @@ export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Pro
       reply,
       { type: "open", caseId: id },
       (send) => deps.bus.subscribe(id, send),
-      // The status frame says whether a worker is actually holding this case: without it a
-      // client cannot tell a live run from a finished one it has merely opened, and every
-      // historical case looks like an agent stuck mid-investigation.
+      // Without a status frame, a finished case looks identical to one stuck mid-investigation.
       async (send) => {
         const kase = await deps.cases.byId(id);
         if (kase) send({ type: "status", lane: kase.lane, active: IN_FLIGHT_LANES.includes(kase.lane) });
@@ -272,9 +244,7 @@ export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Pro
     );
   });
 
-  // Demo aid: stands in for the customer completing payment on Razorpay's mock bank page. Builds
-  // a real signed webhook for the pending order and runs it through the same handler a real
-  // Razorpay delivery hits — the settle and ledger code paths are genuinely exercised.
+  // Demo aid: builds a real signed webhook and runs it through the same handler a live delivery hits.
   app.post("/cases/:id/simulate-capture", requireAuth, async (req, reply) => {
     const id = parseIdParam(req, reply);
     if (id === null) return;

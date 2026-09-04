@@ -16,10 +16,6 @@ import { buildGateContext } from "./gate-context.js";
 
 export type AgentRunner = (deps: AgentDeps, events: AgentEvents) => Promise<AgentProposal>;
 
-// One turn of the recovery loop for a single case: diagnose, gate, attempt, then say what
-// should happen next. Orchestration only; the decision rules are in safetyGate and the money
-// handling in the executor.
-
 const HOUR_MS = 3_600_000;
 const DEFAULT_RESCHEDULE_HOURS = 12;
 const SETTLEMENT_RECHECK_HOURS = 2;
@@ -59,11 +55,8 @@ export class RecoveryPipeline {
     this.stopRegistry = deps.stopRegistry ?? new StopRegistry();
   }
 
-  // Registers a stop and, for a case nothing is actively working right now (idle in INCOMING, or
-  // parked in RETRY_SCHEDULED awaiting a delayed job that may be hours off), resolves it to
-  // STOPPED immediately rather than waiting for that job to eventually fire. A case genuinely
-  // in flight is left to reach its own next checkpoint — see step()'s two stop checks — never
-  // interrupted mid-call.
+  // An idle/parked case resolves to STOPPED immediately; an in-flight one waits for its own
+  // next checkpoint.
   async requestStop(caseId: string, request: StopRequest): Promise<void> {
     this.stopRegistry.stopCase(caseId, request);
     const kase = await this.deps.cases.byId(caseId);
@@ -72,9 +65,6 @@ export class RecoveryPipeline {
     }
   }
 
-  // The emergency brake: no case run after this call starts a new investigation, gate, or
-  // execute step until resumeAll(). Live idle/parked cases are resolved to STOPPED immediately,
-  // same as requestStop; in-flight ones catch it at their own next checkpoint.
   async requestStopAll(request: StopRequest): Promise<{ stoppedNow: number }> {
     this.stopRegistry.stopAll(request);
     const live = await this.deps.cases.listLive();
@@ -88,8 +78,6 @@ export class RecoveryPipeline {
     return { stoppedNow };
   }
 
-  // Lifts the emergency brake only. Does not touch any per-case stop, and does not revive a case
-  // already resolved to STOPPED — reviving one is a deliberate separate action, not built yet.
   resumeAll(): void {
     this.stopRegistry.resumeAll();
   }
@@ -98,9 +86,6 @@ export class RecoveryPipeline {
     return this.stopRegistry.isBraked();
   }
 
-  // The worker's single entry point: settle anything parked from a prior turn, and only run a
-  // fresh diagnosis if the case still needs one. `reclaim` is set when the caller is a retry of
-  // its own crashed job, which is allowed to re-run a case still sitting in DIAGNOSING.
   async advance(
     caseId: string,
     agentEvents: AgentEvents = {},
@@ -111,8 +96,7 @@ export class RecoveryPipeline {
     if (TERMINAL_LANES.includes(kase.lane)) return { kind: "resolved", lane: kase.lane as TerminalLane };
 
     const attempts = await this.deps.attempts.listByCase(caseId);
-    // A webhook may have settled the money outside this lane's own turn; a case with recovered
-    // money settled is finished even if a crash left its lane un-updated.
+    // A crash may have left the lane un-updated after a webhook already settled the money.
     if (attempts.some((a) => a.status === "RECOVERED")) return this.resolve(kase, "RECOVERED");
     const parked = attempts.filter((a) => a.status === "PENDING" || a.status === "AWAITING_RECONCILIATION");
     for (const attempt of parked) {
@@ -133,9 +117,6 @@ export class RecoveryPipeline {
     const stopBefore = this.stopRegistry.check(caseId);
     if (stopBefore) return this.stop(kase, stopBefore);
 
-    // Claim the case for this turn. Moving it to DIAGNOSING is a compare-and-set against the lane
-    // this job just read; a concurrent job that already advanced it makes the move fail. A case
-    // already in DIAGNOSING is owned by another job unless this call is a retry reclaiming it.
     if (kase.lane === "DIAGNOSING") {
       if (!reclaim) return { kind: "not_claimed" };
     } else if (!(await this.enter(kase, "DIAGNOSING"))) {
@@ -151,9 +132,6 @@ export class RecoveryPipeline {
       payload: { attemptNo, activity: "investigate" },
     });
 
-    // A human who resolved this escalation has already decided. Re-running the agent would only
-    // re-derive the conclusion that escalated the case in the first place, so their action stands
-    // in for a proposal — and the gate still runs on it.
     const directive = await pendingDirective(this.deps.events, caseId, priorAttempts);
     const proposal = directive
       ? directedProposal(directive)
@@ -185,9 +163,7 @@ export class RecoveryPipeline {
           },
     );
 
-    // Re-check after the agent call, which can run for tens of seconds: a stop requested while
-    // it was in flight must land before the gate or the executor ever runs, not just before the
-    // investigation started.
+    // A stop requested while the agent call was in flight must land before the gate or executor run.
     const stopAfter = this.stopRegistry.check(caseId);
     if (stopAfter) return this.stop(kase, stopAfter);
 
@@ -240,8 +216,6 @@ export class RecoveryPipeline {
     );
     const result = safetyGate(proposal.action, ctx, this.limits);
 
-    // One shape for every outcome — a caller reading GATE_APPLIED never branches on which
-    // fields exist. `rule` and `detail` are null exactly when nothing fired, i.e. "allow".
     const event = {
       outcome: result.outcome,
       rule: result.outcome === "allow" ? null : result.rule,
@@ -277,7 +251,6 @@ export class RecoveryPipeline {
       return { kind: "awaiting_settlement", delayMs: SETTLEMENT_RECHECK_HOURS * HOUR_MS };
     }
 
-    // The attempt failed. The gate escalates once attemptNo passes the cap; short of that, retry.
     if (attemptNo >= this.limits.maxAttempts) {
       return this.resolve(kase, "ESCALATED", "attempts exhausted");
     }
@@ -309,8 +282,6 @@ export class RecoveryPipeline {
     return { kind: "resolved", lane: "STOPPED" };
   }
 
-  // Returns whether the case is now in `lane`: true if it already was or this call moved it,
-  // false if the compare-and-set lost to a concurrent writer.
   private async enter(kase: RecoveryCase, lane: Lane): Promise<boolean> {
     if (kase.lane === lane) return true;
     const moved = await this.deps.cases.moveLane(kase.id, kase.lane, lane);

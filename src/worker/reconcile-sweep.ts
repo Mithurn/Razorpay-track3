@@ -4,11 +4,7 @@ import type { RecoveryJob } from "./queue.js";
 import { enqueueRecovery } from "./queue.js";
 import { TERMINAL_LANES } from "../domain/case.js";
 
-// A safety net for a worker dying mid-turn: re-queues cases with a parked attempt, and cases
-// stuck in DIAGNOSING past BullMQ's own stall-retry limit. The latter get an explicit `reclaim`
-// flag — a fresh job has attemptsMade: 0, so the pipeline can't otherwise tell it apart from a
-// second worker already mid-turn on the same case. Idempotent; jobId is the case id.
-
+// `reclaim` lets the pipeline tell a stale DIAGNOSING case apart from one another worker still holds.
 export function startReconcileSweep(
   attempts: AttemptRepository,
   cases: CaseRepository,

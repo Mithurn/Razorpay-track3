@@ -1,7 +1,5 @@
 import { z } from "zod";
 
-// Our vocabulary for the payment gateway, not Razorpay's. Adapters translate at the boundary.
-
 export const paymentStatus = z.enum(["created", "authorized", "captured", "refunded", "failed"]);
 export type PaymentStatus = z.infer<typeof paymentStatus>;
 
@@ -35,9 +33,6 @@ export type Downtime = {
   end: string | null;
 };
 
-/**
- * The call reached a definite verdict: the gateway said no. Safe to record as a failure.
- */
 export class GatewayRejectedError extends Error {
   constructor(
     message: string,
@@ -48,10 +43,7 @@ export class GatewayRejectedError extends Error {
   }
 }
 
-/**
- * The outcome is unknown — a 5xx, a timeout, a socket hangup. The request may or may not have
- * been applied. Never record this as success or failure; reconcile against the gateway.
- */
+// Outcome unknown — never record as success or failure; reconcile against the gateway instead.
 export class GatewayUnavailableError extends Error {
   constructor(message: string, cause?: unknown) {
     super(message, { cause });

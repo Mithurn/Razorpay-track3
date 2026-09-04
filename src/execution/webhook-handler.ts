@@ -142,18 +142,12 @@ export class WebhookHandler {
       });
     }
 
-    // A redelivery of a recorded event id is a true no-op only once its attempt is settled — an
-    // unsettled one means the first delivery never finished, and this is the only signal left.
+    // A redelivery is a true no-op only once its attempt is settled — the move is still idempotent.
     if (!fresh && attempt.status !== "PENDING" && attempt.status !== "AWAITING_RECONCILIATION") {
-      // The first delivery may have crashed between settling the attempt and moving the lane;
-      // the move is idempotent, so a redelivery still gets to perform it.
       await this.moveToRecovered(kase, simulated);
       return { status: "duplicate" };
     }
 
-    // A payment.captured webhook carrying a captured entity is Razorpay's authoritative signal
-    // that the money landed — settle directly from it. Other settling events fall back to a
-    // gateway re-check.
     let status: string;
     if (parsed.event === "payment.captured" && captured?.status === "captured") {
       if (captured.amount !== kase.amountPaise) {

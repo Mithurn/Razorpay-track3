@@ -16,17 +16,14 @@ export function recoveryQueue(connection: ConnectionOptions): Queue<RecoveryJob>
     defaultJobOptions: {
       attempts: 4,
       backoff: { type: "exponential", delay: 10_000 },
-      // Drop completed jobs immediately so a case can be re-queued later; keeping the id in the
-      // completed set would make dedupe permanently block the next run.
+      // Keeping a completed job's id would make dedupe permanently block the next run.
       removeOnComplete: true,
       removeOnFail: 200,
     },
   });
 }
 
-// One job per case at a time, without dropping a turn that arrives mid-turn: a duplicate
-// deduplication id on a waiting/delayed job is a no-op, but on an active job BullMQ stores the
-// latest request and materializes it as a new job the moment the active one finishes.
+// A duplicate id on an active job is stored and materialized as a new job once it finishes.
 export async function enqueueRecovery(
   queue: Queue<RecoveryJob>,
   caseId: string,

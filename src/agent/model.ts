@@ -9,9 +9,7 @@ export type ModelKeys = {
 
 export type ModelProvider = "google" | "openrouter";
 
-// Model id syntax picks the provider: "google/<id>" uses the AI Studio key directly (the
-// first-party adapter round-trips Gemini's thought signatures); anything else goes through
-// OpenRouter. The id is always an env override.
+// "google/<id>" uses the AI Studio key directly; anything else goes through OpenRouter.
 export function splitModelId(modelId: string): { provider: ModelProvider; id: string } {
   return modelId.startsWith("google/")
     ? { provider: "google", id: modelId.slice("google/".length) }

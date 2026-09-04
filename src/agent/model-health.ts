@@ -1,8 +1,5 @@
 import { splitModelId } from "./model.js";
 
-// A cheap liveness check for the model provider: one-token completion, short timeout. Used by
-// GET /model-health so a demo operator knows the agent path is up before starting a run.
-
 export async function checkModelHealth(
   keys: { openRouterApiKey: string | undefined; googleApiKey: string | undefined },
   model: string,

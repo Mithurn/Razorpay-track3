@@ -5,14 +5,10 @@ import { enqueueRecovery } from "./queue.js";
 import type { CaseEventBus } from "../api/event-bus.js";
 import type { EventLog } from "../domain/ports.js";
 
-// Turns one pipeline outcome into the next queued job and streams the turn to any watchers. The
-// pipeline holds the decisions; this only schedules and forwards.
-
 export function makeProcessor(pipeline: RecoveryPipeline, queue: Queue<RecoveryJob>, bus: CaseEventBus, events: EventLog) {
   return async function process(job: RecoveryJob, meta: { attemptsMade?: number } = {}): Promise<void> {
     const { caseId, reclaim: forcedReclaim } = job;
-    // Awaited by the caller so a TOOL_CALLED row always commits before its TOOL_RESULT — two
-    // unawaited appends can land on different pooled connections and commit out of order.
+    // Awaited so a TOOL_CALLED row always commits before its TOOL_RESULT, never out of order.
     const persistToolEvent = (type: "TOOL_CALLED" | "TOOL_RESULT", payload: Record<string, unknown>) =>
       events.append({ caseId, type, payload: { ...payload, activity: "investigate" } }).catch((err) => {
         console.error(`failed to persist ${type}:`, err);
@@ -48,9 +44,7 @@ export function makeProcessor(pipeline: RecoveryPipeline, queue: Queue<RecoveryJ
       { reclaim: forcedReclaim === true || (meta.attemptsMade ?? 0) > 0 },
     );
 
-    // Every exit that ends this turn tells the stream so, or a watching client waits forever on a
-    // run that is no longer happening. `not_claimed` is the one exception: another job owns the
-    // case and will publish its own ending.
+    // not_claimed: another job owns this case and will publish its own ending.
     if (outcome.kind === "not_claimed") return;
     if (outcome.kind === "resolved") {
       bus.publish(caseId, { type: "done", lane: outcome.lane, reason: "resolved" });

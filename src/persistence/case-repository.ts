@@ -125,8 +125,7 @@ export class PostgresCaseRepository implements CaseRepository {
           WHERE run_id IS NULL
           GROUP BY lane`,
       ),
-      // isSimulatedPaymentId's own patterns, so this split can never drift from the predicate
-      // used everywhere else the marker matters.
+      // isSimulatedPaymentId's own patterns, so this split can never drift from the shared predicate.
       this.db.query(
         `SELECT
            coalesce(sum(a.recovered_paise) FILTER (

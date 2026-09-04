@@ -3,9 +3,7 @@ import type { RecoveryEvent, StoredEvent } from "../domain/events.js";
 import { recoveryEventType } from "../domain/events.js";
 import type { Db } from "./pool.js";
 
-// Append-only by database grant, not by convention: the app role holds SELECT and INSERT on
-// recovery_events and nothing else. There is deliberately no update or delete method here.
-
+// Append-only by database grant, not convention — the app role holds only SELECT and INSERT.
 export class PostgresEventLog implements EventLog {
   constructor(private readonly db: Db) {}
 

@@ -5,11 +5,6 @@ import { MOVES_MONEY, type RecoveryAction } from "../domain/recovery-action.js";
 import { GatewayRejectedError, GatewayUnavailableError, type PaymentGateway } from "../domain/gateway.js";
 import { RazorpayClient } from "./razorpay-client.js";
 
-// Performs one decided recovery action exactly once. The attempt row (with its unique
-// idempotency key) is claimed before any Razorpay call, so a crash mid-flight leaves a durable
-// claim rather than a lost or doubled attempt. An ambiguous gateway response is never read as
-// success or failure — it parks the attempt for settle() to resolve later.
-
 const TERMINAL_ACTION_DETAIL: Partial<Record<RecoveryAction["kind"], string>> = {
   ESCALATE: "escalated_to_human",
   WRITE_OFF: "written_off",
@@ -24,9 +19,7 @@ export class AttemptExecutor {
     private readonly notifier: NotificationPort,
     opts: { reperformAfterMs?: number } = {},
   ) {
-    // A gateway lookup that misses also matches an order created seconds ago (list-index
-    // eventual consistency), so absence is only trusted for claims old enough that the original
-    // perform, had it run, could no longer be in flight.
+    // A gateway lookup miss also matches list-index eventual consistency, not just true absence.
     this.reperformAfterMs = opts.reperformAfterMs ?? 60 * 60_000;
   }
 
@@ -36,9 +29,7 @@ export class AttemptExecutor {
     const key = idempotencyKeyFor(request.caseId, request.attemptNo);
     const { attempt, created } = await this.attempts.claim(request, key);
 
-    // A concurrent caller that lost the claim does not own this attempt — it must not touch
-    // Razorpay. Whatever the row's current status is, settle() (via the pipeline's parked-
-    // attempt path) is what reconciles it, not a second perform().
+    // The loser of a concurrent claim must not touch Razorpay; settle() reconciles it instead.
     if (!created) return attempt;
 
     await this.events.append({
@@ -69,7 +60,6 @@ export class AttemptExecutor {
     return this.finish(request.caseId, attempt.id, null);
   }
 
-  /** Re-check a parked attempt against the gateway. Used by the webhook handler and the sweep. */
   async settle(
     attempt: Attempt,
     money: { amountPaise: number; currency: string },
@@ -92,8 +82,7 @@ export class AttemptExecutor {
       }
     }
     if (!ref && !MOVES_MONEY.has(action.kind) && action.kind !== "CUSTOMER_NUDGE") {
-      // ESCALATE/WRITE_OFF perform() resolves the row synchronously, so a claim still PENDING
-      // means the process died before it ever ran. Nothing was spent; close it as perform would.
+      // A still-PENDING ESCALATE/WRITE_OFF claim means the process died before it ever ran.
       await this.attempts.resolve(attempt.id, { status: "FAILED", detail: TERMINAL_ACTION_DETAIL[action.kind] });
     }
 
@@ -104,19 +93,13 @@ export class AttemptExecutor {
     return this.finish(attempt.caseId, attempt.id, attempt.status);
   }
 
-  // The order/link was never created: the process died between the durable claim and perform.
-  // Recreate it under the same idempotency key, then settle as if it had just been performed.
-  // Locked so two concurrent callers (the worker's sweep pass and a redelivered webhook, each
-  // holding their own AttemptExecutor) can never both call the gateway for the same attempt —
-  // Razorpay does not dedupe orders by receipt, so an unguarded race here would create two.
+  // Locked: Razorpay does not dedupe orders by receipt, so an unguarded race here would create two.
   private async reperform(
     attempt: Attempt,
     money: { amountPaise: number; currency: string },
     action: RecoveryAction,
   ): Promise<{ ref: string | null; resolved: boolean }> {
     const outcome = await this.attempts.withReperformLock(attempt.id, async () => {
-      // Re-check inside the lock: the winner of a prior race may have recorded a ref since this
-      // caller's own earlier lookup.
       const current = await this.attempts.byId(attempt.id);
       if (current?.razorpayRef) return { ref: current.razorpayRef, resolved: false };
 
@@ -141,8 +124,6 @@ export class AttemptExecutor {
         throw err;
       }
     });
-    // Lost the lock to a concurrent caller: leave this attempt as-is for now, the winner's
-    // recordRazorpayRef (or terminal resolve) will be visible on the next settle() pass.
     return outcome ?? { ref: null, resolved: false };
   }
 
@@ -175,8 +156,7 @@ export class AttemptExecutor {
 
   private async perform(attempt: Attempt, request: AttemptRequest, key: string): Promise<string | null> {
     const { action } = request;
-    // RETRY_SCHEDULED's atHoursFromNow spaces out the *next* attempt if this one fails
-    // (pipeline.ts's rescheduleDelay); the order below is created now either way, not deferred.
+    // The order is created now either way — atHoursFromNow only spaces the *next* attempt.
     if (action.kind === "RETRY_NOW" || action.kind === "RETRY_SCHEDULED") {
       const order = await this.gateway.createOrder({
         amountPaise: request.amountPaise,
@@ -192,8 +172,6 @@ export class AttemptExecutor {
       return this.createOrRecoverLink(attempt.id, request, key);
     }
 
-    // CUSTOMER_NUDGE moves no money and has no Razorpay ref, but it must still *do* something —
-    // it used to return here having sent nothing at all.
     if (action.kind === "CUSTOMER_NUDGE") {
       await this.notifier.send({
         caseId: request.caseId,
@@ -204,7 +182,6 @@ export class AttemptExecutor {
       return null;
     }
 
-    // ESCALATE / WRITE_OFF touch no money; the worker moves the case lane.
     await this.attempts.resolve(attempt.id, { status: "FAILED", detail: TERMINAL_ACTION_DETAIL[action.kind]! });
     return null;
   }
@@ -246,11 +223,9 @@ export class AttemptExecutor {
     } else if (verdict.kind === "failed") {
       await this.attempts.resolve(attemptId, { status: "FAILED", detail: verdict.detail });
     }
-    // pending: the row stays PENDING for a webhook or a later sweep.
   }
 
-  // A nudge has no Razorpay ref, so no webhook or sweep can ever settle it. Left PENDING it would
-  // re-check forever; once the message is away there is nothing more to observe, so it ends here.
+  // A nudge has no Razorpay ref, so nothing else can ever settle it — left PENDING it would hang.
   private async closeUnobservableNudge(attemptId: string, action: RecoveryAction): Promise<void> {
     if (action.kind !== "CUSTOMER_NUDGE") return;
     const current = await this.attempts.byId(attemptId);

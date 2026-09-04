@@ -1,11 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { EventLog, NotificationPort } from "../domain/ports.js";
 
-// The only stub in the build, and it is deliberate. Razorpay's own recovery agents send nudges
-// over WhatsApp or email through a connector; wiring a real provider is an integration, not a
-// recovery decision, so it is out of scope here. What matters is that the seam exists and that
-// `delivered: false` travels with the result — nothing downstream may report a nudge as sent.
-
 export class LoggingNotifier implements NotificationPort {
   constructor(private readonly events: EventLog) {}
 

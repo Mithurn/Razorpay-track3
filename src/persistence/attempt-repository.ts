@@ -108,8 +108,7 @@ export class PostgresAttemptRepository implements AttemptRepository {
     await this.db.query("UPDATE recovery_attempts SET razorpay_ref = $2 WHERE id = $1", [id, ref]);
   }
 
-  // A RECOVERED attempt is a real credit that already landed; nothing may demote it back to an
-  // in-flight status, or a later re-settle can re-arm settleRecovered and double-credit the case.
+  // Never demotes a RECOVERED attempt — that would let a later re-settle double-credit the case.
   async resolve(
     id: string,
     patch: { status: Exclude<AttemptStatus, "RECOVERED">; detail?: string | null },
@@ -124,10 +123,7 @@ export class PostgresAttemptRepository implements AttemptRepository {
     );
   }
 
-  // Touches two tables on purpose: settling the attempt and crediting the case must be one
-  // atomic step, or a crash between them leaves the ledger wrong. The guard is keyed to
-  // settled_payment_id rather than outcome, so even a hypothetical status demotion elsewhere
-  // can't re-arm a credit that already has a real payment id behind it.
+  // Settles the attempt and credits the case atomically, guarded on settled_payment_id.
   async settleRecovered(id: string, capturedPaise: number, paymentId: string): Promise<boolean> {
     if (!Number.isInteger(capturedPaise) || capturedPaise <= 0) {
       throw new Error(`settleRecovered needs a positive integer paise amount, got ${capturedPaise}`);
@@ -157,9 +153,7 @@ export class PostgresAttemptRepository implements AttemptRepository {
     return rows.map((r) => toAttempt(r as Row));
   }
 
-  // Session-scoped advisory lock, namespaced under REPERFORM_LOCK_NS: released automatically if
-  // the holding connection dies, so a crash mid-reperform can never leave this permanently
-  // locked, unlike a row flag would.
+  // Session-scoped: releases automatically if the holding connection dies, unlike a row flag.
   async withReperformLock<T>(attemptId: string, fn: () => Promise<T>): Promise<T | null> {
     const client = await this.db.connect();
     try {

@@ -33,8 +33,7 @@ export type AgentConfig = {
 
 export type AgentEvents = {
   onReasoningDelta?: (text: string) => void;
-  // Awaited around the actual tool execution, so a durable TOOL_CALLED record always commits
-  // before the TOOL_RESULT that follows it — not just called first, actually landed first.
+  // Awaited so a durable TOOL_CALLED record always commits before its TOOL_RESULT.
   onToolCall?: (call: ToolCall) => void | Promise<void>;
   onToolResult?: (result: ToolResult) => void | Promise<void>;
   onConcluded?: (proposal: AgentProposal) => void;
@@ -78,10 +77,7 @@ export async function runRecoveryAgent(
 
   let toolCalls = 0;
 
-  // Wrap each investigation tool so the call and its raw output, with wall-clock timing, reach
-  // the stream. Fired from here, not from onStepFinish, so onToolCall lands before onToolResult
-  // for the same call — the AI SDK only reports a finished step, by which point the call already
-  // executed, which would otherwise report the result before the call that produced it.
+  // Fired from here, not onStepFinish, so onToolCall lands before onToolResult for the same call.
   const investigationTools = Object.fromEntries(
     Object.entries(buildTools(deps)).map(([name, t]) => [
       name,

@@ -2,12 +2,6 @@ import type { CaseRepository, NewCase, RoomMetrics, SimilarCaseSummary } from ".
 import type { EventLog } from "../domain/ports.js";
 import type { Lane, RecoveryCase } from "../domain/case.js";
 
-// Wraps a CaseRepository so every lane change is also a durable, auditable event — the same
-// pattern PublishingEventLog uses for the event log itself. Without this, moveLane is a bare SQL
-// UPDATE: the two call sites that move a lane (the pipeline's own turn, and a human decision on
-// an escalated case) would each have to remember to append the fact themselves, and a lane
-// change would not be part of the canonical event stream at all. This makes it impossible to
-// move a lane without the move also being recorded.
 export class LanePublishingCaseRepository implements CaseRepository {
   constructor(
     private readonly inner: CaseRepository,

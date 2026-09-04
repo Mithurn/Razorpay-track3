@@ -3,15 +3,9 @@ import type { ToolSource } from "../agent/recovery-agent.js";
 
 export type { ToolSource };
 
-// In-process fan-out from the running pipeline to any SSE clients watching a case. Single
-// process only; a multi-node deployment would put Redis pub/sub here.
-
-// Why a turn ended. `resolved` is terminal for the case; the rest end this turn only.
 export type DoneReason = "resolved" | "rescheduled" | "awaiting_settlement";
 
 export type CaseStreamEvent =
-  // Always the first event on a new subscription: what the case is doing right now, so a client
-  // can tell a live run from a case that is merely being read.
   | { type: "status"; lane: string; active: boolean }
   | { type: "reasoning"; text: string }
   | { type: "tool"; name: string }
@@ -28,10 +22,7 @@ export type CaseStreamEvent =
   | { type: "audit"; eventType: string; payload: Record<string, unknown>; at: string }
   | { type: "done"; lane: string; reason: DoneReason };
 
-// The room-wide feed: every durable event, across every case, in the shape the per-case stream
-// already uses for `audit` plus which case it belongs to. Deliberately narrower than
-// CaseStreamEvent — no reasoning deltas or tool pings here, only what was actually recorded, so
-// the room view is the audit trail at a glance, not a firehose of one case's live investigation.
+// Deliberately narrower than CaseStreamEvent — only what was actually recorded, no live tool pings.
 export type RoomStreamEvent = {
   type: "audit";
   caseId: string;

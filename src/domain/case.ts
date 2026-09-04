@@ -13,13 +13,7 @@ export const lane = z.enum([
 ]);
 export type Lane = z.infer<typeof lane>;
 
-// STOPPED is terminal for now: a merchant-stopped case is not automatically resumed. Reviving it
-// is a deliberate future action (not built yet), same shape as the human decision on an
-// ESCALATED case, not something the pipeline should ever do on its own.
 export const TERMINAL_LANES: readonly Lane[] = ["RECOVERED", "ESCALATED", "WRITTEN_OFF", "STOPPED"];
-
-// Lanes a worker is actively holding. A case outside these is parked: nothing is running for it,
-// so a stream opened on it must not present itself as a live run.
 export const IN_FLIGHT_LANES: readonly Lane[] = ["DIAGNOSING", "DECIDING", "ATTEMPTING"];
 
 export const customerPayment = z.object({
@@ -49,8 +43,7 @@ export const recoveryCase = z.object({
 });
 export type RecoveryCase = z.infer<typeof recoveryCase>;
 
-// Razorpay surfaces risk-blocked payments with this failure reason. The gate's risk_hold veto
-// reads it directly from the case so it never depends on the agent's own diagnosis.
+// The gate's risk_hold veto reads this directly from the case, never from the agent's diagnosis.
 export const RISK_CHECK_FAILURE_REASON = "payment_risk_check_failed";
 
 export function isRiskHold(kase: RecoveryCase): boolean {

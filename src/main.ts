@@ -28,8 +28,6 @@ import { isRiskHold, isHardDecline } from "./domain/case.js";
 import { CaseEventBus } from "./api/event-bus.js";
 import { registerRoutes } from "./api/routes.js";
 
-// Composition root. Every dependency is wired here and nowhere else.
-
 const config = loadConfig();
 
 const pool = createPool(config.DATABASE_URL);
@@ -37,10 +35,7 @@ const attempts = new PostgresAttemptRepository(pool);
 const webhooks = new PostgresWebhookInbox(pool);
 const runs = new RunRepository(pool);
 const bus = new CaseEventBus();
-// Every appended event is mirrored to the live stream as an `audit` event.
 const events = new PublishingEventLog(new PostgresEventLog(pool), bus);
-// Every successful lane move is recorded as a CASE_LANE_CHANGED event through the same log, so
-// case position is never a bare UPDATE invisible to the audit trail.
 const cases = new LanePublishingCaseRepository(new PostgresCaseRepository(pool), events);
 
 const razorpay = new RazorpayClient({
@@ -92,7 +87,6 @@ const queue = recoveryQueue(connection);
 const worker = recoveryWorker(connection, makeProcessor(pipeline, queue, bus, events));
 const sweep = startReconcileSweep(attempts, cases, queue);
 
-// The queue is bound here, in the composition root — the handler only sees the port.
 const enqueuer = { enqueue: (caseId: string) => enqueueRecovery(queue, caseId) };
 const webhookHandler = new WebhookHandler({
   client: razorpay,
@@ -106,8 +100,7 @@ const webhookHandler = new WebhookHandler({
 });
 
 const app = Fastify({ logger: true });
-// Keep the raw JSON bytes on the request so the Razorpay webhook HMAC verifies against exactly
-// what was sent, while req.body stays the ordinary parsed object for every other route.
+// Keep the raw JSON bytes so the Razorpay webhook HMAC verifies against exactly what was sent.
 app.addContentTypeParser("application/json", { parseAs: "string" }, (req, body, done) => {
   (req as { rawBody?: string }).rawBody = body as string;
   try {

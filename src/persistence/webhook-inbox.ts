@@ -1,9 +1,7 @@
 import type { WebhookInbox } from "../domain/ports.js";
 import type { Db } from "./pool.js";
 
-// razorpay_webhooks.event_id is the primary key, so a duplicate delivery collides and inserts
-// nothing. Append-only by grant: the app role holds SELECT and INSERT and nothing else.
-
+// event_id is the primary key, so a duplicate delivery collides and inserts nothing.
 export class PostgresWebhookInbox implements WebhookInbox {
   constructor(private readonly db: Db) {}
 

@@ -46,10 +46,7 @@ The moves:
 Root causes to classify into: hard_decline, insufficient_funds, bank_downtime, soft_decline,
 risk_hold, technical, unrecoverable.`;
 
-// The customer's identifier is deliberately absent. Live it is their email or phone number
-// (webhook-handler.ts derives customerRef from the Razorpay payment), and none of the reasoning
-// needs it — the agent works from history, downtime, similar cases and prior attempts. Nothing
-// identifying a customer is sent to a third-party model.
+// The customer's identifier is deliberately absent — nothing identifying goes to a third-party model.
 export function caseBrief(kase: RecoveryCase, priorAttempts: number): string {
   return [
     `Failed payment for merchant ${kase.merchantRef}.`,

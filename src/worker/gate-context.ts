@@ -15,9 +15,7 @@ function hoursSinceLastContact(prior: Attempt[], clock: Clock): number | null {
   return (clock.now().getTime() - Date.parse(last.createdAt)) / 3_600_000;
 }
 
-// Named for what the gate actually paces: the last time Razorpay was genuinely called. An
-// ESCALATE or WRITE_OFF attempt never touched the bank and must not arm the charge cooldown —
-// it used to, via a filter that only checked SKIPPED and let ESCALATE through as if it were one.
+// An ESCALATE or WRITE_OFF attempt never touched the bank and must not arm the charge cooldown.
 function hoursSinceLastAttempt(prior: Attempt[], clock: Clock): number | null {
   const moneyMoves = prior.filter((a) => MOVES_MONEY.has(a.action) && a.status !== "SKIPPED");
   const last = moneyMoves.at(-1);
@@ -44,8 +42,7 @@ export function buildGateContext(
     riskHold: proposal.diagnosisRootCause === "risk_hold" || (riskHoldForCase?.(kase) ?? false),
     hardDecline: proposal.diagnosisRootCause === "hard_decline" || (hardDeclineForCase?.(kase) ?? false),
     unrecoverableDiagnosis: proposal.diagnosisRootCause === "unrecoverable",
-    // A degraded loop already fell back to the safe action; its zero confidence is a missing
-    // diagnosis, not a weak one, and clamping it to ESCALATE would defeat degrade-to-safe.
+    // A degraded loop's zero confidence is a missing diagnosis, not a weak one.
     confidence: proposal.degraded ? 1 : proposal.confidence,
     now: clock.now(),
   };

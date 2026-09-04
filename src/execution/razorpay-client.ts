@@ -62,8 +62,7 @@ function toPayment(raw: z.infer<typeof paymentSchema>): GatewayPayment {
     id: raw.id,
     orderId: raw.order_id ?? null,
     amountPaise: raw.amount,
-    // Razorpay leaves amount_captured null until capture settles; a captured payment carries the
-    // full amount. Never infer a captured value from the requested one.
+    // Razorpay leaves amount_captured null until capture settles; a captured payment carries the full amount.
     capturedPaise: raw.status === "captured" ? (raw.amount_captured ?? raw.amount) : 0,
     status: status.success ? status.data : "failed",
     method: raw.method ?? null,
@@ -129,8 +128,7 @@ export class RazorpayClient implements PaymentGateway {
         .safeParse(body);
       const description = err.success ? (err.data.error.description ?? text) : text;
       const reason = err.success ? (err.data.error.reason ?? null) : null;
-      // Razorpay returns throttling as a 400 with this description, not a 429. It is a
-      // retry-later condition, not a verdict on the request.
+      // Razorpay returns throttling as a 400 with this description, not a 429.
       if (/too many requests|rate limit/i.test(description)) {
         throw new GatewayUnavailableError(`razorpay ${path}: ${description}`);
       }
@@ -232,13 +230,7 @@ export class RazorpayClient implements PaymentGateway {
     }
   }
 
-  /**
-   * Razorpay's order LIST index is eventually consistent — an order created moments ago is absent
-   * here while `GET /orders/:id` already returns it. A null therefore means "unknown", never "it
-   * did not land", so this must only be called by the reconciler on a later pass, never as an
-   * inline retry guard. `receipt` is also not unique at Razorpay (duplicates are accepted), so it
-   * is a lookup label only; our own attempts.idempotency_key is the real constraint.
-   */
+  // Eventually consistent; receipt is not unique at Razorpay — a lookup label, not a constraint.
   async findOrderByIdempotencyKey(idempotencyKey: string): Promise<GatewayOrder | null> {
     const body = await this.call(`/orders?receipt=${encodeURIComponent(idempotencyKey)}`);
     const list = this.parse(z.object({ items: z.array(orderSchema).default([]) }), body, "/orders?receipt");

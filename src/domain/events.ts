@@ -9,8 +9,6 @@ export const recoveryEventType = z.enum([
   "AUDIT_GAP",
   "AGENT_PROPOSED",
   "AGENT_DEGRADED",
-  // A human resolved an escalation. Durable because it is both an audit fact and the input the
-  // next pipeline turn reads to know what the human actually decided.
   "HUMAN_DIRECTIVE",
   "AGENT_SKIPPED_HUMAN_DIRECTED",
   "GATE_APPLIED",
