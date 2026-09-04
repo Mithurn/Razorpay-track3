@@ -19,9 +19,7 @@ import { rulesRunner } from "./rules-arm.js";
 import { recordingRunner, replayRunner } from "./mock-agent.js";
 import { scoreArm, exceptionList, formatReport, type CaseRecord } from "./metrics.js";
 import { LoggingNotifier } from "../src/execution/notifier.js";
-
-const MAX_TURNS = 12;
-const CONCURRENCY = 10;
+import { MAX_AGENT_TURNS_PER_CASE, BENCH_CONCURRENCY } from "./constants.js";
 
 type Arm = "agent" | "fixed" | "rules";
 const ALL_ARMS: Arm[] = ["agent", "fixed", "rules"];
@@ -136,8 +134,8 @@ type ArmDeps = {
 
 async function runArm(corpus: CorpusCase[], deps: ArmDeps): Promise<Map<string, number | null>> {
   const timing = new Map<string, number | null>();
-  for (let i = 0; i < corpus.length; i += CONCURRENCY) {
-    const batch = corpus.slice(i, i + CONCURRENCY);
+  for (let i = 0; i < corpus.length; i += BENCH_CONCURRENCY) {
+    const batch = corpus.slice(i, i + BENCH_CONCURRENCY);
     const hours = await Promise.all(batch.map((c) => driveCase(c, deps)));
     batch.forEach((c, j) => timing.set(c.id, hours[j]!));
   }
@@ -168,7 +166,7 @@ async function driveCase(c: CorpusCase, deps: ArmDeps): Promise<number | null> {
     runAgent: deps.runner,
   });
 
-  for (let turn = 0; turn < MAX_TURNS; turn++) {
+  for (let turn = 0; turn < MAX_AGENT_TURNS_PER_CASE; turn++) {
     const outcome = await pipeline.advance(c.id);
     if (outcome.kind === "resolved") {
       return outcome.lane === "RECOVERED" ? resolver.recoveredAtHour(c.id) : null;

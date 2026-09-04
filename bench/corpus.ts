@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import type { NewCase } from "../src/domain/ports.js";
-import type { RecoveryAction } from "../src/domain/recovery-action.js";
 import type { CustomerPayment } from "../src/domain/case.js";
 import type { RootCause } from "../src/domain/failure.js";
 
@@ -27,14 +26,10 @@ export type CorpusOptions = {
   size?: number;
   seed?: number;
   downFraction?: number;
-  /**
-   * Overwrite every case's failureCode/failureReason with one generic value, leaving ground
-   * truth untouched. `rules-arm.ts` switches on that exact string, and in this corpus it is
-   * close to the answer key — 7 templates, one `failureReason` each. Blinding it removes the
-   * one input the rules table needs and everything else keeps working from: customer history,
-   * the downtime feed, similar-case outcomes, prior attempts. Isolates what diagnosis is
-   * actually worth from what a templated corpus' label happens to give away for free.
-   */
+  // Overwrite failureCode/failureReason with one generic value, ground truth untouched. Removes
+  // the one input rules-arm.ts branches on (here close to the answer key), leaving every arm to
+  // work from history, downtime, similar cases and prior attempts. Evaluation tool only — see
+  // BREAKS.md: isRiskHold reads the same field, so blinded, the risk-hold veto never fires.
   blindReason?: boolean;
 };
 
@@ -175,6 +170,11 @@ const TEMPLATES: Template[] = [
 const GENERIC_DECLINE_REASONS = new Set(["card_declined", "payment_failed"]);
 const DOWNTIME_PAIR_RATE = 5;
 
+// ₹6,499 is over safety-gate.ts's DEFAULT_LIMITS.maxExposurePaise (₹5,000) — the same figure the
+// live demo's cust_over_cap uses, so the exposure cap is exercised by the measured batch and not
+// only a unit test and one seeded case.
+const AMOUNTS_PAISE = [49900, 99900, 149900, 249900, 649900];
+
 export function generateCorpus(opts: CorpusOptions): CorpusCase[] {
   const rng = mulberry32(opts.seed ?? 42);
   const size = opts.size ?? 120;
@@ -184,11 +184,7 @@ export function generateCorpus(opts: CorpusOptions): CorpusCase[] {
   for (let i = 0; i < size; i++) {
     const template = TEMPLATES[i % TEMPLATES.length]!;
     const built = template.build(rng);
-    // ₹6,499 is over safety-gate.ts's DEFAULT_LIMITS.maxExposurePaise (₹5,000) — the same figure
-    // the live demo's cust_over_cap uses. Without it, the exposure cap is proven only by a unit
-    // test and the demo's one seeded case, never by the measured batch.
-    const AMOUNTS = [49900, 99900, 149900, 249900, 649900];
-    const base = AMOUNTS[Math.floor(rng() * AMOUNTS.length)]!;
+    const base = AMOUNTS_PAISE[Math.floor(rng() * AMOUNTS_PAISE.length)]!;
 
     let isDownPair = false;
     if (GENERIC_DECLINE_REASONS.has(template.reason)) {

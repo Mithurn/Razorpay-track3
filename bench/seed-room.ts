@@ -7,6 +7,7 @@ import { RunRepository } from "../src/persistence/run-repository.js";
 import { RecoveryPipeline } from "../src/worker/pipeline.js";
 import { RazorpayClient } from "../src/execution/razorpay-client.js";
 import { generateCorpus, type GroundTruth } from "./corpus.js";
+import { MAX_AGENT_TURNS_PER_CASE } from "./constants.js";
 import { GroundTruthResolver } from "./ground-truth-resolver.js";
 import { BenchGateway } from "./bench-gateway.js";
 import { fixedScheduleRunner } from "./fixed-arm.js";
@@ -83,10 +84,8 @@ async function main(): Promise<void> {
           }),
         runAgent: runner,
       });
-      // Same persistence pattern as the live worker (src/worker/recovery-worker.ts): a replayed
-      // tool call/result becomes a durable TOOL_CALLED/TOOL_RESULT row, awaited in order, so the
-      // seeded room's case panel shows the same investigation trace a live run would have left,
-      // not just the final proposal with an empty "N signals checked" drawer.
+      // Same as the live worker: each replayed tool call/result becomes a durable
+      // TOOL_CALLED/TOOL_RESULT row, awaited in order, so the seeded room shows a real trace.
       const agentEvents = {
         onToolCall: (call: { name: string; callId: string; args: unknown }) =>
           events.append({ caseId: c.id, type: "TOOL_CALLED", payload: { ...call, activity: "investigate" } }),
@@ -94,7 +93,7 @@ async function main(): Promise<void> {
           events.append({ caseId: c.id, type: "TOOL_RESULT", payload: { ...r, activity: "investigate" } }),
       };
       let simHours: number | null = null;
-      for (let turn = 0; turn < 12; turn++) {
+      for (let turn = 0; turn < MAX_AGENT_TURNS_PER_CASE; turn++) {
         const outcome = await pipeline.advance(c.id, agentEvents);
         if (outcome.kind === "resolved") {
           simHours = outcome.lane === "RECOVERED" ? resolver.recoveredAtHour(c.id) : null;
