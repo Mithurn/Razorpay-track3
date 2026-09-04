@@ -143,16 +143,16 @@ describe.runIf(adminUrl)("POST /webhooks/razorpay", () => {
     const enqueuer: CaseEnqueuer = { enqueue: async () => undefined };
     // registerRoutes lives in the api/ orchestration tier and legitimately holds the queue type.
     const queue = { add: async () => undefined } as never;
-    const handler = new WebhookHandler(
+    const handler = new WebhookHandler({
       client,
-      new PostgresWebhookInbox(db),
+      inbox: new PostgresWebhookInbox(db),
       attempts,
       cases,
       events,
       executor,
       enqueuer,
-      "merch_1",
-    );
+      merchantRef: "merch_1",
+    });
 
     app = Fastify();
     app.addContentTypeParser(
@@ -302,5 +302,52 @@ describe.runIf(adminUrl)("POST /webhooks/razorpay", () => {
     expect(
       (await new PostgresCaseRepository(db).byId(caseId))!.recoveredPaise,
     ).toBe(149900);
+  });
+
+  it("returns 500 rather than HMAC-verifying a re-serialized body when rawBody is unavailable", async () => {
+    // No addContentTypeParser hook here, unlike buildApp() — req.rawBody is never set, the exact
+    // condition the fallback used to paper over with a body that can never verify.
+    const bareApp = Fastify();
+    await registerRoutes(bareApp, {
+      gateway: { getPaymentLink: async () => null },
+      cases: {} as never,
+      attempts: {} as never,
+      events: {} as never,
+      runs: {} as never,
+      queue: {} as never,
+      webhookHandler: {} as never,
+      bus: { subscribe: () => () => undefined } as never,
+      pipeline: {
+        requestStop: async () => undefined,
+        requestStopAll: async () => ({ stoppedNow: 0 }),
+        resumeAll: () => undefined,
+        isBraked: () => false,
+      },
+      modelHealth: async () => ({ model: "test", reachable: true }),
+      verifyAppendOnly: async () => ({ enforced: true, role: "recovery_app" }),
+      runtimeInfo: {
+        model: "test",
+        deadlineMs: 90_000,
+        stepBudget: 6,
+        limits: { maxAttempts: 4, maxExposurePaise: 500_000, cooldownHours: 6, minConfidence: 0.6, contactCooldownHours: 24 },
+        razorpayKeyId: "rzp_test_stub",
+      },
+      razorpayWebhookSecret: "whsec_no_rawbody_test",
+      demoAccessToken: undefined,
+    });
+
+    const res = await bareApp.inject({
+      method: "POST",
+      url: "/webhooks/razorpay",
+      headers: {
+        "content-type": "application/json",
+        "x-razorpay-signature": "irrelevant",
+        "x-razorpay-event-id": "evt_no_rawbody",
+      },
+      payload: { event: "payment.failed" },
+    });
+
+    expect(res.statusCode).toBe(500);
+    await bareApp.close();
   });
 });

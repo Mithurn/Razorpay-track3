@@ -145,6 +145,45 @@ describe.runIf(adminUrl)("RecoveryPipeline", () => {
     expect(gateEvent!.payload).toMatchObject({ outcome: "allow", rule: null, detail: null, proposed: "RETRY_NOW", applied: "RETRY_NOW" });
   });
 
+  it("resolves a case whose money already settled instead of re-investigating it", async () => {
+    await seed();
+    let agentRuns = 0;
+    const pipeline = new RecoveryPipeline(
+      baseDeps({
+        runAgent: async () => {
+          agentRuns++;
+          return proposal({});
+        },
+      }),
+    );
+    const attempts = new PostgresAttemptRepository(db);
+
+    const { attempt, created } = await attempts.claim(
+      {
+        caseId,
+        attemptNo: 1,
+        rootCause: "soft_decline",
+        action: { kind: "RETRY_NOW" },
+        reasoning: "seed",
+        amountPaise: 149900,
+        currency: "INR",
+        scheduledFor: null,
+        clamp: null,
+        createdAt: new Date().toISOString(),
+      },
+      `${caseId}:1`,
+    );
+    expect(created).toBe(true);
+    await attempts.settleRecovered(attempt.id, 149900, "pay_already_settled");
+    await new PostgresCaseRepository(db).moveLane(caseId, "INCOMING", "ATTEMPTING");
+
+    const outcome = await pipeline.advance(caseId);
+
+    expect(outcome).toEqual({ kind: "resolved", lane: "RECOVERED" });
+    expect(agentRuns).toBe(0);
+    expect((await new PostgresCaseRepository(db).byId(caseId))!.lane).toBe("RECOVERED");
+  });
+
   it("routes a risk-flagged proposal to ESCALATED without moving money", async () => {
     await seed();
     const gw = new FakeGateway();
@@ -267,7 +306,7 @@ describe.runIf(adminUrl)("RecoveryPipeline", () => {
     await pipeline.step(caseId);
     const events = (await new PostgresEventLog(db).forCase(caseId)).map((e) => e.type);
     expect(events).toContain("AGENT_DEGRADED");
-    const attempt = await new PostgresAttemptRepository(db).byCaseAndNo(caseId, 1);
+    const attempt = (await new PostgresAttemptRepository(db).listByCase(caseId)).find((a) => a.attemptNo === 1);
     expect(attempt).not.toBeNull();
 
     // The attempt row is an audit record. A loop that never reached a diagnosis must say so —
@@ -293,7 +332,7 @@ describe.runIf(adminUrl)("RecoveryPipeline", () => {
     const outcome = await pipeline.step(caseId);
     expect(outcome.kind).not.toBe("awaiting_settlement");
 
-    const attempt = await new PostgresAttemptRepository(db).byCaseAndNo(caseId, 1);
+    const attempt = (await new PostgresAttemptRepository(db).listByCase(caseId)).find((a) => a.attemptNo === 1);
     expect(attempt?.status).toBe("FAILED");
     expect(attempt?.detail).toContain("not observable");
 
@@ -331,7 +370,7 @@ describe.runIf(adminUrl)("RecoveryPipeline", () => {
       await pipeline.step(caseId);
 
       expect(agentRan).toBe(false);
-      const attempt = await new PostgresAttemptRepository(db).byCaseAndNo(caseId, 1);
+      const attempt = (await new PostgresAttemptRepository(db).listByCase(caseId)).find((a) => a.attemptNo === 1);
       expect(attempt?.action).toBe("PAYMENT_LINK");
       // No model produced this, so there is no diagnosis to claim.
       expect(attempt?.rootCause).toBeNull();
@@ -362,7 +401,7 @@ describe.runIf(adminUrl)("RecoveryPipeline", () => {
 
       expect(outcome.kind).not.toBe("reschedule");
       expect(gw.orders).toBe(0); // a link, not an order
-      const attempt = await new PostgresAttemptRepository(db).byCaseAndNo(caseId, 2);
+      const attempt = (await new PostgresAttemptRepository(db).listByCase(caseId)).find((a) => a.attemptNo === 2);
       expect(attempt?.action).toBe("PAYMENT_LINK");
     });
 
@@ -379,7 +418,7 @@ describe.runIf(adminUrl)("RecoveryPipeline", () => {
       // A card-network fine is not the merchant's to waive, authorization or not.
       expect(outcome).toEqual({ kind: "resolved", lane: "ESCALATED" });
       expect(gw.orders).toBe(0);
-      const attempt = await new PostgresAttemptRepository(db).byCaseAndNo(caseId, 1);
+      const attempt = (await new PostgresAttemptRepository(db).listByCase(caseId)).find((a) => a.attemptNo === 1);
       expect(attempt?.action).toBe("ESCALATE");
     });
   });

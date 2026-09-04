@@ -77,7 +77,16 @@ describe.runIf(adminUrl)("WebhookHandler", () => {
     const events = new PostgresEventLog(db);
     const executor = new AttemptExecutor(attempts, events, new FakeGateway(), resolver, new LoggingNotifier(events));
     return {
-      handler: new WebhookHandler(client, new PostgresWebhookInbox(db), attempts, cases, events, executor, noopQueue, "merch_1"),
+      handler: new WebhookHandler({
+        client,
+        inbox: new PostgresWebhookInbox(db),
+        attempts,
+        cases,
+        events,
+        executor,
+        enqueuer: noopQueue,
+        merchantRef: "merch_1",
+      }),
       attempts,
       cases,
     };
@@ -207,6 +216,34 @@ describe.runIf(adminUrl)("WebhookHandler", () => {
     const redelivery = await handler.handle(evt);
     expect(redelivery).toEqual({ status: "processed", attemptStatus: "RECOVERED" });
     expect((await cases.byId(caseId))!.recoveredPaise).toBe(149900);
+  });
+
+  it("moves the lane on a redelivery whose first delivery crashed between settle and lane move", async () => {
+    await seedPendingAttempt();
+    const { handler, attempts, cases } = build(new PaidOnceResolver());
+    const evt = signed(capturedEvent());
+    await new PostgresWebhookInbox(db).recordIfNew(evt.eventId, "payment.captured", JSON.parse(evt.rawBody));
+
+    const attempt = (await attempts.listByCase(caseId))[0]!;
+    await attempts.settleRecovered(attempt.id, 149900, "pay_wh_crash");
+
+    const redelivery = await handler.handle(evt);
+    expect(redelivery.status).toBe("duplicate");
+    expect((await cases.byId(caseId))!.lane).toBe("RECOVERED");
+  });
+
+  it("does not credit a capture whose amount does not match the case", async () => {
+    await seedPendingAttempt();
+    const { handler, cases } = build(new PaidOnceResolver());
+    const mismatched = {
+      event: "payment.captured",
+      payload: { payment: { entity: { id: "pay_wh_1", order_id: orderRef, amount: 999, status: "captured" } } },
+    };
+
+    const res = await handler.handle(signed(mismatched));
+
+    expect(res).toEqual({ status: "processed", attemptStatus: "AWAITING_RECONCILIATION" });
+    expect((await cases.byId(caseId))!.recoveredPaise).toBe(0);
   });
 
   it("ignores events it does not act on", async () => {

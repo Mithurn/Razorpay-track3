@@ -11,6 +11,9 @@ import type {
 import type { AttemptExecutor } from "./attempt-executor.js";
 import type { RazorpayClient } from "./razorpay-client.js";
 import { reconstructAction } from "./action-codec.js";
+import type { RecoveryCase } from "../domain/case.js";
+import { TERMINAL_LANES } from "../domain/case.js";
+import { isSimulatedPaymentId } from "../domain/simulated-payment.js";
 
 const paymentEntity = z.object({
   id: z.string(),
@@ -74,38 +77,42 @@ function caseFromFailedPayment(p: z.infer<typeof paymentEntity>, merchantRef: st
   };
 }
 
+export type WebhookHandlerDeps = {
+  client: RazorpayClient;
+  inbox: WebhookInbox;
+  attempts: AttemptRepository;
+  cases: CaseRepository;
+  events: EventLog;
+  executor: AttemptExecutor;
+  enqueuer: CaseEnqueuer;
+  merchantRef: string;
+};
+
 export class WebhookHandler {
-  constructor(
-    private readonly client: RazorpayClient,
-    private readonly inbox: WebhookInbox,
-    private readonly attempts: AttemptRepository,
-    private readonly cases: CaseRepository,
-    private readonly events: EventLog,
-    private readonly executor: AttemptExecutor,
-    private readonly enqueuer: CaseEnqueuer,
-    private readonly merchantRef: string,
-  ) {}
+  constructor(private readonly deps: WebhookHandlerDeps) {}
 
   async handle(input: { rawBody: string; signature: string; eventId: string }): Promise<WebhookResult> {
-    if (!this.client.verifyWebhook(input.rawBody, input.signature)) return { status: "invalid_signature" };
+    if (!this.deps.client.verifyWebhook(input.rawBody, input.signature)) return { status: "invalid_signature" };
 
+    let raw: unknown;
     let parsed: z.infer<typeof eventSchema>;
     try {
-      parsed = eventSchema.parse(JSON.parse(input.rawBody));
+      raw = JSON.parse(input.rawBody);
+      parsed = eventSchema.parse(raw);
     } catch {
       return { status: "malformed" };
     }
 
-    const fresh = await this.inbox.recordIfNew(input.eventId, parsed.event, JSON.parse(input.rawBody));
+    const fresh = await this.deps.inbox.recordIfNew(input.eventId, parsed.event, raw);
 
     if (INGESTION_EVENTS.has(parsed.event)) {
       if (!fresh) return { status: "duplicate" };
       const payment = parsed.payload.payment?.entity;
       if (!payment) return { status: "malformed" };
-      const existing = await this.cases.byOriginalPaymentId(payment.id);
+      const existing = await this.deps.cases.byOriginalPaymentId(payment.id);
       if (existing) return { status: "ingested", caseId: existing.id };
-      const kase = await this.cases.create(caseFromFailedPayment(payment, this.merchantRef));
-      await this.enqueuer.enqueue(kase.id);
+      const kase = await this.deps.cases.create(caseFromFailedPayment(payment, this.deps.merchantRef));
+      await this.deps.enqueuer.enqueue(kase.id);
       return { status: "ingested", caseId: kase.id };
     }
 
@@ -118,27 +125,30 @@ export class WebhookHandler {
       null;
     if (!ref) return { status: "malformed" };
 
-    const attempt = await this.attempts.byRazorpayRef(ref);
+    const attempt = await this.deps.attempts.byRazorpayRef(ref);
     if (!attempt) return { status: "unmatched", ref };
 
-    // A redelivery of a recorded event id is a true no-op only once its attempt is settled — an
-    // unsettled one means the first delivery never finished, and this is the only signal left.
-    if (!fresh && attempt.status !== "PENDING" && attempt.status !== "AWAITING_RECONCILIATION") {
-      return { status: "duplicate" };
-    }
-
-    const kase = await this.cases.byId(attempt.caseId);
+    const kase = await this.deps.cases.byId(attempt.caseId);
     if (!kase) return { status: "unmatched", ref };
 
     const captured = parsed.payload.payment?.entity;
-    const simulated = captured?.id?.startsWith("pay_sim_") ?? false;
+    const simulated = captured?.id ? isSimulatedPaymentId(captured.id) : false;
 
     if (fresh) {
-      await this.events.append({
+      await this.deps.events.append({
         caseId: attempt.caseId,
         type: "ATTEMPT_OUTCOME",
         payload: { via: "webhook", event: parsed.event, ref, simulated, activity: "execute" },
       });
+    }
+
+    // A redelivery of a recorded event id is a true no-op only once its attempt is settled — an
+    // unsettled one means the first delivery never finished, and this is the only signal left.
+    if (!fresh && attempt.status !== "PENDING" && attempt.status !== "AWAITING_RECONCILIATION") {
+      // The first delivery may have crashed between settling the attempt and moving the lane;
+      // the move is idempotent, so a redelivery still gets to perform it.
+      await this.moveToRecovered(kase, simulated);
+      return { status: "duplicate" };
     }
 
     // A payment.captured webhook carrying a captured entity is Razorpay's authoritative signal
@@ -146,20 +156,36 @@ export class WebhookHandler {
     // gateway re-check.
     let status: string;
     if (parsed.event === "payment.captured" && captured?.status === "captured") {
-      const credited = await this.attempts.settleRecovered(attempt.id, captured.amount, captured.id);
-      status = credited || attempt.status === "RECOVERED" ? "RECOVERED" : attempt.status;
+      if (captured.amount !== kase.amountPaise) {
+        await this.deps.attempts.resolve(attempt.id, {
+          status: "AWAITING_RECONCILIATION",
+          detail: `capture amount ${captured.amount} does not match case amount ${kase.amountPaise}`,
+        });
+        status = "AWAITING_RECONCILIATION";
+      } else {
+        const credited = await this.deps.attempts.settleRecovered(attempt.id, captured.amount, captured.id);
+        status = credited || attempt.status === "RECOVERED" ? "RECOVERED" : attempt.status;
+      }
     } else {
-      status = (await this.executor.settle(attempt, kase.amountPaise, reconstructAction(attempt.action))).status;
+      status = (await this.deps.executor.settle(attempt, kase, reconstructAction(attempt.action))).status;
     }
 
-    if (status === "RECOVERED" && !["RECOVERED", "ESCALATED", "WRITTEN_OFF"].includes(kase.lane)) {
-      await this.cases.moveLane(kase.id, kase.lane, "RECOVERED");
-      await this.events.append({
+    if (status === "RECOVERED") await this.moveToRecovered(kase, simulated);
+    return { status: "processed", attemptStatus: status };
+  }
+
+  private async moveToRecovered(
+    kase: RecoveryCase,
+    simulated: boolean,
+  ): Promise<void> {
+    if (TERMINAL_LANES.includes(kase.lane)) return;
+    const moved = await this.deps.cases.moveLane(kase.id, kase.lane, "RECOVERED");
+    if (moved) {
+      await this.deps.events.append({
         caseId: kase.id,
         type: "CASE_RESOLVED",
         payload: { lane: "RECOVERED", via: "webhook", simulated, activity: "outcome" },
       });
     }
-    return { status: "processed", attemptStatus: status };
   }
 }

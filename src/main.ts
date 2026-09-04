@@ -14,7 +14,8 @@ import { RazorpayOutcomeResolver } from "./execution/razorpay-outcome-resolver.j
 import { AttemptExecutor } from "./execution/attempt-executor.js";
 import { LoggingNotifier } from "./execution/notifier.js";
 import { WebhookHandler } from "./execution/webhook-handler.js";
-import { RecoveryPipeline, agentRunnerFor } from "./worker/pipeline.js";
+import { RecoveryPipeline } from "./worker/pipeline.js";
+import { runRecoveryAgent } from "./agent/recovery-agent.js";
 import { DEFAULT_LIMITS } from "./safety/safety-gate.js";
 import { resolveModel } from "./agent/model.js";
 import { checkModelHealth } from "./agent/model-health.js";
@@ -68,17 +69,22 @@ const pipeline = new RecoveryPipeline({
       runId: kase.runId,
       limit: query.limit ?? 8,
     }),
-  runAgent: agentRunnerFor({
-    model: guardModel(
-      resolveModel(config.AGENT_MODEL, {
-        openRouterApiKey: config.OPENROUTER_API_KEY,
-        googleApiKey: config.GOOGLE_GENERATIVE_AI_API_KEY,
-      }),
-      createBudget(config.AGENT_SESSION_CAP_USD),
+  runAgent: (deps, events) =>
+    runRecoveryAgent(
+      deps,
+      {
+        model: guardModel(
+          resolveModel(config.AGENT_MODEL, {
+            openRouterApiKey: config.OPENROUTER_API_KEY,
+            googleApiKey: config.GOOGLE_GENERATIVE_AI_API_KEY,
+          }),
+          createBudget(config.AGENT_SESSION_CAP_USD),
+        ),
+        stepBudget: config.AGENT_STEP_BUDGET,
+        deadlineMs: config.AGENT_TIMEOUT_MS,
+      },
+      events,
     ),
-    stepBudget: config.AGENT_STEP_BUDGET,
-    deadlineMs: config.AGENT_TIMEOUT_MS,
-  }),
 });
 
 const connection = redisConnection(config.REDIS_URL);
@@ -88,7 +94,16 @@ const sweep = startReconcileSweep(attempts, cases, queue);
 
 // The queue is bound here, in the composition root — the handler only sees the port.
 const enqueuer = { enqueue: (caseId: string) => enqueueRecovery(queue, caseId) };
-const webhookHandler = new WebhookHandler(razorpay, webhooks, attempts, cases, events, executor, enqueuer, config.MERCHANT_REF);
+const webhookHandler = new WebhookHandler({
+  client: razorpay,
+  inbox: webhooks,
+  attempts,
+  cases,
+  events,
+  executor,
+  enqueuer,
+  merchantRef: config.MERCHANT_REF,
+});
 
 const app = Fastify({ logger: true });
 // Keep the raw JSON bytes on the request so the Razorpay webhook HMAC verifies against exactly
@@ -131,7 +146,7 @@ await registerRoutes(app, {
   demoAccessToken: config.DEMO_ACCESS_TOKEN,
 });
 
-await app.listen({ port: config.PORT, host: "0.0.0.0" });
+await app.listen({ port: config.PORT, host: config.HOST });
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => {
