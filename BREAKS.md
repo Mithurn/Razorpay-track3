@@ -357,3 +357,27 @@ number rather than only in this file.
 display error string — a real Razorpay integration would carry it as its own signal on the payment
 entity, not folded into `failureReason` the way this corpus's shorthand does. That's a schema and
 domain-type change, not a one-line patch, and it's flagged here rather than rushed in.
+
+---
+
+## A tool returned a per-template timing echo, and nobody noticed until a disclosure pass went looking for leaked signals
+
+**Expected:** every signal the agent's tools return is what a real merchant system would expose —
+no tool carries ground truth the production shape wouldn't have.
+**Actual:** `get_similar_resolved_cases` (`src/persistence/case-repository.ts`, `similarResolved`)
+returns `hoursToResolution` for earlier-resolved sibling cases with the same failure reason in the
+same run — a legitimate production signal. But the corpus is templated: each template's
+ground-truth settle hour is a fixed value (72h, 24h, 14h, 12h, 8h, 6h by template), so a
+late-batch case can effectively read its template's exact recovery timing through its resolved
+siblings. It leaks *when*, not *what action*, and it is agent-arm-only — but on this corpus it is
+a crisper signal than production would give.
+**Why it's dangerous:** silent ground-truth leakage into a measured arm is exactly how a
+benchmark number gets inflated without anyone noticing; the whole project's credibility rests on
+the agent winning or losing on real reasoning.
+**How diagnosed:** a deliberate pass over every tool's output for anything the ground truth
+determines, after two earlier leaks in this repo were already caught the same way.
+**Fix:** disclosed, not removed — the signal is production-defensible and the recorded bench was
+generated with it present. The README states the echo explicitly next to the evaluation section.
+**Safeguard:** the disclosure; and the real fix for a future corpus is diversifying settle hours
+per template (per-case jitter on the ground-truth `atHour`), which would blur the echo without
+touching any tool.

@@ -75,6 +75,14 @@ explicitly, or the reproduce command silently replays a different (and much weak
 run instead of this table's:
 `AGENT_MODEL=google/gemini-3.6-flash npm run bench -- --size 60 --seed 42 --mock`.
 
+**The same cache key has a second trap.** `--mock` keys its recording on model/seed/size only
+(`bench/.cache/agent-turns-seed<seed>-n<size>-<model>.json`), not on the corpus contents or the
+agent's system prompt. Editing either after a recording exists would silently replay the old
+turns against new inputs rather than erroring or re-recording — the mismatch is invisible unless
+someone diffs the corpus or prompt against the cache's own timestamp. This submission's numbers
+are exactly what shipped: the corpus and prompt were not touched after this recording, so nothing
+here is stale, but the risk is real for future edits and is not built out of the cache key.
+
 **Read the money rows honestly: it's close, and sometimes it loses.** The agent recovers three
 fewer cases than the rules table and ₹4,497 less. Run across five seeds (42, 7, 13, 99, 2024) the
 agent's recovery rate ranges **50.0%–58.3% (mean 53.7%)** against the rules table's 55.0%–63.3%,
@@ -84,10 +92,43 @@ own playbook) is a genuinely strong baseline. That finding survived two hardenin
 is the honest version of it. **`--blind-reason` (below) shows why that baseline is a property of
 this corpus, not of the problem.**
 
-**The recoverable ceiling is also the tell for why the money rows can't discriminate much
-further.** Both arms recover 97–98% of what's genuinely recoverable in this batch — the corpus
-isn't hard enough at the *action* level to separate a good policy from a mediocre one. It's hard
-enough at the *diagnosis* level, which is the row a lookup table cannot produce at all.
+**The recoverable ceiling.** Of the 60 cases, 44 are genuinely recoverable (the other 16 are the
+8 risk-hold and 8 genuinely-unfunded cases the corpus marks unrecoverable by design) worth
+₹1,08,456 — the ceiling row above. Against that denominator: the agent reaches **33/44 cases
+(75.0%) and ₹51,967 (47.9% of ceiling rupees)**, the rules table **36/44 (81.8%) and ₹56,464
+(52.1%)**, the fixed schedule **20/44 (45.5%) and ₹31,480 (29.0%)**. No arm comes close to the
+ceiling on money, and on both rows the rules table still edges the agent — the corpus's real
+separator is the *diagnosis* row, which is the one a lookup table cannot produce at all.
+
+**What the agent proposes on the first attempt.** The table a payments reviewer actually wants:
+the agent's first-attempt proposed action (pre-gate — the gate's clamps are counted separately
+below) crossed with the ground-truth correct action, over all 60 cases of the seed-42 run. Ground truth
+maps to: the case's recoverable-by family (retry / payment link / nudge), `escalate` for the 8
+risk-hold cases (only a human may act), and `write-off` for the 8 genuinely-unfunded cases.
+Derived from turn #1 of the recorded run in
+`bench/.cache/agent-turns-seed42-n60-google_gemini-3.6-flash.json`; row totals are 60.
+
+| proposed ↓ / correct → | retry | payment link | nudge | escalate | write-off |
+|------------------------|-------|--------------|-------|----------|-----------|
+| retry (26+2+8 = 36)    | 26    | 2            | 0     | 0        | 8         |
+| payment link (7)       | 0     | 5            | 0     | 2        | 0         |
+| nudge (13)             | 2     | 0            | 9     | 2        | 0         |
+| escalate (4)           | 0     | 0            | 0     | 4        | 0         |
+
+The misses are the honest part: 8 unfunded accounts drew a first-attempt retry (the hard-decline
+veto and write-off rule stop most, not all, of that downstream), and 2 risk-hold cases were
+nudged before the gate caught them. 44 of 60 first proposals are the correct family.
+
+**One disclosure on the `get_similar_resolved_cases` tool: it carries a timing echo on this
+corpus.** The tool is a real production shape — for a case, it returns the outcome and
+hours-to-resolution of earlier-resolved sibling cases with the same failure reason, in the same
+run. On a templated corpus, though, each template's ground-truth settle hour is a fixed value
+(72h, 24h, 14h, 12h, 8h, 6h depending on the template), so a late-batch case can, in effect, read
+its template's answer for *when* the money settles. It is agent-arm-only (the rules table never
+calls tools), it does not leak the correct *action*, and it is defensible as what a real merchant
+system would expose — but on a templated corpus it is a signal a heterogeneous production corpus
+would blur, and it is disclosed here rather than left for a reviewer to find. Corpus
+diversification is the fix, and it is future work.
 
 **Root-cause accuracy is where the gap runs the other way, and it's consistent.** `bench/rules-arm.ts`
 never diagnoses — it has no concept of *why* a payment failed. Across the same five seeds, the
