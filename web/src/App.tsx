@@ -11,6 +11,7 @@ import { deriveActivities, type RawEvent } from "./loop/activities.js";
 import { TopBar } from "./room/TopBar.js";
 import { Sidebar } from "./room/Sidebar.js";
 import { CustomerPanel } from "./room/CustomerPanel.js";
+import { RazorpayCheckout } from "./room/RazorpayCheckout.js";
 import { useRoomStream } from "./room/useRoomStream.js";
 import type { CaseDetail, Lane, RecoveryCase, RunSummary } from "./types.js";
 import type { RuntimeConfig } from "./api.js";
@@ -313,9 +314,17 @@ function Stage({
               Work this case now
             </button>
           )}
+          {kase?.lane === "ATTEMPTING" && attempt?.status === "PENDING" && attempt.razorpayRef && cfg && (
+            <RazorpayCheckout
+              caseId={caseId}
+              keyId={cfg.razorpayKeyId}
+              customerRef={kase.customerRef}
+              onPaid={() => setTick((n) => n + 1)}
+            />
+          )}
           {kase?.lane === "ATTEMPTING" && attempt?.status === "PENDING" && attempt.razorpayRef && (
-            <button className="btn btn--primary" onClick={() => onSimulateCapture(caseId)}>
-              Customer completes payment <ArrowRight size={13} />
+            <button className="btn btn--ghost" onClick={() => onSimulateCapture(caseId)}>
+              Simulate payment (no real charge) <ArrowRight size={13} />
             </button>
           )}
           {canStop && confirmingStop && (

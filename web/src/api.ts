@@ -7,9 +7,15 @@ export type RuntimeConfig = {
   deadlineMs: number;
   stepBudget: number;
   limits: { maxAttempts: number; maxExposurePaise: number; cooldownHours: number };
+  razorpayKeyId: string;
 };
 
 export type AuditVerify = { enforced: boolean; role: string; error?: string };
+
+export type PayInfo =
+  | { payable: false }
+  | { payable: true; kind: "order"; orderId: string; amountPaise: number; currency: string }
+  | { payable: true; kind: "payment_link"; url: string; amountPaise: number };
 
 async function readError(res: Response, path: string): Promise<Error> {
   const body = await res.json().catch(() => null);
@@ -51,6 +57,7 @@ export const scoreboard = () =>
   }));
 
 export const runtimeConfig = () => get<RuntimeConfig>("/config");
+export const payInfo = (id: string) => get<PayInfo>(`/cases/${id}/pay`);
 export const verifyAudit = (id: string) => get<AuditVerify>(`/cases/${id}/audit/verify`);
 export const metrics = () => get<RoomMetrics>("/metrics");
 

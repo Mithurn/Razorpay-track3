@@ -5,9 +5,12 @@ import { registerRoutes } from "../src/api/routes.js";
 // The auth hook runs before any DB lookup, so these routes can be exercised against a fake case
 // id with no database at all — an unauthorized request must never reach the handler.
 
-async function buildApp(demoAccessToken: string | undefined): Promise<FastifyInstance> {
+async function buildApp(
+  demoAccessToken: string | undefined,
+): Promise<FastifyInstance> {
   const app = Fastify();
   await registerRoutes(app, {
+    gateway: { getPaymentLink: async () => null },
     cases: { byId: async () => null } as never,
     attempts: {} as never,
     events: {} as never,
@@ -15,14 +18,26 @@ async function buildApp(demoAccessToken: string | undefined): Promise<FastifyIns
     queue: { add: async () => undefined } as never,
     webhookHandler: {} as never,
     bus: { subscribe: () => () => undefined } as never,
-    pipeline: { requestStop: async () => undefined, requestStopAll: async () => ({ stoppedNow: 0 }), resumeAll: () => undefined, isBraked: () => false },
+    pipeline: {
+      requestStop: async () => undefined,
+      requestStopAll: async () => ({ stoppedNow: 0 }),
+      resumeAll: () => undefined,
+      isBraked: () => false,
+    },
     modelHealth: async () => ({ model: "test", reachable: true }),
     verifyAppendOnly: async () => ({ enforced: true, role: "recovery_app" }),
     runtimeInfo: {
       model: "test",
       deadlineMs: 90_000,
       stepBudget: 6,
-      limits: { maxAttempts: 4, maxExposurePaise: 500000, cooldownHours: 6, minConfidence: 0.6, contactCooldownHours: 24 },
+      limits: {
+        maxAttempts: 4,
+        maxExposurePaise: 500000,
+        cooldownHours: 6,
+        minConfidence: 0.6,
+        contactCooldownHours: 24,
+      },
+      razorpayKeyId: "rzp_test_stub",
     },
     razorpayWebhookSecret: "whsec_auth_test",
     demoAccessToken,

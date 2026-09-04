@@ -13,18 +13,29 @@ import { enqueueRecovery } from "../worker/queue.js";
 import type { AuditVerifyResult } from "../persistence/audit-verify.js";
 import type { SafetyLimits } from "../safety/safety-gate.js";
 import type { StopRequest } from "../worker/stop-registry.js";
+import type { PaymentGateway } from "../domain/gateway.js";
 
 export type RuntimeInfo = {
   model: string;
   deadlineMs: number;
   stepBudget: number;
   limits: SafetyLimits;
+  // The publishable key — this is what it's for; Checkout.js needs it client-side to open the
+  // real Razorpay widget. The secret key never leaves the server.
+  razorpayKeyId: string;
 };
+
+export type PayInfo =
+  | { payable: false }
+  | { payable: true; kind: "order"; orderId: string; amountPaise: number; currency: string }
+  | { payable: true; kind: "payment_link"; url: string; amountPaise: number };
 
 export type RouteDeps = {
   cases: CaseRepository;
   attempts: AttemptRepository;
   events: EventLog;
+  // Narrowed to the one read the pay route needs — resolving a payment link's real URL.
+  gateway: Pick<PaymentGateway, "getPaymentLink">;
   runs: RunRepository;
   queue: Queue<RecoveryJob>;
   webhookHandler: WebhookHandler;
@@ -98,6 +109,31 @@ export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Pro
     if (!kase) return reply.code(404).send({ error: "not found" });
     const [attempts, events] = await Promise.all([deps.attempts.listByCase(id), deps.events.forCase(id)]);
     return { case: kase, attempts, events };
+  });
+
+  // What the customer would actually see right now, if there is a genuinely payable attempt —
+  // a real Razorpay order or payment link, never a bench/seeded one. The frontend uses this to
+  // decide whether to offer a real Checkout.js button or fall back to the simulated capture.
+  app.get("/cases/:id/pay", async (req, reply): Promise<PayInfo> => {
+    const { id } = req.params as { id: string };
+    const kase = await deps.cases.byId(id);
+    if (!kase) return reply.code(404).send({ payable: false });
+
+    const attempts = await deps.attempts.listByCase(id);
+    const pending = attempts.find(
+      (a) => a.status === "PENDING" && a.razorpayRef && !a.razorpayRef.includes("_bench_"),
+    );
+    if (!pending?.razorpayRef) return { payable: false };
+
+    if (pending.action === "RETRY_NOW" || pending.action === "RETRY_SCHEDULED") {
+      return { payable: true, kind: "order", orderId: pending.razorpayRef, amountPaise: kase.amountPaise, currency: kase.currency };
+    }
+    if (pending.action === "PAYMENT_LINK") {
+      const link = await deps.gateway.getPaymentLink(pending.razorpayRef);
+      if (!link) return { payable: false };
+      return { payable: true, kind: "payment_link", url: link.url, amountPaise: link.amountPaise };
+    }
+    return { payable: false };
   });
 
   app.get("/runs/:id", async (req, reply) => {

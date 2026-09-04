@@ -10,11 +10,15 @@ import { CaseEventBus } from "../src/api/event-bus.js";
 type Frame = Record<string, unknown>;
 
 async function withRoomStream(
-  run: (opts: { readFrame: (ms?: number) => Promise<Frame | null>; bus: CaseEventBus }) => Promise<void>,
+  run: (opts: {
+    readFrame: (ms?: number) => Promise<Frame | null>;
+    bus: CaseEventBus;
+  }) => Promise<void>,
 ): Promise<void> {
   const bus = new CaseEventBus();
   const app: FastifyInstance = Fastify();
   await registerRoutes(app, {
+    gateway: { getPaymentLink: async () => null },
     cases: {
       byId: async () => null,
       metrics: async () => ({
@@ -30,14 +34,26 @@ async function withRoomStream(
     queue: {} as never,
     webhookHandler: {} as never,
     bus,
-    pipeline: { requestStop: async () => undefined, requestStopAll: async () => ({ stoppedNow: 0 }), resumeAll: () => undefined, isBraked: () => false },
+    pipeline: {
+      requestStop: async () => undefined,
+      requestStopAll: async () => ({ stoppedNow: 0 }),
+      resumeAll: () => undefined,
+      isBraked: () => false,
+    },
     modelHealth: async () => ({ model: "test", reachable: true }),
     verifyAppendOnly: async () => ({ enforced: true, role: "recovery_app" }),
     runtimeInfo: {
       model: "test",
       deadlineMs: 90_000,
       stepBudget: 6,
-      limits: { maxAttempts: 4, maxExposurePaise: 500000, cooldownHours: 6, minConfidence: 0.6, contactCooldownHours: 24 },
+      limits: {
+        maxAttempts: 4,
+        maxExposurePaise: 500000,
+        cooldownHours: 6,
+        minConfidence: 0.6,
+        contactCooldownHours: 24,
+      },
+      razorpayKeyId: "rzp_test_stub",
     },
     razorpayWebhookSecret: "whsec_room_stream_test",
     demoAccessToken: undefined,
@@ -72,7 +88,10 @@ async function withRoomStream(
     const readFrame = async (ms = 500): Promise<Frame | null> => {
       const idle = Symbol("idle");
       while (queue.length === 0) {
-        const next = await Promise.race([reader.read(), new Promise((r) => setTimeout(() => r(idle), ms))]);
+        const next = await Promise.race([
+          reader.read(),
+          new Promise((r) => setTimeout(() => r(idle), ms)),
+        ]);
         if (next === idle) return null;
         const { done, value } = next as { done: boolean; value?: Uint8Array };
         if (done) return null;

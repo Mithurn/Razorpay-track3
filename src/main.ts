@@ -120,7 +120,9 @@ await registerRoutes(app, {
     deadlineMs: config.AGENT_TIMEOUT_MS,
     stepBudget: config.AGENT_STEP_BUDGET,
     limits: DEFAULT_LIMITS,
+    razorpayKeyId: config.RAZORPAY_KEY_ID,
   },
+  gateway: razorpay,
   razorpayWebhookSecret: config.RAZORPAY_WEBHOOK_SECRET,
   demoAccessToken: config.DEMO_ACCESS_TOKEN,
 });

@@ -13,7 +13,12 @@ import { RazorpayClient } from "../src/execution/razorpay-client.js";
 import { CaseEventBus } from "../src/api/event-bus.js";
 import { registerRoutes } from "../src/api/routes.js";
 import type { OutcomeResolver } from "../src/domain/ports.js";
-import type { GatewayOrder, GatewayPayment, GatewayPaymentLink, PaymentGateway } from "../src/domain/gateway.js";
+import type {
+  GatewayOrder,
+  GatewayPayment,
+  GatewayPaymentLink,
+  PaymentGateway,
+} from "../src/domain/gateway.js";
 import { LoggingNotifier } from "../src/execution/notifier.js";
 import type { CaseEnqueuer } from "../src/domain/ports.js";
 
@@ -24,7 +29,9 @@ class FakeGateway implements PaymentGateway {
   async createOrder(i: { amountPaise: number }): Promise<GatewayOrder> {
     return { id: "order_route", amountPaise: i.amountPaise };
   }
-  async createPaymentLink(i: { amountPaise: number }): Promise<GatewayPaymentLink> {
+  async createPaymentLink(i: {
+    amountPaise: number;
+  }): Promise<GatewayPaymentLink> {
     return { id: "plink_route", url: "x", amountPaise: i.amountPaise };
   }
   async getPayment(): Promise<GatewayPayment | null> {
@@ -61,8 +68,12 @@ describe.runIf(adminUrl)("POST /webhooks/razorpay", () => {
     await app?.close();
     await db.query("DELETE FROM razorpay_webhooks WHERE event LIKE 'payment%'");
     if (caseId) {
-      await db.query("DELETE FROM recovery_events WHERE case_id = $1", [caseId]);
-      await db.query("DELETE FROM recovery_attempts WHERE case_id = $1", [caseId]);
+      await db.query("DELETE FROM recovery_events WHERE case_id = $1", [
+        caseId,
+      ]);
+      await db.query("DELETE FROM recovery_attempts WHERE case_id = $1", [
+        caseId,
+      ]);
       await db.query("DELETE FROM recovery_cases WHERE id = $1", [caseId]);
     }
   });
@@ -110,28 +121,56 @@ describe.runIf(adminUrl)("POST /webhooks/razorpay", () => {
     );
     await attempts.recordRazorpayRef(attempt.id, orderRef);
 
-    const client = new RazorpayClient({ keyId: "k", keySecret: "s", webhookSecret: SECRET });
+    const client = new RazorpayClient({
+      keyId: "k",
+      keySecret: "s",
+      webhookSecret: SECRET,
+    });
     const resolver: OutcomeResolver = {
-      resolve: async () => ({ kind: "recovered", capturedPaise: 149900, paymentId: "pay_route_1" }),
+      resolve: async () => ({
+        kind: "recovered",
+        capturedPaise: 149900,
+        paymentId: "pay_route_1",
+      }),
     };
-    const executor = new AttemptExecutor(attempts, events, new FakeGateway(), resolver, new LoggingNotifier(events));
+    const executor = new AttemptExecutor(
+      attempts,
+      events,
+      new FakeGateway(),
+      resolver,
+      new LoggingNotifier(events),
+    );
     const enqueuer: CaseEnqueuer = { enqueue: async () => undefined };
     // registerRoutes lives in the api/ orchestration tier and legitimately holds the queue type.
     const queue = { add: async () => undefined } as never;
-    const handler = new WebhookHandler(client, new PostgresWebhookInbox(db), attempts, cases, events, executor, enqueuer, "merch_1");
+    const handler = new WebhookHandler(
+      client,
+      new PostgresWebhookInbox(db),
+      attempts,
+      cases,
+      events,
+      executor,
+      enqueuer,
+      "merch_1",
+    );
 
     app = Fastify();
-    app.addContentTypeParser("application/json", { parseAs: "string" }, (req, body, done) => {
-      (req as { rawBody?: string }).rawBody = body as string;
-      try {
-        done(null, body === "" ? undefined : JSON.parse(body as string));
-      } catch (err) {
-        const parseError = err as Error & { statusCode?: number };
-        parseError.statusCode = 400;
-        done(parseError, undefined);
-      }
-    });
+    app.addContentTypeParser(
+      "application/json",
+      { parseAs: "string" },
+      (req, body, done) => {
+        (req as { rawBody?: string }).rawBody = body as string;
+        try {
+          done(null, body === "" ? undefined : JSON.parse(body as string));
+        } catch (err) {
+          const parseError = err as Error & { statusCode?: number };
+          parseError.statusCode = 400;
+          done(parseError, undefined);
+        }
+      },
+    );
     await registerRoutes(app, {
+      gateway: { getPaymentLink: async () => null },
       cases,
       attempts,
       events,
@@ -139,14 +178,26 @@ describe.runIf(adminUrl)("POST /webhooks/razorpay", () => {
       queue,
       webhookHandler: handler,
       bus: new CaseEventBus(),
-      pipeline: { requestStop: async () => undefined, requestStopAll: async () => ({ stoppedNow: 0 }), resumeAll: () => undefined, isBraked: () => false },
+      pipeline: {
+        requestStop: async () => undefined,
+        requestStopAll: async () => ({ stoppedNow: 0 }),
+        resumeAll: () => undefined,
+        isBraked: () => false,
+      },
       modelHealth: async () => ({ model: "test", reachable: true }),
       verifyAppendOnly: async () => ({ enforced: true, role: "recovery_app" }),
       runtimeInfo: {
         model: "test",
         deadlineMs: 90_000,
         stepBudget: 6,
-        limits: { maxAttempts: 4, maxExposurePaise: 500000, cooldownHours: 6, minConfidence: 0.6, contactCooldownHours: 24 },
+        limits: {
+          maxAttempts: 4,
+          maxExposurePaise: 500000,
+          cooldownHours: 6,
+          minConfidence: 0.6,
+          contactCooldownHours: 24,
+        },
+        razorpayKeyId: "rzp_test_stub",
       },
       razorpayWebhookSecret: SECRET,
       demoAccessToken: "test-token",
@@ -156,7 +207,16 @@ describe.runIf(adminUrl)("POST /webhooks/razorpay", () => {
   function body(): string {
     return JSON.stringify({
       event: "payment.captured",
-      payload: { payment: { entity: { id: "pay_route_1", order_id: orderRef, amount: 149900, status: "captured" } } },
+      payload: {
+        payment: {
+          entity: {
+            id: "pay_route_1",
+            order_id: orderRef,
+            amount: 149900,
+            status: "captured",
+          },
+        },
+      },
     });
   }
 
@@ -170,12 +230,21 @@ describe.runIf(adminUrl)("POST /webhooks/razorpay", () => {
     const res = await app.inject({
       method: "POST",
       url: "/webhooks/razorpay",
-      headers: { "content-type": "application/json", "x-razorpay-signature": sign(raw), "x-razorpay-event-id": "evt_r1" },
+      headers: {
+        "content-type": "application/json",
+        "x-razorpay-signature": sign(raw),
+        "x-razorpay-event-id": "evt_r1",
+      },
       payload: raw,
     });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toMatchObject({ status: "processed", attemptStatus: "RECOVERED" });
-    expect((await new PostgresCaseRepository(db).byId(caseId))!.recoveredPaise).toBe(149900);
+    expect(res.json()).toMatchObject({
+      status: "processed",
+      attemptStatus: "RECOVERED",
+    });
+    expect(
+      (await new PostgresCaseRepository(db).byId(caseId))!.recoveredPaise,
+    ).toBe(149900);
   });
 
   it("rejects a bad signature with 401", async () => {
@@ -183,7 +252,11 @@ describe.runIf(adminUrl)("POST /webhooks/razorpay", () => {
     const res = await app.inject({
       method: "POST",
       url: "/webhooks/razorpay",
-      headers: { "content-type": "application/json", "x-razorpay-signature": "bad", "x-razorpay-event-id": "evt_r2" },
+      headers: {
+        "content-type": "application/json",
+        "x-razorpay-signature": "bad",
+        "x-razorpay-event-id": "evt_r2",
+      },
       payload: body(),
     });
     expect(res.statusCode).toBe(401);
@@ -213,9 +286,21 @@ describe.runIf(adminUrl)("POST /webhooks/razorpay", () => {
       "x-razorpay-signature": sign(raw),
       "x-razorpay-event-id": "evt_r3",
     };
-    await app.inject({ method: "POST", url: "/webhooks/razorpay", headers, payload: raw });
-    const second = await app.inject({ method: "POST", url: "/webhooks/razorpay", headers, payload: raw });
+    await app.inject({
+      method: "POST",
+      url: "/webhooks/razorpay",
+      headers,
+      payload: raw,
+    });
+    const second = await app.inject({
+      method: "POST",
+      url: "/webhooks/razorpay",
+      headers,
+      payload: raw,
+    });
     expect(second.json()).toMatchObject({ status: "duplicate" });
-    expect((await new PostgresCaseRepository(db).byId(caseId))!.recoveredPaise).toBe(149900);
+    expect(
+      (await new PostgresCaseRepository(db).byId(caseId))!.recoveredPaise,
+    ).toBe(149900);
   });
 });

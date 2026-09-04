@@ -21,6 +21,7 @@ import {
   LayoutList,
   Inbox,
   RotateCw,
+  CreditCard,
   type LucideIcon,
 } from "lucide-react";
 import type { Activity } from "../loop/activities.js";
@@ -48,6 +49,7 @@ export {
   LayoutList,
   Inbox,
   RotateCw,
+  CreditCard,
 };
 
 export const ACTIVITY_ICON: Record<Activity["kind"], LucideIcon> = {
