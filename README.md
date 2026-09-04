@@ -232,6 +232,12 @@ stated otherwise here:
   `NUDGE_QUEUED` event with `delivered: false` and the attempt resolves — it does not loop forever
   re-checking a delivery that never happens, and nothing downstream ever reads it as sent. Wiring
   a real provider is a connector integration, not a recovery decision, and is out of scope here.
+- **The stop registry is in-memory, per-process.** The emergency brake and per-case stop
+  (`src/worker/stop-registry.ts`) live in the worker process's own memory, not Redis or Postgres.
+  On this project's target — a single-node demo deployment — that's correct: a stop request and
+  the worker handling it are the same process, so it always lands. A hypothetical multi-node
+  deployment would need shared state instead, since a stop-all request would only halt the node
+  that received it.
 - **The human decision on an escalated case is real and executes.** Clicking retry/redirect on a
   "waiting on you" case records a `HUMAN_DIRECTIVE` in the append-only log; the next pipeline turn
   reads it, performs exactly that action instead of re-running the agent, and the gate still runs
