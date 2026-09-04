@@ -10,6 +10,8 @@ const COLUMNS = `id, case_id, attempt_no, root_cause, action, agent_reasoning, i
   razorpay_ref, settled_payment_id, clamped, clamp_reason, outcome, outcome_detail,
   recovered_paise, created_at`;
 
+const REPERFORM_LOCK_NS = 875_100;
+
 type Row = Record<string, unknown>;
 
 function toAttempt(row: Row): Attempt {
@@ -153,5 +155,26 @@ export class PostgresAttemptRepository implements AttemptRepository {
         WHERE outcome IN ('PENDING','AWAITING_RECONCILIATION') ORDER BY created_at`,
     );
     return rows.map((r) => toAttempt(r as Row));
+  }
+
+  // Session-scoped advisory lock, namespaced under REPERFORM_LOCK_NS: released automatically if
+  // the holding connection dies, so a crash mid-reperform can never leave this permanently
+  // locked, unlike a row flag would.
+  async withReperformLock<T>(attemptId: string, fn: () => Promise<T>): Promise<T | null> {
+    const client = await this.db.connect();
+    try {
+      const { rows } = await client.query("SELECT pg_try_advisory_lock($1, hashtext($2)) AS locked", [
+        REPERFORM_LOCK_NS,
+        attemptId,
+      ]);
+      if (!(rows[0] as { locked: boolean }).locked) return null;
+      try {
+        return await fn();
+      } finally {
+        await client.query("SELECT pg_advisory_unlock($1, hashtext($2))", [REPERFORM_LOCK_NS, attemptId]);
+      }
+    } finally {
+      client.release();
+    }
   }
 }

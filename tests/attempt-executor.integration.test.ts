@@ -305,6 +305,38 @@ describe.runIf(adminUrl)("AttemptExecutor", () => {
     expect(events.map((e) => e.type)).toContain("ATTEMPT_REPERFORMED");
   });
 
+  it("re-performs exactly once when two executors race settle() on the same stale attempt", async () => {
+    await seedCase();
+    const gw = new FakeGateway();
+    // Widen the window so both concurrent reperform() calls are genuinely in flight at once —
+    // the exact condition the advisory lock in withReperformLock must serialize.
+    gw.createDelayMs = 50;
+    const resolver = new ScriptedResolver([captured(149900), captured(149900)]);
+    // Two separate AttemptExecutor instances, as the real deployment has: one inside
+    // RecoveryPipeline (the BullMQ worker path) and one wired directly in main.ts (the webhook
+    // HTTP path).
+    const execA = build(gw, resolver, { reperformAfterMs: 0 });
+    const execB = build(gw, resolver, { reperformAfterMs: 0 });
+    const repo = new PostgresAttemptRepository(db);
+
+    const twoHoursAgo = new Date(Date.now() - 2 * 3_600_000).toISOString();
+    const { attempt, created } = await repo.claim(request({ createdAt: twoHoursAgo }), `${caseId}:1`);
+    expect(created).toBe(true);
+
+    const [a, b] = await Promise.all([
+      execA.settle(attempt, { amountPaise: 149900, currency: "INR" }, { kind: "RETRY_NOW" }),
+      execB.settle(attempt, { amountPaise: 149900, currency: "INR" }, { kind: "RETRY_NOW" }),
+    ]);
+
+    expect(gw.orderCreates).toBe(1);
+    const finalRef = await repo.byId(attempt.id);
+    expect(finalRef!.razorpayRef).toMatch(/^order_fake_/);
+    // Whichever call lost the race must never disagree with the row that actually landed.
+    for (const outcome of [a, b]) {
+      if (outcome.razorpayRef) expect(outcome.razorpayRef).toBe(finalRef!.razorpayRef);
+    }
+  });
+
   it("parks a fresh claimed-but-never-performed attempt instead of re-performing it", async () => {
     await seedCase();
     const gw = new FakeGateway();

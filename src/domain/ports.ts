@@ -63,6 +63,13 @@ export interface AttemptRepository {
    */
   settleRecovered(id: string, capturedPaise: number, paymentId: string): Promise<boolean>;
   listUnsettled(): Promise<Attempt[]>;
+  /**
+   * Runs `fn` under exclusive access for this attempt id, across processes — mirrors the CAS
+   * discipline `claim()` uses on `idempotency_key`, but for the reperform path, where two
+   * concurrent callers could otherwise both call the gateway before either records a ref.
+   * Returns `null` without running `fn` if another caller already holds the lock.
+   */
+  withReperformLock<T>(attemptId: string, fn: () => Promise<T>): Promise<T | null>;
 }
 
 /**

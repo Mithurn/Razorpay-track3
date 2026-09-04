@@ -106,31 +106,44 @@ export class AttemptExecutor {
 
   // The order/link was never created: the process died between the durable claim and perform.
   // Recreate it under the same idempotency key, then settle as if it had just been performed.
+  // Locked so two concurrent callers (the worker's sweep pass and a redelivered webhook, each
+  // holding their own AttemptExecutor) can never both call the gateway for the same attempt —
+  // Razorpay does not dedupe orders by receipt, so an unguarded race here would create two.
   private async reperform(
     attempt: Attempt,
     money: { amountPaise: number; currency: string },
     action: RecoveryAction,
   ): Promise<{ ref: string | null; resolved: boolean }> {
-    try {
-      const ref = await this.createFor(attempt, money, action);
-      await this.attempts.recordRazorpayRef(attempt.id, ref);
-      await this.events.append({
-        caseId: attempt.caseId,
-        type: "ATTEMPT_REPERFORMED",
-        payload: { attemptNo: attempt.attemptNo, razorpayRef: ref, activity: "execute" },
-      });
-      return { ref, resolved: false };
-    } catch (err) {
-      if (err instanceof GatewayUnavailableError) {
-        await this.attempts.resolve(attempt.id, { status: "AWAITING_RECONCILIATION", detail: err.message });
-        return { ref: null, resolved: true };
+    const outcome = await this.attempts.withReperformLock(attempt.id, async () => {
+      // Re-check inside the lock: the winner of a prior race may have recorded a ref since this
+      // caller's own earlier lookup.
+      const current = await this.attempts.byId(attempt.id);
+      if (current?.razorpayRef) return { ref: current.razorpayRef, resolved: false };
+
+      try {
+        const ref = await this.createFor(attempt, money, action);
+        await this.attempts.recordRazorpayRef(attempt.id, ref);
+        await this.events.append({
+          caseId: attempt.caseId,
+          type: "ATTEMPT_REPERFORMED",
+          payload: { attemptNo: attempt.attemptNo, razorpayRef: ref, activity: "execute" },
+        });
+        return { ref, resolved: false };
+      } catch (err) {
+        if (err instanceof GatewayUnavailableError) {
+          await this.attempts.resolve(attempt.id, { status: "AWAITING_RECONCILIATION", detail: err.message });
+          return { ref: null, resolved: true };
+        }
+        if (err instanceof GatewayRejectedError) {
+          await this.attempts.resolve(attempt.id, { status: "FAILED", detail: err.reason ?? err.message });
+          return { ref: null, resolved: true };
+        }
+        throw err;
       }
-      if (err instanceof GatewayRejectedError) {
-        await this.attempts.resolve(attempt.id, { status: "FAILED", detail: err.reason ?? err.message });
-        return { ref: null, resolved: true };
-      }
-      throw err;
-    }
+    });
+    // Lost the lock to a concurrent caller: leave this attempt as-is for now, the winner's
+    // recordRazorpayRef (or terminal resolve) will be visible on the next settle() pass.
+    return outcome ?? { ref: null, resolved: false };
   }
 
   private createFor(
