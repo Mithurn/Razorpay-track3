@@ -1,14 +1,8 @@
-// Shared backoff loop behind useLiveRun and useRoomStream: open an SSE generator, hand every
-// event to the caller, and on a dropped connection reconnect with exponential backoff — reset to
-// no-delay the moment an event actually arrives, since a live drop right after a good connection
-// shouldn't be penalized like a cold start. Stops when the signal aborts, `onEvent` returns
-// `true` (the caller's own "this run is over" signal), or (if given) `maxAttempts` is exceeded
-// without a single event landing.
+// Shared exponential-backoff SSE reconnect loop behind useLiveRun and useRoomStream.
 
 export type ReconnectOptions = {
   baseMs?: number;
   maxMs?: number;
-  /** Consecutive connect attempts allowed with no event landing between them. Unbounded if omitted. */
   maxAttempts?: number;
   onConnected?: () => void;
   onDisconnected?: () => void;

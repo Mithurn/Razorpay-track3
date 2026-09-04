@@ -11,12 +11,8 @@ import type { EventLog } from "../domain/ports.js";
 export function makeProcessor(pipeline: RecoveryPipeline, queue: Queue<RecoveryJob>, bus: CaseEventBus, events: EventLog) {
   return async function process(job: RecoveryJob, meta: { attemptsMade?: number } = {}): Promise<void> {
     const { caseId, reclaim: forcedReclaim } = job;
-    // Tool calls/results get two paths: an immediate bus signal for a responsive live UI, and a
-    // durable append (which the bus mirrors as an `audit` event a moment later) so the tool
-    // trace survives a restart and is part of the canonical event log, not just in-memory.
-    // Awaited by the caller (recovery-agent.ts's tool wrapper), so a TOOL_CALLED row always
-    // commits before its TOOL_RESULT — two unawaited appends can land on different pooled
-    // connections and commit out of order.
+    // Awaited by the caller so a TOOL_CALLED row always commits before its TOOL_RESULT — two
+    // unawaited appends can land on different pooled connections and commit out of order.
     const persistToolEvent = (type: "TOOL_CALLED" | "TOOL_RESULT", payload: Record<string, unknown>) =>
       events.append({ caseId, type, payload: { ...payload, activity: "investigate" } }).catch((err) => {
         console.error(`failed to persist ${type}:`, err);

@@ -26,8 +26,7 @@ const schema = z.object({
   // Hard ceiling on model spend for the whole server process. The agent throws past this.
   AGENT_SESSION_CAP_USD: z.coerce.number().positive().default(0.5),
   PORT: z.coerce.number().int().positive().default(3000),
-  // Localhost unless explicitly opened up: several read routes stream raw tool output carrying
-  // customer email/phone/VPA, so a 0.0.0.0 default would publish them to the local network.
+  // Localhost by default — a 0.0.0.0 default would publish customer PII-carrying streams.
   HOST: z.string().default("localhost"),
   // Shared-secret bearer token gating the mutating case routes (recover/decision/simulate-
   // capture). Not required so a fresh clone's config still parses; the routes stay closed until

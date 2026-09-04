@@ -307,10 +307,7 @@ export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Pro
     if (typeof signature !== "string" || typeof eventId !== "string") {
       return reply.code(400).send({ error: "missing signature headers" });
     }
-    // A re-serialized body can never verify against Razorpay's HMAC (key order, whitespace,
-    // number formatting all differ) — the raw bytes the signature was computed over must survive
-    // to here or the compare is meaningless. A missing rawBody is a hook wiring bug, not a
-    // legitimate request state.
+    // A re-serialized body can never verify against Razorpay's HMAC — fail loudly, not silently.
     const rawBody = (req as { rawBody?: string }).rawBody;
     if (rawBody === undefined) return reply.code(500).send({ error: "rawBody unavailable" });
     const result = await deps.webhookHandler.handle({ rawBody, signature, eventId });

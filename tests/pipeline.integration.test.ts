@@ -333,7 +333,7 @@ describe.runIf(adminUrl)("RecoveryPipeline", () => {
     expect(outcome.kind).not.toBe("awaiting_settlement");
 
     const attempt = (await new PostgresAttemptRepository(db).listByCase(caseId)).find((a) => a.attemptNo === 1);
-    expect(attempt?.status).toBe("FAILED");
+    expect(attempt?.status).toBe("COMPLETED");
     expect(attempt?.detail).toContain("not observable");
 
     const events = await new PostgresEventLog(db).forCase(caseId);

@@ -2,11 +2,7 @@ import type { FastifyReply, FastifyRequest } from "fastify";
 
 const KEEP_ALIVE_MS = 15_000;
 
-/**
- * One SSE connection: open the stream and send `openEvent`, subscribe before the snapshot read
- * (so an event landing during that read is never missed between the snapshot and the first live
- * frame), send the snapshot, then ping every 15s until the client disconnects.
- */
+// Subscribe before the snapshot read, so an event landing during that read is never missed.
 export function openSse(
   req: FastifyRequest,
   reply: FastifyReply,
