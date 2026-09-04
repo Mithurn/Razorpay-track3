@@ -61,25 +61,28 @@ that match the ground truth — it points at the tools that carry the real signa
 |--------------------------|------------|------------|-------------|
 | recovered                | 33 / 60    | 20 / 60    | 36 / 60     |
 | recovery rate            | 55.0%      | 33.3%      | 60.0%       |
-| ₹ recovered              | ₹52,967    | ₹31,480    | ₹56,464     |
+| ₹ recovered              | ₹51,967    | ₹31,480    | ₹56,464     |
 | ₹ recoverable (ceiling)  | ₹1,08,456  | ₹1,08,456  | ₹1,08,456   |
-| escalation rate          | 38.3%      | 66.7%      | 40.0%       |
-| over-nudge rate          | 3.3%       | 0.0%       | 1.7%        |
-| mean attempts/recovery   | 1.18       | 1.30       | 1.03        |
-| mean hours to recovery   | 32.2       | 38.4       | 28.2        |
-| **root-cause accuracy**  | **71.7%**  | — (no diagnosis) | — (no diagnosis) |
+| escalation rate          | 35.0%      | 66.7%      | 40.0%       |
+| over-nudge rate          | 5.0%       | 0.0%       | 1.7%        |
+| mean attempts/recovery   | 1.15       | 1.30       | 1.03        |
+| mean hours to recovery   | 33.3       | 38.4       | 28.2        |
+| **root-cause accuracy**  | **73.3%**  | — (no diagnosis) | — (no diagnosis) |
 | undiagnosed (degraded)   | 1 / 60     | —          | —           |
 
-Seed 42, `google/gemini-3.6-flash`. Reproduce it for free, no API key:
-`npm run bench -- --size 60 --seed 42 --mock`.
+Seed 42, `google/gemini-3.6-flash`. Reproduce it for free, no API key — the model must be pinned
+explicitly, or the reproduce command silently replays a different (and much weaker) cached model's
+run instead of this table's:
+`AGENT_MODEL=google/gemini-3.6-flash npm run bench -- --size 60 --seed 42 --mock`.
 
 **Read the money rows honestly: it's close, and sometimes it loses.** The agent recovers three
-fewer cases than the rules table and ₹3,497 less. Run across five seeds (42, 7, 13, 99, 2024) the
-agent's recovery rate ranges **46.7%–58.3% (mean 52.3%)** against the rules table's 55.0%–63.3%,
+fewer cases than the rules table and ₹4,497 less. Run across five seeds (42, 7, 13, 99, 2024) the
+agent's recovery rate ranges **50.0%–58.3% (mean 53.7%)** against the rules table's 55.0%–63.3%,
 a real, sometimes double-digit gap — not a cherry-picked win. On a templated corpus, a 6-line
 switch statement on `error_reason` (`bench/rules-arm.ts`, transcribed straight from the agent's
 own playbook) is a genuinely strong baseline. That finding survived two hardening passes and this
-is the honest version of it.
+is the honest version of it. **`--blind-reason` (below) shows why that baseline is a property of
+this corpus, not of the problem.**
 
 **The recoverable ceiling is also the tell for why the money rows can't discriminate much
 further.** Both arms recover 97–98% of what's genuinely recoverable in this batch — the corpus
@@ -88,7 +91,7 @@ enough at the *diagnosis* level, which is the row a lookup table cannot produce 
 
 **Root-cause accuracy is where the gap runs the other way, and it's consistent.** `bench/rules-arm.ts`
 never diagnoses — it has no concept of *why* a payment failed. Across the same five seeds, the
-agent's root-cause accuracy holds at **71.7%–75.0% (mean 73.0%)**, with the loop reaching a
+agent's root-cause accuracy holds at **71.7%–75.0% (mean 73.3%)**, with the loop reaching a
 diagnosis on all but 2 of 300 cases. That's measured independently of which action the agent then
 chose, so one number can't launder the other, and a null diagnosis (the loop degrading before it
 concludes) counts as wrong, not excluded — it used to fall back to a hardcoded `"technical"` and
@@ -102,9 +105,9 @@ rounds of this project was the playbook handing it the answer, not the model rea
 model costs roughly $1.20–1.35 per 60-case run (~500 model calls) and is the one this table uses.
 `AGENT_MODEL` is an env override for exactly this reason — the model is measured, not assumed.
 
-**Guardrails firing in this batch, not only in the property test:** `contact_window` skipped 10
+**Guardrails firing in this batch, not only in the property test:** `contact_window` skipped 12
 nudges outside 08:00–19:00 IST, `exposure_cap` clamped 8 over-limit cases to escalation,
-`risk_hold` clamped 4, `write_off_unsupported` clamped 1 write-off the agent proposed without an
+`risk_hold` clamped 4, `write_off_unsupported` clamped 2 write-offs the agent proposed without an
 unrecoverable diagnosis. The exhaustive gate property test (`tests/safety-gate.test.ts`, 32 cases
 over 4,608+ generated contexts) proves every rule *can* fire correctly; this is evidence that they
 *do*, on real model output, in the measured batch.
@@ -113,7 +116,55 @@ Of the 27 unrecovered cases: 16 are stopped correctly by design (8 risk holds th
 by policy, 8 accounts the corpus marks genuinely unfunded) — not misses. The other 11 are real:
 mostly bank-downtime and generic-decline cases where a retry timed past the window would have
 recovered the payment and didn't. The full transcript for every case, including every miss, is in
-`bench/.cache/agent-turns-seed42-n60-google_gemini-3.6-flash.json`.
+`bench/.cache/agent-turns-seed42-n60-google_gemini-3.6-flash.json` — now with the full tool-call
+trace behind every diagnosis, not just the final proposal (see "What broke" below).
+
+### Does the diagnosis actually matter, or does the rules table just know the answer key?
+
+The rules table's edge above is a fair result, but the corpus makes it an easy one: 7 templates,
+each with its own `failureReason` string, and `rules-arm.ts` is a 6-line switch on that exact
+string. In live Razorpay data `payment_failed` covers a dozen unrelated causes with no reliable
+mapping to the right action — which is the whole premise of the agent's own system prompt. This
+batch never tests that premise, because the label the rules table branches on is, here, close to
+the answer.
+
+`bench/corpus.ts --blind-reason` replaces every case's `failureCode`/`failureReason` with one
+generic value before it reaches any arm, while leaving the actual ground truth (what recovers it,
+when) untouched. The rules table can no longer branch on cause and collapses to its one `default:`
+guess for every case — a blind retry schedule with no diagnosis at all, which is what
+`rules-arm.ts` actually degrades to without the label.
+
+| blind-reason, seed 42     | agent      | fixed      | rules table |
+|----------------------------|------------|------------|-------------|
+| recovered                  | 27 / 60    | 20 / 60    | 20 / 60     |
+| recovery rate               | 45.0%      | 33.3%      | 33.3%       |
+| ₹ recovered                 | ₹42,473    | ₹31,480    | ₹31,480     |
+| escalation rate              | 30.0%      | 66.7%      | 66.7%       |
+| root-cause accuracy          | 31.7%      | — (no diagnosis) | — (no diagnosis) |
+
+**With the error code hidden, the rules table collapses from 60.0%/₹56,464 to a dead tie with the
+fixed schedule at 33.3%/₹31,480** — it has no other information, so a "diagnosis" table with no
+diagnosis degrades to exactly a calendar. **The agent also drops — 55.0%→45.0% recovery,
+73.3%→31.7% root-cause accuracy** — because the case brief hands the model the error code too, so
+part of its edge in the labeled table was reading the same label, not pure tool-driven reasoning.
+It still beats both non-diagnosing arms by a real margin (11.7pp recovery, ₹10,993) on nothing but
+customer history, the live downtime feed, similar-case outcomes and prior attempts. That is the
+honest measurement: diagnosis is worth something even blind, just less than the labeled table
+suggested, and a lookup table is worth nothing at all once the one input it needs is gone.
+Reproduce with `AGENT_MODEL=google/gemini-3.6-flash npm run bench -- --size 60 --seed 42 --mock --blind-reason`.
+
+**This run also surfaced a real gap, not just a headline number.** `isRiskHold` (`src/domain/case.ts`)
+— the deterministic, case-data veto that forces every risk-flagged payment to a human, independent
+of the agent's own diagnosis — reads the exact same `failureReason` string this experiment blinds.
+With it blinded, the veto never fires (`risk_hold` clamp count: 4 in the labeled run, 0 here), and
+4 of the 8 genuinely risk-holding cases were written off by the agent's own (wrong, "unrecoverable")
+diagnosis instead of escalating to a human — the `write_off_unsupported` gate only checks that the
+agent *claimed* an unrecoverable diagnosis, not that the claim is true. In this build risk-hold
+status is carried in the same field as the diagnostic hint, which a real Razorpay integration would
+not do (risk-check failure is its own signal on the payment entity, not folded into the display
+error string) — but it means `--blind-reason` is an evaluation tool for the diagnosis question
+only, not a mode safe to run unattended, and the coupling itself is a real finding, logged in
+`BREAKS.md`.
 
 ## What's real, what's stubbed, what's simulated
 
@@ -154,6 +205,42 @@ stated otherwise here:
   mandates, no multi-tenancy. Said plainly rather than left for a reviewer to find.
 
 ## Architecture
+
+The recovery loop, one failed payment at a time — the agent proposes, the gate can only add
+caution, the executor is the only thing that ever touches Razorpay:
+
+```mermaid
+flowchart LR
+    F["Failed payment\n(webhook / synthetic)"] --> AG
+
+    subgraph AG["Recovery Agent — bounded tool loop"]
+        direction TB
+        T1[get_customer_payment_history]
+        T2[check_bank_downtime — live]
+        T3[get_similar_resolved_cases]
+        T4[get_this_case_prior_attempts]
+        T5[get_recovery_playbook]
+    end
+
+    AG --> PR["Proposal\nroot cause · confidence · action"]
+    PR --> SG{{"Safety Gate\npure function — clamp or veto only,\nnever picks the action"}}
+    SG -- allow --> EX["Attempt Executor\none idempotency key per attempt"]
+    SG -- "clamp / veto\n(risk hold, exposure cap,\nhard decline, attempt cap...)" --> ESC["Escalate to a human"]
+    SG -- "skip\n(cooldown, RBI contact window)" --> RS["Reschedule"]
+    EX --> RZ[("Razorpay\ntest mode")]
+    RZ -- "webhook or re-check\n(never assumes success\non a 5xx / timeout)" --> EX
+    EX --> OUT["Recovered / Failed"]
+
+    AG -.append.-> LOG[("Append-only audit log\nDB role cannot UPDATE/DELETE")]
+    SG -.append.-> LOG
+    EX -.append.-> LOG
+```
+
+No LLM-originated proposal can lower caution, move money twice, or move it past the exposure cap
+or attempt cap — see "What it does" above and `src/safety/safety-gate.ts` for exactly what the
+gate can and cannot do.
+
+Module dependency direction is separately enforced (not just this data-flow diagram):
 
 ```
 api / worker / bench   →   agent · safety · execution · persistence   →   domain
@@ -227,7 +314,8 @@ npm test                  # 209 tests (needs docker compose up)
 
 # the evaluation — agent, fixed schedule, and the rules table, on one batch
 AGENT_MODEL=google/gemini-3.6-flash npx tsx --env-file=.env bench/run.ts --size 60   # records
-npx tsx --env-file=.env bench/run.ts --size 60 --mock                               # replays, free
+AGENT_MODEL=google/gemini-3.6-flash npx tsx --env-file=.env bench/run.ts --size 60 --mock   # replays, free
+AGENT_MODEL=google/gemini-3.6-flash npx tsx --env-file=.env bench/run.ts --size 60 --mock --blind-reason
 
 # seed the live demo queue
 npx tsx --env-file=.env bench/seed-demo.ts

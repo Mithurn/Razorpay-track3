@@ -112,7 +112,10 @@ export function formatReport(agent: ArmMetrics, fixed: ArmMetrics, exceptions: E
   const rupees = (p: number) => `₹${(p / 100).toLocaleString("en-IN")}`;
   const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
   const arms = [agent, fixed, ...(rules ? [rules] : [])];
-  const col = (n: number | string) => String(n).padStart(12);
+  // Wide enough for the longest cell ("— (no diagnosis)", 17 chars) plus a real gap to the next
+  // column — padStart(12) let that string butt straight up against the next column with no
+  // separator at all.
+  const col = (n: number | string) => String(n).padStart(20);
   const row = (label: string, get: (m: ArmMetrics) => string) => `${label.padEnd(26)}${arms.map((m) => col(get(m))).join("")}`;
 
   const lines = [

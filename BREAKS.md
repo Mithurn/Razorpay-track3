@@ -328,3 +328,34 @@ a path inside the container — stdin reads exactly what the shell just opened, 
 in between.
 **Safeguard:** never trust a bind-mounted file for a command run right after editing it in the
 same session; pipe it instead, or restart the mount.
+
+---
+
+## The risk-hold veto and the diagnostic label were the same field, and an experiment built to test the label found it
+
+**Expected:** an experiment to isolate what the agent's diagnosis is actually worth — blind the
+corpus's `failureReason` (the label `rules-arm.ts` branches on, and the same string the agent's
+own case brief reads) and compare all three arms with it hidden but ground truth untouched. Nothing
+safety-relevant should move; the veto is a case-data check, not a diagnosis.
+**Actual:** `isRiskHold` (`src/domain/case.ts`) reads exactly the field the experiment blinds
+(`kase.failureReason === "payment_risk_check_failed"`). With it hidden, the deterministic
+risk-hold veto never fires — 4 clamps in the labeled run, 0 in the blinded one — and 4 of the 8
+genuinely risk-holding cases were written off by the agent's own (wrong) "unrecoverable" diagnosis
+instead of escalating to a human. `write_off_unsupported` didn't catch it either: that gate checks
+whether the agent *claimed* an unrecoverable diagnosis, not whether the claim is true, so a
+misdiagnosed risk hold that says "unrecoverable" sails through it.
+**Why it's dangerous:** this is exactly the failure this project's central rule exists to prevent
+— a path where the agent's own (mistaken) judgment ends a case a human was supposed to see, with
+no deterministic check reading anything the agent didn't say. It only didn't happen in the
+published headline run because the corpus never blinds the label there.
+**How diagnosed:** the experiment was built to answer a different question (does diagnosis beat a
+lookup table with the label hidden) and this fell out of checking the gate's rule-firing counts
+before writing up the result, not from looking for it.
+**Fix:** none shipped. Blinding `failureReason` is real, useful evidence for the diagnosis
+question and stays as a `--blind-reason` bench flag — but it is now documented as an evaluation
+tool only, never a mode to run unattended, and the README states the coupling plainly next to the
+number rather than only in this file.
+**Safeguard, not yet built:** the real fix is giving risk-hold its own field, independent of the
+display error string — a real Razorpay integration would carry it as its own signal on the payment
+entity, not folded into `failureReason` the way this corpus's shorthand does. That's a schema and
+domain-type change, not a one-line patch, and it's flagged here rather than rushed in.

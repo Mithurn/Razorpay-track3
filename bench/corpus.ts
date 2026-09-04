@@ -27,7 +27,19 @@ export type CorpusOptions = {
   size?: number;
   seed?: number;
   downFraction?: number;
+  /**
+   * Overwrite every case's failureCode/failureReason with one generic value, leaving ground
+   * truth untouched. `rules-arm.ts` switches on that exact string, and in this corpus it is
+   * close to the answer key — 7 templates, one `failureReason` each. Blinding it removes the
+   * one input the rules table needs and everything else keeps working from: customer history,
+   * the downtime feed, similar-case outcomes, prior attempts. Isolates what diagnosis is
+   * actually worth from what a templated corpus' label happens to give away for free.
+   */
+  blindReason?: boolean;
 };
+
+const BLINDED_CODE = "PAYMENT_FAILED";
+const BLINDED_REASON = "payment_failed_generic";
 
 // A small deterministic PRNG so a run is reproducible and the numbers are defensible.
 function mulberry32(seed: number): () => number {
@@ -204,8 +216,8 @@ export function generateCorpus(opts: CorpusOptions): CorpusCase[] {
       originalPaymentId: null,
       amountPaise: base,
       currency: "INR",
-      failureCode: template.code,
-      failureReason: template.reason,
+      failureCode: opts.blindReason ? BLINDED_CODE : template.code,
+      failureReason: opts.blindReason ? BLINDED_REASON : template.reason,
       failedAt: new Date(Date.parse("2026-09-01T06:00:00.000Z") + i * 3_600_000).toISOString(),
       method: template.method,
       instrument,

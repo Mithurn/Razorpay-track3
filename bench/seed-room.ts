@@ -83,9 +83,19 @@ async function main(): Promise<void> {
           }),
         runAgent: runner,
       });
+      // Same persistence pattern as the live worker (src/worker/recovery-worker.ts): a replayed
+      // tool call/result becomes a durable TOOL_CALLED/TOOL_RESULT row, awaited in order, so the
+      // seeded room's case panel shows the same investigation trace a live run would have left,
+      // not just the final proposal with an empty "N signals checked" drawer.
+      const agentEvents = {
+        onToolCall: (call: { name: string; callId: string; args: unknown }) =>
+          events.append({ caseId: c.id, type: "TOOL_CALLED", payload: { ...call, activity: "investigate" } }),
+        onToolResult: (r: { name: string; callId: string; source: string; raw: unknown; ms: number }) =>
+          events.append({ caseId: c.id, type: "TOOL_RESULT", payload: { ...r, activity: "investigate" } }),
+      };
       let simHours: number | null = null;
       for (let turn = 0; turn < 12; turn++) {
-        const outcome = await pipeline.advance(c.id);
+        const outcome = await pipeline.advance(c.id, agentEvents);
         if (outcome.kind === "resolved") {
           simHours = outcome.lane === "RECOVERED" ? resolver.recoveredAtHour(c.id) : null;
           break;

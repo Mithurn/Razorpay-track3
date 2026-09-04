@@ -27,7 +27,12 @@ export function TopBar({
 }) {
   const recoveredLivePaise = metrics?.recoveredLivePaise ?? 0;
   const recoveredSimulatedPaise = metrics?.recoveredSimulatedPaise ?? 0;
-  const recovered = useTweenedNumber(recoveredLivePaise);
+  // The batch total is the hero figure — it's the number Track 3's bar actually grades ("measured
+  // money recovered across a batch"), and it's what the whole evaluation section is about. A real
+  // live capture from working `cust_live_demo` on camera is genuine money too, just from a sample
+  // of one — shown as a ticking accent underneath, never blended into the batch total (the two
+  // are summed from clearly separate sources on purpose; see README's "What's real" section).
+  const recoveredLive = useTweenedNumber(recoveredLivePaise);
   const exposure = useTweenedNumber(metrics?.exposurePaise ?? 0);
   const [benchOpen, setBenchOpen] = useState(false);
   const [stopping, setStopping] = useState(false);
@@ -66,11 +71,16 @@ export function TopBar({
     <header className="topbar">
       <div className="topbar__metrics">
         <Metric
-          label="Recovered"
-          value={rupees(recovered)}
+          label="Recovered — 60-case batch"
+          value={rupees(recoveredSimulatedPaise)}
           tone="recovered"
-          delta={recoveredDelta}
-          note={recoveredSimulatedPaise > 0 ? `+ ${rupees(recoveredSimulatedPaise)} simulated (recorded batch)` : null}
+          note={
+            recoveredDelta
+              ? `${recoveredDelta} just captured, live`
+              : recoveredLivePaise > 0
+                ? `+ ${rupees(recoveredLive)} live this session`
+                : "no live captures yet this session"
+          }
         />
         <Metric label="Exposure at risk" value={rupees(exposure)} tone="plain" />
         <Metric label="Recovery rate" value={resolved > 0 ? pct(recoveryRate) : "—"} tone="plain" />

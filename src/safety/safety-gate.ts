@@ -76,7 +76,10 @@ export type GuardrailRule =
 // hard-decline case below needs its own veto.
 const AUTO_REATTEMPT: ReadonlySet<RecoveryAction["kind"]> = new Set(["RETRY_NOW", "RETRY_SCHEDULED"]);
 
-// RBI Fair Practices Code, Para 55: no recovery contact before 08:00 or after 19:00 IST.
+// Modelled on the RBI Fair Practices Code's recovery-agent contact-hours norm (no contact before
+// 08:00 or after 19:00 IST) — that guidance targets lenders' recovery agents, not a merchant
+// retrying its own subscription charge, so this is a deliberately conservative adoption of the
+// same standard, not a claim that a specific paragraph binds this case.
 export const CONTACT_WINDOW_START_HOUR_IST = 8;
 export const CONTACT_WINDOW_END_HOUR_IST = 19;
 const IST_OFFSET_MIN = 330; // UTC+5:30, no DST
@@ -139,7 +142,7 @@ export function safetyGate(
   }
 
   if (proposal.kind === "CUSTOMER_NUDGE" && !isWithinContactWindow(ctx.now)) {
-    const detail = `outside the ${CONTACT_WINDOW_START_HOUR_IST}:00-${CONTACT_WINDOW_END_HOUR_IST}:00 IST contact window (RBI Fair Practices Code)`;
+    const detail = `outside the ${CONTACT_WINDOW_START_HOUR_IST}:00-${CONTACT_WINDOW_END_HOUR_IST}:00 IST contact window (modelled on the RBI Fair Practices Code)`;
     return { outcome: "skip", rule: "contact_window", detail };
   }
 

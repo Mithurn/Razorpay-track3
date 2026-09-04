@@ -31,12 +31,12 @@ npm run dev
 
 Open **http://localhost:5173**. You'll see:
 
-- **Header scoreboard** — the batch result: agent ₹52,967 (55.0% recovered) vs the fixed
+- **Header scoreboard** — the batch result: agent ₹51,967 (55.0% recovered) vs the fixed
   day-1/3/5/7 schedule ₹31,480 (33.3%). See the README for the full three-arm table, including the
-  rules-table baseline (which the agent does *not* cleanly beat on money) and the root-cause
-  accuracy row it cannot produce — the action-policy numbers are close, sometimes a loss, and
-  that's stated plainly there.
-- **Case flow** — 33 recovered, 23 escalated, 4 written off, plus two fresh cases: `cust_live_demo`
+  rules-table baseline (which the agent does *not* cleanly beat on money), the root-cause accuracy
+  row it cannot produce, and the `--blind-reason` experiment that isolates what the diagnosis is
+  actually worth once the corpus's own answer-key label is hidden.
+- **Case flow** — 33 recovered, 21 escalated, 6 written off, plus two fresh cases: `cust_live_demo`
   and `cust_over_cap`.
 - **Waiting on you** — the risk-hold escalations, with working retry / send-link / write-off buttons.
 
@@ -77,9 +77,12 @@ $0.50).
 ## The evaluation
 
 ```bash
-npm run bench -- --size 60 --mock     # replays the recorded run, ~1s, free — agent, fixed, rules
+# always pin AGENT_MODEL on --mock — the cache is keyed by model, and the config default
+# (minimax/minimax-m3:free) replays a much weaker recorded run without it, silently
+AGENT_MODEL=google/gemini-3.6-flash npm run bench -- --size 60 --mock       # replays, ~1s, free
 AGENT_MODEL=google/gemini-3.6-flash npm run bench -- --size 60 --cap-usd 3.00   # a real agent run
 npm run bench -- --arm rules --size 60 --mock   # just the rules-table baseline, no cache needed
+AGENT_MODEL=google/gemini-3.6-flash npm run bench -- --size 60 --mock --blind-reason  # see README
 ```
 
 The bare `--cap-usd` default (30 cents) is calibrated for the zero-cost model, not the headline
@@ -87,9 +90,9 @@ one — a real run on `google/gemini-3.6-flash` costs roughly $1.20–1.35 (~500
 cases), so pass `--cap-usd` explicitly or the run trips its own budget guard partway through.
 
 `--mock` replays the agent's recorded turns from `bench/.cache/agent-turns-seed<N>-n60-<model>.json`
-— the cache is keyed by model as well as seed and size, so a different `AGENT_MODEL` needs its own
-recording first. Only the agent arm needs a cache; `fixed` and `rules` are pure functions and run
-for free either way.
+(`-blind.json` under `--blind-reason`) — the cache is keyed by model as well as seed and size, so a
+different `AGENT_MODEL` needs its own recording first. Only the agent arm needs a cache; `fixed`
+and `rules` are pure functions and run for free either way.
 
 ## Tests
 

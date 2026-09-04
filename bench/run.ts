@@ -33,6 +33,7 @@ const { values } = parseArgs({
     seed: { type: "string", default: "42" },
     arm: { type: "string" },
     "cap-usd": { type: "string", default: "0.30" },
+    "blind-reason": { type: "boolean", default: false },
   },
 });
 
@@ -44,7 +45,10 @@ const seed = Number(values.seed);
 // result, when nothing had actually run. Also what makes a same-corpus model sweep possible: each
 // model gets its own file instead of overwriting the last one's recording.
 const modelSlug = (process.env.AGENT_MODEL ?? "minimax/minimax-m3:free").replace(/[^a-zA-Z0-9._-]/g, "_");
-const cachePath = `bench/.cache/agent-turns-seed${seed}-n${size}-${modelSlug}.json`;
+const blindReason = values["blind-reason"] === true;
+// A blinded corpus produces different agent turns than the labeled one — its own cache file, or
+// a --blind-reason run would silently replay (or overwrite) the labeled run's recording.
+const cachePath = `bench/.cache/agent-turns-seed${seed}-n${size}-${modelSlug}${blindReason ? "-blind" : ""}.json`;
 
 async function main(): Promise<void> {
   const config = loadConfig();
@@ -94,7 +98,7 @@ async function main(): Promise<void> {
   for (const arm of armsToRun) {
     const runId = randomUUID();
     await runs.create(runId, arm, `${arm} seed=${seed} n=${size}`, { seed, size, mock: values.mock });
-    const corpus = generateCorpus({ runId, size, seed });
+    const corpus = generateCorpus({ runId, size, seed, blindReason });
     const truth = new Map<string, GroundTruth>(corpus.map((c) => [c.id, c.groundTruth]));
 
     for (const c of corpus) await cases.create(c);

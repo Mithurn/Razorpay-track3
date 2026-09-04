@@ -113,7 +113,11 @@ await registerRoutes(app, {
   webhookHandler,
   bus,
   pipeline,
-  modelHealth: () => checkModelHealth(config.OPENROUTER_API_KEY, config.AGENT_MODEL),
+  modelHealth: () =>
+    checkModelHealth(
+      { openRouterApiKey: config.OPENROUTER_API_KEY, googleApiKey: config.GOOGLE_GENERATIVE_AI_API_KEY },
+      config.AGENT_MODEL,
+    ),
   verifyAppendOnly: () => verifyAppendOnly(pool),
   runtimeInfo: {
     model: config.AGENT_MODEL,
