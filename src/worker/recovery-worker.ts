@@ -18,9 +18,12 @@ export function makeProcessor(pipeline: RecoveryPipeline, queue: Queue<RecoveryJ
     // commits before its TOOL_RESULT — two unawaited appends can land on different pooled
     // connections and commit out of order.
     const persistToolEvent = (type: "TOOL_CALLED" | "TOOL_RESULT", payload: Record<string, unknown>) =>
-      events
-        .append({ caseId, type, payload: { ...payload, activity: "investigate" } })
-        .catch((err) => console.error(`failed to persist ${type}:`, err));
+      events.append({ caseId, type, payload: { ...payload, activity: "investigate" } }).catch((err) => {
+        console.error(`failed to persist ${type}:`, err);
+        return events
+          .append({ caseId, type: "AUDIT_GAP", payload: { lostEvent: type, activity: "investigate" } })
+          .catch((gapErr) => console.error(`failed to record AUDIT_GAP after losing ${type}:`, gapErr));
+      });
 
     const outcome = await pipeline.advance(
       caseId,
