@@ -15,8 +15,6 @@ export type EdgeId =
   | "EXECUTE-OUTCOME"
   | "OUTCOME-INVESTIGATE";
 
-export const STAGES: StageId[] = ["INCOMING", "INVESTIGATE", "PROPOSE", "GATE", "EXECUTE", "OUTCOME"];
-
 export const TOOL_LABELS: Record<string, string> = {
   get_customer_payment_history: "history",
   check_bank_downtime: "downtime",

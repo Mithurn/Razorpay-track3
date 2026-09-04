@@ -1,6 +1,5 @@
 import { createHmac, randomUUID } from "node:crypto";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import type { Queue } from "bullmq";
 import { createPool, type Db } from "../src/persistence/pool.js";
 import { PostgresCaseRepository } from "../src/persistence/case-repository.js";
 import { PostgresAttemptRepository } from "../src/persistence/attempt-repository.js";
@@ -11,7 +10,6 @@ import { WebhookHandler } from "../src/execution/webhook-handler.js";
 import { RazorpayClient } from "../src/execution/razorpay-client.js";
 import type { OutcomeResolver, OutcomeVerdict } from "../src/domain/ports.js";
 import type { GatewayOrder, GatewayPayment, GatewayPaymentLink, PaymentGateway } from "../src/domain/gateway.js";
-import type { RecoveryJob } from "../src/worker/queue.js";
 import { LoggingNotifier } from "../src/execution/notifier.js";
 import type { CaseEnqueuer } from "../src/domain/ports.js";
 

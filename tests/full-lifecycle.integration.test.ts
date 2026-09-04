@@ -238,7 +238,7 @@ describe.runIf(adminUrl)(
         add: async () => undefined,
       } as unknown as import("bullmq").Queue<RecoveryJob>;
       const process = makeProcessor(pipeline, noopQueue, bus, eventLog);
-      return { bus, cases, eventLog, gateway, pipeline, process };
+      return { bus, cases, gateway, pipeline, process };
     }
 
     async function buildApp(
@@ -285,7 +285,7 @@ describe.runIf(adminUrl)(
     it("recovers a case and every stage reaches Postgres, the room stream, and metrics", async () => {
       const id = await seed();
       let agentFired = false;
-      const { bus, cases, eventLog, gateway, pipeline, process } = buildStack(
+      const { bus, cases, gateway, pipeline, process } = buildStack(
         scriptedAgent(
           {
             action: { kind: "RETRY_NOW" },
