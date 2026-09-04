@@ -1,13 +1,15 @@
+import { splitModelId } from "./model.js";
+
 // A cheap liveness check for the model provider: one-token completion, short timeout. Used by
-// GET /model-health so a demo operator knows the agent path is up before starting a run. A
-// "google/" model id is probed against AI Studio directly, the same provider split as agent/model.ts.
+// GET /model-health so a demo operator knows the agent path is up before starting a run.
 
 export async function checkModelHealth(
   keys: { openRouterApiKey: string | undefined; googleApiKey: string | undefined },
   model: string,
 ): Promise<{ model: string; reachable: boolean; detail?: string }> {
-  if (model.startsWith("google/")) return checkGoogle(keys.googleApiKey, model.slice("google/".length));
-  return checkOpenRouter(keys.openRouterApiKey, model);
+  const { provider, id } = splitModelId(model);
+  if (provider === "google") return checkGoogle(keys.googleApiKey, id);
+  return checkOpenRouter(keys.openRouterApiKey, id);
 }
 
 async function checkOpenRouter(

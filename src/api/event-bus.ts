@@ -1,9 +1,10 @@
 import { EventEmitter } from "node:events";
+import type { ToolSource } from "../agent/recovery-agent.js";
+
+export type { ToolSource };
 
 // In-process fan-out from the running pipeline to any SSE clients watching a case. Single
 // process only; a multi-node deployment would put Redis pub/sub here.
-
-export type ToolSource = "local" | "razorpay-live";
 
 // Why a turn ended. `resolved` is terminal for the case; the rest end this turn only.
 export type DoneReason = "resolved" | "rescheduled" | "awaiting_settlement";
