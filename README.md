@@ -82,26 +82,37 @@ The demo GIF below shows this case being worked in real-time:
 
 ## Architecture
 
-```
-Failed Payment
-      ↓
-AI Investigation
- (customer history, bank downtime, similar cases, playbook)
-      ↓
-Recovery Proposal
- (action + root cause + confidence)
-      ↓
-Deterministic Safety Gate
-   ├─ Allow (proposal passes all nine rules)
-   ├─ Clamp (retry → escalate due to risk hold / exposure cap)
-   ├─ Skip (cooldown / contact window violation)
-   └─ Reschedule (attempted too soon, wait N hours)
-      ↓
-Execution (one idempotency key, re-check on 5xx)
-      ↓
-Razorpay Test Mode
-      ↓
-Outcome + Append-Only Audit Ledger
+```mermaid
+flowchart TD
+    FP["Failed Payment"]
+    
+    FP --> AGT["AI Investigation<br/>(customer history · bank downtime<br/>similar cases · playbook)"]
+    
+    AGT --> PROP["Recovery Proposal<br/>(action · root cause · confidence)"]
+    
+    PROP --> GATE["Safety Gate<br/>(9 deterministic rules)"]
+    
+    GATE -- "allow" --> EX["Idempotent Execution"]
+    GATE -- "clamp" --> ESC["Escalate to human"]
+    GATE -- "skip" --> RS["Reschedule"]
+    
+    EX <--> RZ["Razorpay<br/>test mode"]
+    EX --> OUT["Recovered / Failed"]
+    
+    AGT -. "append" .-> LOG["Audit Log<br/>(INSERT only)"]
+    GATE -. "append" .-> LOG
+    EX -. "append" .-> LOG
+    
+    style AGT fill:#1e1b4b,stroke:#6366f1,color:#e0e7ff
+    style GATE fill:#1a2e1a,stroke:#22c55e,color:#dcfce7
+    style LOG fill:#1c1917,stroke:#78716c,color:#d6d3d1
+    style RZ fill:#0c1a2e,stroke:#3b82f6,color:#dbeafe
+    style FP fill:#2d1b1b,stroke:#ef4444,color:#fecaca
+    style ESC fill:#2d2006,stroke:#f59e0b,color:#fef3c7
+    style RS fill:#1a1a2e,stroke:#8b5cf6,color:#ede9fe
+    style OUT fill:#1a2e1a,stroke:#22c55e,color:#dcfce7
+    style PROP fill:#1e1e2e,stroke:#6366f1,color:#e0e7ff
+    style EX fill:#1e2030,stroke:#3b82f6,color:#dbeafe
 ```
 
 ### Layering
