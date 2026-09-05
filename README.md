@@ -8,7 +8,11 @@ Built for **Razorpay AI Buildathon 2026 - Track 3 (AI Revenue Recovery)**.
 ![Tests](https://img.shields.io/badge/tests-223%20passing-green)
 ![Razorpay](https://img.shields.io/badge/Razorpay-Test%20Mode-blue)
 
-> **Add GIF here:** `![Demo](demo.gif)` once you create it
+## Demo
+
+**Watch the agent investigate a failed payment and override the historical pattern based on live bank downtime**
+
+![Agent investigating Bank of India downtime and scheduling a retry instead of sending a payment link](demo.gif)
 
 ---
 
