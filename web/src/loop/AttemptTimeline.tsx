@@ -41,8 +41,7 @@ export function AttemptTimeline({ attempts }: { attempts: Attempt[] }) {
   return (
     <div className="tl">
       <div className="tl__head">
-        Attempts — each one runs exactly once, tagged with a unique idempotency key so a retry can
-        never double-charge
+        Attempts. Each one is tagged with a unique idempotency key so a retry can never double-charge.
       </div>
       {rows.map((a) => (
         <AttemptRow key={a.id} attempt={a} />

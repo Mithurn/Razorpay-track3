@@ -230,7 +230,7 @@ function Stage({
     return (
       <section className="stage stage--empty">
         <p className="empty">
-          Pick a case on the left to watch how the agent worked it — the signals it pulled, what
+          Pick a case on the left to watch how the agent worked it: the signals it pulled, what
           it concluded, how the safety gate ruled, and what actually happened.
           {freshCase && (
             <>
@@ -344,7 +344,7 @@ function Stage({
           )}
           {canStop && confirmingStop && (
             <span className="topbar__confirm-stop">
-              <span>Stop permanently — cannot be resumed.</span>
+              <span>Stop permanently. Cannot be resumed.</span>
               <button
                 className="btn btn--danger-solid"
                 onClick={() => {
@@ -431,7 +431,7 @@ function VerifyAuditButton({ caseId }: { caseId: string }) {
         className="btn btn--ghost"
         onClick={run}
         disabled={result === "pending"}
-        title="Connects to Postgres as the app's own restricted role and tries to edit the event log — the database refuses. Proves the audit trail can't be altered, even by us."
+        title="Connects to Postgres as the app's own restricted role and tries to edit the event log. The database refuses. Proves the audit trail can't be altered, even by us."
       >
         {result === "pending" ? <Spinner size={13} /> : null}
         {result === "pending" ? "Checking…" : "Check log is tamper-proof"}
@@ -439,7 +439,7 @@ function VerifyAuditButton({ caseId }: { caseId: string }) {
       {result && result !== "pending" && (
         <span className={"verify-audit__result" + (result.enforced ? " verify-audit__result--ok" : " verify-audit__result--bad")}>
           {result.enforced ? <Check size={13} /> : <X size={13} />}
-          {result.enforced ? "Event log is append-only — the database enforces it" : result.error ?? "not enforced"}
+          {result.enforced ? "Event log is append-only. The database enforces it." : result.error ?? "not enforced"}
         </span>
       )}
     </span>

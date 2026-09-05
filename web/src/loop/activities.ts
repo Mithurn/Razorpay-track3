@@ -99,7 +99,7 @@ function newPropose(ev: RawEvent): Activity {
     tone: degraded ? "deny" : "plain",
     startedAt: ev.at,
     endedAt: ev.at,
-    summary: degraded ? "degraded to a safe fallback — no diagnosis reached" : `${rootCause ?? "?"} → proposes ${action}`,
+    summary: degraded ? "degraded to a safe fallback, no diagnosis reached" : `${rootCause ?? "?"} → proposes ${action}`,
     detail: [
       { label: "root cause", value: degraded ? "none (degraded)" : (rootCause ?? "—") },
       { label: "confidence", value: degraded ? "—" : confidence.toFixed(2) },
@@ -121,10 +121,10 @@ function newGate(ev: RawEvent): Activity {
   const tone: Tone = outcome === "allow" ? "clear" : "deny";
   const summary =
     outcome === "allow"
-      ? "within every limit — proposal unchanged"
+      ? "within every limit, proposal unchanged"
       : outcome === "skip"
-        ? `skipped this attempt — ${rule} (${detailText})`
-        : `clamped ${proposed} → ${applied} — ${rule}`;
+        ? `skipped this attempt: ${rule} (${detailText})`
+        : `clamped ${proposed} → ${applied}: ${rule}`;
   const detail: DetailRow[] =
     outcome === "allow"
       ? [
@@ -187,9 +187,9 @@ function closeExecute(a: Activity, ev: RawEvent): void {
     status === "RECOVERED"
       ? `captured ${rupees(recoveredPaise)}${ref ? ` · ${ref}` : ""}`
       : status === "COMPLETED"
-        ? `completed${p.detail ? ` — ${p.detail}` : ""}`
-        : status === "FAILED"
-          ? `failed${p.detail ? ` — ${p.detail}` : ""}`
+        ? `completed${p.detail ? `: ${p.detail}` : ""}`
+          : status === "FAILED"
+          ? `failed${p.detail ? `: ${p.detail}` : ""}`
           : `awaiting settlement${ref ? ` · ${ref}` : ""}`;
   a.detail.push({ label: "status", value: status });
   if (recoveredPaise > 0) a.detail.push({ label: "recovered", value: rupees(recoveredPaise) });
@@ -216,7 +216,7 @@ function newOutcome(ev: RawEvent, rationale?: string): Activity {
       tone: "deny",
       startedAt: ev.at,
       endedAt: ev.at,
-      summary: reason === "user_requested" ? "stopped on your request" : `stopped — ${reason}`,
+      summary: reason === "user_requested" ? "stopped on your request" : `stopped: ${reason}`,
       detail: [
         { label: "reason", value: reason },
         ...(str(p.note) ? [{ label: "note", value: str(p.note)! }] : []),
