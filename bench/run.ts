@@ -72,7 +72,10 @@ async function main(): Promise<void> {
   console.error(`loaded ${downtimes.length} live downtimes from Razorpay`);
 
   const armsToRun: Arm[] = values.arm ? [values.arm as Arm] : ALL_ARMS;
-  const budget = createBudget(Number(values["cap-usd"]));
+  const budget = createBudget(Number(values["cap-usd"]), {
+    usdPerMInput: config.AGENT_USD_PER_M_INPUT,
+    usdPerMOutput: config.AGENT_USD_PER_M_OUTPUT,
+  });
 
   const agentRunner: AgentRunner = !armsToRun.includes("agent")
     ? fixedScheduleRunner
@@ -114,7 +117,9 @@ async function main(): Promise<void> {
     const records = await collect(corpus, cases, attempts, truth, timing);
     console.error(
       `${arm}: ${corpus.length} cases in ${((Date.now() - started) / 1000).toFixed(1)}s` +
-        (arm === "agent" && !values.mock ? ` · ${budget.calls} model calls, ~$${budget.estUsd.toFixed(3)} est` : ""),
+        (arm === "agent" && !values.mock
+          ? ` · ${budget.calls} model calls, ${budget.inputTokens}/${budget.outputTokens} tokens, $${budget.usdUsed.toFixed(4)}`
+          : ""),
     );
     results[arm] = records;
     await runs.finish(runId, { ...scoreArm(arm, records) });
@@ -127,7 +132,7 @@ async function main(): Promise<void> {
   // would silently change what the list means.
   const exceptionArm = results.agent ? "agent" : results.fixed ? "fixed" : null;
   const exceptions = exceptionArm ? exceptionList(results[exceptionArm as "agent" | "fixed"]!) : [];
-  console.log(formatReport(agentM, fixedM, exceptions, rulesM, exceptionArm ?? undefined));
+  console.log(formatReport(agentM, fixedM, exceptions, rulesM, exceptionArm ?? undefined, budget));
 
   await pool.end();
 }

@@ -17,6 +17,11 @@ const schema = z.object({
   AGENT_TIMEOUT_MS: z.coerce.number().int().positive().default(90_000),
   AGENT_STEP_BUDGET: z.coerce.number().int().positive().default(6),
   AGENT_SESSION_CAP_USD: z.coerce.number().positive().default(0.5),
+  // Token counts are measured off the provider's usage block; these rates turn them into money and
+  // are a declared input, not a measurement. Defaults are the Gemini API standard tier — change
+  // them with the model, and after any pricing change.
+  AGENT_USD_PER_M_INPUT: z.coerce.number().nonnegative().default(1.5),
+  AGENT_USD_PER_M_OUTPUT: z.coerce.number().nonnegative().default(7.5),
   PORT: z.coerce.number().int().positive().default(3000),
   HOST: z.string().default("localhost"),
   DEMO_ACCESS_TOKEN: optionalString,

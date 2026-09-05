@@ -1,82 +1,87 @@
 # RecoveryOps
 
-A payment recovery system where AI handles contextual investigation and strategy, while deterministic code retains financial authority.
+**A decision-making and execution system for ambiguous payment failures.**
 
-Built for **Razorpay AI Buildathon 2026 - Track 3 (AI Revenue Recovery)**.
+Built for Razorpay AI Buildathon 2026 — Track 3: AI Revenue Recovery.
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-blue?logo=typescript&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-223%20passing-green)
+![Tests](https://img.shields.io/badge/tests-230%20passing-green)
 ![Razorpay](https://img.shields.io/badge/Razorpay-Test%20Mode-blue)
 
 ---
 
-## What it does
+## The problem
 
-RecoveryOps processes failed payments through a three-stage pipeline:
+A payment gateway can detect that a charge failed. It cannot tell you whether the failure is a
+transient bank timeout (retry in 24 hours), a customer whose account will never fund (write off),
+or a risk hold that a human must approve (escalate). Every one of those cases has the same
+`error_reason` field from Razorpay. The right recovery action differs by context, and context
+requires investigation.
 
-**1. Investigation (AI)**
-
-A bounded agent investigates each case using four tools:
-- Customer payment history (success rate, cadence, prior attempts)
-- Live Razorpay downtime feed (issuer-specific bank outages)
-- Similar resolved cases (what recovery actions worked for this failure reason)
-- Recovery playbook (mechanism-level guidance, no timing hints)
-
-The agent proposes one recovery action with a root-cause diagnosis and confidence score. The loop is bounded by a step budget (8), a wall-clock deadline (60s), and a forced conclusion on the last step. On timeout or error, it degrades to a safe 48-hour retry.
-
-**2. Safety gate (deterministic)**
-
-Every proposal passes through a pure function that enforces nine rules:
-
-| Rule | Enforces | Human override |
-|------|----------|---------------|
-| Risk hold | `payment_risk_check_failed` → escalate | Yes |
-| Hard decline | Never auto-retry card-issuer permanent declines | No |
-| Attempt cap | Maximum 4 attempts per case | No |
-| Exposure cap | ₹5,000 per case | Yes |
-| Confidence floor | Agent must meet 0.6 confidence to move money | No |
-| Charge cooldown | 6 hours between attempts that move money | No |
-| Contact cooldown | 24 hours between customer nudges | No |
-| Contact window | Customer contact only 08:00-19:00 IST (RBI Fair Practices) | No |
-| Write-off diagnosis | Can't write off without an unrecoverable root cause | No |
-
-The gate reads risk holds and hard declines directly from the case's `failureReason`, independent of what the agent diagnosed. It can clamp (retry → escalate), skip (cooldown violation), or allow. It cannot make a proposal less cautious.
-
-**3. Idempotent execution**
-
-One attempt = one `idempotency_key` = at most one Razorpay order/link. The key is unique at the DB level. The attempt row is inserted before any Razorpay call, so a crash mid-flight leaves a durable claim.
-
-On a 5xx or timeout, the system does not assume success or failure. It re-checks `GET /payments/:id` before concluding. Ambiguous attempts land in `AWAITING_RECONCILIATION` and are settled by webhook or reconciliation sweep.
-
-Every proposal, gate decision, Razorpay call, and outcome is recorded in `recovery_events`. The application DB role has `SELECT, INSERT` permissions only. No `UPDATE`, no `DELETE`. Enforced at the Postgres GRANT level.
-
-**Core principle: AI proposes. Deterministic code decides what is allowed.**
+Standard dunning logic retries on a fixed schedule regardless of cause. That racks up decline
+fees, irritates customers whose cards are genuinely broken, and misses customers who would have
+paid if reached through the right channel at the right time.
 
 ---
 
-## Example: Bank downtime override
+## What RecoveryOps does
 
-The agent's value shows when context overrides historical patterns:
+RecoveryOps answers one question per failed payment: **what is the right recovery action for this specific case, and is it safe to execute?**
+
+The hard problem in payment recovery is not detecting failures — every gateway does that. It is deciding what to do about each one. A bank timeout needs a different action than an expired card, which needs a different action than a risk hold. Standard retry logic applies the same schedule to all three. RecoveryOps runs a bounded investigation per case, proposes the contextually appropriate action, and enforces a deterministic safety contract before any money moves.
 
 ```
-card_declined
-     ↓
-customer history: 4 successful payments, monthly payer
-     ↓
-similar resolved cases: payment link worked 4/5 times
-     ↓
-bank downtime tool: Bank of India, active high-severity outage
-     ↓
-agent conclusion: payment link would fail if issuing bank is down
-     ↓
-proposed action: retry after downtime window instead of following the 4/5 pattern
+Failed Payment
+      ↓
+Bounded Investigation Agent
+      ↓                      ← customer history · bank downtime · similar cases · prior attempts
+Recovery Proposal
+ (action · root cause · confidence)
+      ↓
+Deterministic Safety Gate
+ (9 rules, pure function)
+      ↓               ↓               ↓
+   Allow           Clamp to        Skip and
+   execution       ESCALATE        reschedule
+      ↓
+Idempotent Razorpay execution
+      ↓
+Recovered / Failed / AWAITING_RECONCILIATION
+      ↓
+Reconcile / Audit / Re-plan
 ```
 
-**Same failure code. Different context. Different action.**
+**The agent can change its mind. The safety layer cannot.**
 
-The demo GIF below shows this case being worked in real-time:
+The agent proposes a strategy. The gate holds financial authority. Every outcome is recorded in an
+append-only audit log the application cannot modify.
 
-![Agent investigating Bank of India downtime and scheduling a retry instead of sending a payment link](demo.gif)
+---
+
+## Recovery lifecycle
+
+1. A `payment.failed` webhook arrives. HMAC-verified. Written into a deduplicated inbox. A new
+   case is created and queued.
+
+2. The agent runs a bounded investigation: up to 6 steps, 60-second wall-clock deadline. It calls
+   up to five tools and proposes one action with a root cause and confidence score. If the deadline
+   or step budget fires, it degrades to a 48-hour retry with a `null` root cause — never a guessed
+   one.
+
+3. Every proposal passes through the safety gate. The gate enforces nine deterministic rules (risk
+   hold, hard decline, attempt cap, exposure cap, confidence floor, charge cooldown, contact
+   cooldown, RBI contact window, write-off diagnosis check). It can clamp (escalate the action),
+   skip (defer), or allow. It cannot make a proposal less cautious than what the agent proposed.
+
+4. If allowed, the executor claims the attempt row (with a `UNIQUE idempotency_key`) before
+   touching Razorpay. One key = at most one Razorpay order or payment link. A 5xx or timeout lands
+   the attempt in `AWAITING_RECONCILIATION` — the executor re-checks `GET /orders/:id/payments` or
+   `GET /payment_links/:id` and settles only on a genuinely captured payment. It never concludes
+   from list absence.
+
+5. Every event — proposal, gate decision, Razorpay call, outcome — is appended to
+   `recovery_events`. The application DB role has `SELECT, INSERT` only. No `UPDATE`, no
+   `DELETE`. Enforced at the Postgres `GRANT` level.
 
 ---
 
@@ -84,25 +89,25 @@ The demo GIF below shows this case being worked in real-time:
 
 ```mermaid
 flowchart TD
-    FP["Failed Payment"]
-    
-    FP --> AGT["AI Investigation<br/>(customer history · bank downtime<br/>similar cases · playbook)"]
-    
+    FP["payment.failed webhook"]
+
+    FP --> AGT["AI Investigation<br/>(customer history · bank downtime<br/>similar cases · playbook · prior attempts)"]
+
     AGT --> PROP["Recovery Proposal<br/>(action · root cause · confidence)"]
-    
+
     PROP --> GATE["Safety Gate<br/>(9 deterministic rules)"]
-    
+
     GATE -- "allow" --> EX["Idempotent Execution"]
     GATE -- "clamp" --> ESC["Escalate to human"]
     GATE -- "skip" --> RS["Reschedule"]
-    
+
     EX <--> RZ["Razorpay<br/>test mode"]
-    EX --> OUT["Recovered / Failed"]
-    
-    AGT -. "append" .-> LOG["Audit Log<br/>(INSERT only)"]
+    EX --> OUT["Recovered / Failed / AWAITING_RECONCILIATION"]
+
+    AGT -. "append" .-> LOG["Audit Log<br/>(INSERT only · GRANT-enforced)"]
     GATE -. "append" .-> LOG
     EX -. "append" .-> LOG
-    
+
     style AGT fill:#1e1b4b,stroke:#6366f1,color:#e0e7ff
     style GATE fill:#1a2e1a,stroke:#22c55e,color:#dcfce7
     style LOG fill:#1c1917,stroke:#78716c,color:#d6d3d1
@@ -121,98 +126,181 @@ flowchart TD
 api / worker / bench → agent · safety · execution · persistence → domain
 ```
 
-- `domain/` imports nothing from other `src/` folders. Pure functions and types only.
-- `agent/`, `safety/`, `execution/`, `persistence/` depend on `domain/` and on interfaces, never on `pg`, Razorpay SDK, or BullMQ types leaking upward.
-- `worker/`, `api/`, `bench/` orchestrate. They hold no business rules.
-- HTTP DTOs, DB rows, Razorpay responses, and domain objects are distinct types. Convert explicitly at the boundary (Zod).
+`domain/` has no imports from other `src/` packages. `agent/`, `safety/`, `execution/`,
+`persistence/` depend on `domain/` interfaces — not on `pg`, Razorpay SDK, or BullMQ types.
+`worker/`, `api/`, `bench/` orchestrate and hold no business rules.
 
-[`tests/architecture.test.ts`](./tests/architecture.test.ts) walks every import and asserts no layer violations.
+[`tests/architecture.test.ts`](./tests/architecture.test.ts) walks every import and asserts no
+layer violations at test time.
+
+---
+
+## Safety guarantees
+
+| Rule | Enforces | Overridable by human |
+|------|----------|---------------------|
+| Risk hold | `payment_risk_check_failed` always escalates | Yes |
+| Hard decline | Card-network permanent declines never auto-retry | No |
+| Attempt cap | Maximum 4 attempts per case | No |
+| Exposure cap | ₹5,000 per case before human sign-off | Yes |
+| Confidence floor | Agent must meet 0.6 confidence to move money | No |
+| Charge cooldown | 6 hours between money-moving attempts | No |
+| Contact cooldown | 24 hours between customer-facing actions | No |
+| Contact window | 08:00–19:00 IST only (RBI Fair Practices Code) | No |
+| Write-off gate | Cannot write off without an unrecoverable root cause | No |
+
+The gate is a pure function. Same inputs → same output. No I/O, no state. The safety-gate test
+suite (`tests/safety-gate.test.ts`) runs exhaustive property checks across 4,608 input
+combinations and pins every rule. The gate was rewritten after a real bug: the risk-hold veto was
+originally wired to the agent's *diagnosis* (which could be wrong) rather than the case's own
+`failureReason` (which cannot be spoofed). That bug is documented in
+[`BREAKS.md`](./BREAKS.md).
+
+---
+
+## Razorpay integration
+
+RecoveryOps uses Razorpay's test mode. The integration is live: real API calls, real HMAC webhook
+verification, real order and payment-link creation, real capture events. None of it is mocked
+during normal operation.
+
+Key Razorpay behaviours discovered empirically (documented in [`BREAKS.md`](./BREAKS.md)):
+
+- `receipt` is not a unique field at Razorpay. `reference_id` is. We use `reference_id`.
+- Order list responses are eventually consistent. A 5xx mid-create cannot be resolved by checking
+  the list. We re-check `GET /orders/:id/payments` for the specific artifact we created.
+- Throttling comes back as a `400`, not a `429`.
+
+The executor claims an attempt row with a `UNIQUE idempotency_key` *before* calling Razorpay.
+This is exactly-once recovery attempt semantics at our execution boundary: the database physically
+rejects a second claim on the same attempt, so a crash between claim and dispatch produces one
+eventual execution, not two.
 
 ---
 
 ## Evaluation
 
-60 synthetic cases, same gate and executor, three different strategies:
+60 synthetic cases, same gate and executor, three strategies. The last column reruns each arm with
+Razorpay's `error_reason` label blanked out:
 
-| Strategy            | Recovered | Recovery Rate |  ₹ Recovered | Root-Cause Accuracy |
-|---------------------|----------:|--------------:|-------------:|--------------------:|
-| Fixed schedule      |    20 /60 |         33.3% |      ₹31,480 |   - (no diagnosis)  |
-| AI agent            |    33 /60 |         55.0% |      ₹51,967 |              73.3%  |
-| Deterministic rules |    36 /60 |         60.0% |      ₹56,464 |   - (no diagnosis)  |
+| Strategy | Recovered | Recovery Rate | ₹ Recovered | Root-Cause Accuracy | Rate, label hidden |
+|----------|----------:|--------------:|------------:|--------------------:|-------------------:|
+| Fixed schedule | 20/60 | 33.3% | ₹31,480 | — (no diagnosis) | 33.3% |
+| AI agent | 33/60 | 55.0% | ₹51,967 | 73.3% | **45.0%** |
+| Deterministic rules | 36/60 | 60.0% | ₹56,464 | — (no diagnosis) | **33.3%** |
 
-### Result
+### What the result actually means
 
-**The rules baseline wins.** A 6-line switch on `error_reason` ([`bench/rules-arm.ts`](./bench/rules-arm.ts)) recovered more revenue than the agent on this corpus.
+**The rules baseline wins by three cases.** A 6-line switch on `error_reason`
+([`bench/rules-arm.ts`](./bench/rules-arm.ts)) recovered ₹4,497 more than the agent. That is the
+published number, and it stands as it came out.
 
-The agent reached 73.3% root-cause diagnosis accuracy, graded separately so one metric cannot hide the other. The rules table cannot diagnose at all - it has no concept of *why* a payment failed.
+**It wins by reading a label it did not compute.** Hide that label and the rules table falls to
+33.3% — a dead tie with a dumb calendar — while the agent holds 45.0%. The switch statement is a
+lookup on a field the issuer's response filled in. The agent is the only arm that still works
+without it, and the only one that can say *why* a payment failed: 73.3% root-cause accuracy
+against baselines with no concept of cause.
 
-The evaluation was designed to measure where AI judgment adds value, not to make AI look good.
+Both results came out of the same harness. The evaluation was designed to measure where AI
+judgment adds value, not to make AI look good.
 
-**These are test-mode simulations, not real merchant revenue.** The benchmark uses Razorpay's own `error_reason` values and synthetic ground truth for recoverability.
+### Five seeds, and a blind control
 
-See [`bench/`](./bench/) for the full evaluation code.
+Across seeds 42, 7, 13, 99, and 2024 the agent recovers **50.0–58.3%** against the rules table's
+**55.0–63.3%**. The rules table's win is consistent across seeds, not a lucky draw.
+
+`--blind-reason` replaces every `failureCode` and `failureReason` with a single generic value
+before it reaches any arm, leaving ground truth untouched:
+
+| blind-reason, seed 42 | agent | fixed | rules |
+|-----------------------|------:|------:|------:|
+| recovery rate | 45.0% | 33.3% | 33.3% |
+| ₹ recovered | ₹42,473 | ₹31,480 | ₹31,480 |
+| root-cause accuracy | 31.7% | — | — |
+
+```bash
+AGENT_MODEL=google/gemini-3.6-flash npm run bench -- --size 60 --seed 42 --mock --blind-reason
+```
+
+### What the agent missed
+
+Of the 27 unrecovered cases on seed 42:
+
+- **16 are correct stops.** 8 risk holds (must go to a human by policy) and 8 genuinely unfunded
+  accounts. These are not misses.
+- **11 are real misses.** Mostly bank-downtime and generic-decline cases where a retry timed past
+  the window.
+
+The largest systematic error: **all 8 genuinely-unfunded cases were diagnosed as
+`insufficient_funds`**. Both templates carry the same Razorpay `error_reason`. The only
+separating signal is a rising failure trend in customer history. The agent read the label, not the
+trend.
+
+Every case, including every miss, has its full tool-call trace in
+[`bench/.cache/`](./bench/.cache/).
+
+### Cost
+
+A live 8-case slice on seed 2025, measured from the provider's own usage blocks:
+
+| | measured |
+|---|---:|
+| model calls | 89 |
+| input / output tokens | 188,823 / 23,925 |
+| cost @ $1.50 / $7.50 per M | **$0.4627** |
+| cost per recovery | **$0.1542** |
+| ₹ recovered per $1 of model spend | **₹9,720** |
+
+The five committed seed runs predate the token meter — their cost is not published.
+`--mock` replays any of them at zero model calls.
 
 ---
 
 ## What broke
 
-### Risk-hold wiring bug
+15 failures documented in [`BREAKS.md`](./BREAKS.md), written as they were found. Two worth
+naming here:
 
-The safety gate had a risk-hold veto reading `proposal.diagnosisRootCause === "risk_hold"` plus an optional `riskHoldForCase` callback. The callback was optional and wasn't passed at any construction site.
-
-**Impact**: A misdiagnosed risk-flagged payment would have bypassed the one rule that exists to force a human decision.
-
-**Fix**: The gate now reads `isRiskHold(kase)` directly from the case's `failureReason`, independent of what the agent concluded.
-
-**Proof**: [`tests/pipeline.integration.test.ts`](./tests/pipeline.integration.test.ts) drives a risk-flagged payment through a deliberately wrong model, asserts the gate escalates it, and verifies **zero calls to Razorpay**:
+**Risk-hold veto was wired to the wrong signal.** The gate read `proposal.diagnosisRootCause ===
+"risk_hold"` — meaning a misdiagnosed case could bypass human review. Fix: the gate now reads
+`failureReason` directly from the case, independent of diagnosis. Proof:
 
 ```bash
 npm test -- pipeline.integration.test.ts -t "escalates a risk-hold case"
 ```
 
-### Benchmark leakage
+**Benchmark leaked the answer key.** Failed attempt rows contained strings like `"too early,
+recovers at +72h"`. The agent read prior attempts as a tool and was reading ground truth. Fix:
+failed outcomes now return `"payment declined"`. The honest number dropped. The number was
+republished.
 
-The benchmark wrote failure detail onto attempt rows with strings like `"too early, recovers at +72h"`. The agent reads prior attempts as a tool. On its second turn, it was reading the answer key.
-
-**Fix**: Every failed outcome now returns a flat `"payment declined"` string. A test enforces this and fails if any recovery hint reaches the agent.
-
-**Cost**: The honest number after the fix was 45% agent vs 47% fixed - the agent was briefly losing. The old headline was retired.
-
-**Outcome**: The corpus was hardened, the prompt de-spoonfed, the agent re-recorded on a better model. Final result: 55% agent vs 60% rules. The rules table still wins, and that's the published number.
-
-See [`BREAKS.md`](./BREAKS.md) for 13 other failures, including:
-- The escalation rail that used to be a dead end
-- The dedupe that could permanently drop a real capture
-- The schema apply script that silently ran a truncated file
-- The cache that silently replayed stale recordings
+Other entries: the escalation rail that was a dead end, the dedup that could drop a real capture,
+the schema script that silently ran truncated, the cache that replayed stale recordings, the spend
+cap that ran 2.1× under the real bill.
 
 ---
 
-## Reliability
+## Scope and known boundaries
 
-### Ambiguous Razorpay responses
+The build was deliberately focused on the decision-making and execution core — the parts that
+are hardest to get right and easiest to get wrong invisibly. Known boundaries:
 
-A 5xx or timeout mid-create does not tell us whether the order/link was created. Razorpay's order list is eventually consistent (lag on the order of minutes).
-
-**Fix**: The attempt row's own `UNIQUE idempotency_key` is authoritative. Ambiguous creates land in `AWAITING_RECONCILIATION`. The executor re-checks `GET /payments/:id` before concluding.
-
-**Principle**: Never assume an ambiguous payment attempt succeeded or failed without reconciliation.
-
-### Idempotent execution
-
-One attempt = one `idempotency_key` = at most one Razorpay order/link. The key is unique at the DB level. The attempt row is inserted *before* any Razorpay call, so a crash mid-flight leaves a durable claim, never a lost or doubled attempt.
-
-### Webhook deduplication
-
-Duplicate Razorpay webhooks (same event ID) are deduplicated. If the process died between recording the event ID and settling the attempt, a redelivery settles it instead of being treated as a no-op.
-
-### Append-only event log
-
-Every proposal, gate decision, Razorpay call, and outcome is recorded in `recovery_events`. The application database role has `SELECT, INSERT` permissions only. No `UPDATE`, no `DELETE`. Enforced at the Postgres GRANT level, not by convention.
-
-See [`db/schema.sql`](./db/schema.sql) line 88.
-
-An integration test connects as `recovery_app`, tries to UPDATE the event log, and expects the database to refuse.
+- **Razorpay test mode.** The API surface, HMAC verification, order/link creation, and capture
+  webhooks are all live. The keys are test-mode. No real merchant revenue is at risk.
+- **Synthetic corpus.** 60 cases generated from templates. The rules baseline wins partly because
+  `error_reason` is a clean signal on a templated distribution; on a real corpus with messier
+  failure patterns the agent's contextual reasoning has more room to differentiate.
+- **Outbound messaging is scoped out.** The agent decides `CUSTOMER_NUDGE` (with channel) or
+  `PAYMENT_LINK` (with rail). The execution layer records the action and the contact attempt
+  count. Dispatching to a messaging provider (Twilio, Exotel, MSG91) is the next integration
+  layer — the domain type and safety rules for it are already in place.
+- **Card payments.** UPI and netbanking origination work; mandate/subscription recovery (UPI
+  Autopay NPCI retry windows, NACH lapse handling) is not modelled.
+- **Single-tenant.** One `MERCHANT_REF` per deployment. Multi-tenant row isolation is not built.
+- **Token cost is session-level.** Metered correctly per bench run; not written per-event into
+  `recovery_events`. Adding it there is the obvious next instrumentation step.
+- **Concurrency is tested; throughput is not.** Executor races and webhook races have integration
+  tests. High-volume load testing has not been done.
 
 ---
 
@@ -220,111 +308,84 @@ An integration test connects as `recovery_app`, tries to UPDATE the event log, a
 
 | Layer | Technology | Why |
 |-------|-----------|-----|
-| Runtime | Node 20+ / TypeScript (ESM) | Type safety at boundaries, ESM for clean imports |
-| API | Fastify | HTTP API and schema validation |
-| Database | PostgreSQL 16 | ACID transactions, row-level locks for concurrency, role-based grants for append-only |
-| Queue | Redis + BullMQ | Durable job queue, supports priorities and delays |
-| Agent | Vercel AI SDK v7 + hand-rolled loop | Tool-use standardized, streaming built-in. Loop is owned code (step budget, deadline, degrade-to-safe) |
-| LLM | OpenRouter + Google Gemini | No minimum spend, no cloud billing. Model is env-configurable |
+| Runtime | Node 22 / TypeScript (ESM) | Type safety at every boundary |
+| API | Fastify | HTTP, schema validation, SSE |
+| Database | PostgreSQL 16 | ACID, row-level locks, role-based grants |
+| Queue | Redis + BullMQ | Durable jobs, delay scheduling |
+| Agent loop | Vercel AI SDK v7 + hand-rolled | SDK standardises tool calls; the loop is owned code |
+| LLM | OpenRouter / Google Gemini | Model is env-configurable; no vendor lock-in |
 | Validation | Zod | Runtime schema validation at every external boundary |
-| Gateway | Razorpay test mode | Real Orders, Payment Links, Checkout, webhook signatures |
-| Frontend | React + Vite | Fast dev loop, streaming hooks |
-| Container | Docker Compose | Single-command dev environment |
-| Testing | Vitest | Fast, native ESM support, 223 tests |
+| Gateway | Razorpay test mode | Real API calls, real HMAC |
+| Frontend | React + Vite | Streaming hooks, fast dev loop |
+| Container | Docker Compose | Single-command environment |
+| Testing | Vitest | 230 tests, ESM-native |
 
-No agent framework (the bounds are the product, not framework config). No ORM (would cost the DB-grant proof). No DI container.
+No agent framework — the bounds are the product, not framework config. No ORM — would cost the
+DB-grant proof. No DI container.
 
----
+### What changes in production
 
-## Repository map
+The only layer running in test mode is the Razorpay gateway. These are the production swaps:
 
-```
-src/
-├── agent/          # Bounded tool loop, prompt, tools
-├── safety/         # Deterministic safety gate (pure function)
-├── execution/      # Razorpay client, attempt executor, webhook handler
-├── persistence/    # Postgres repositories, event log
-├── worker/         # BullMQ pipeline: case → agent → gate → executor → record
-├── domain/         # Pure types and business rules, zero I/O
-└── api/            # Fastify routes, SSE streams
-
-bench/              # Three-arm evaluation (agent, fixed, rules)
-web/                # React UI: case flow, agent reasoning stream, scoreboard
-db/                 # Schema, role grants
-tests/              # 223 tests, including safety-gate property tests
-```
+| What | Demo | Production |
+|------|------|-----------|
+| Razorpay | Test mode keys | Live keys; same API surface, same idempotency logic |
+| Database | Docker Compose Postgres | Managed Postgres — schema and grants identical |
+| Queue | Docker Compose Redis | Managed Redis (Upstash, ElastiCache) |
+| LLM | OpenRouter / AI Studio key | Same providers, production keys |
+| Auth | Single shared token | Per-merchant JWT |
+| Outreach | `CUSTOMER_NUDGE` logged, not dispatched | Messaging provider (Twilio, Exotel, MSG91) |
 
 ---
 
-## Run locally
+## Repository structure
+
+```
+src/            Backend — see src/README.md for the engineering deep-dive
+bench/          Three-arm evaluation harness (agent · fixed · rules)
+web/            React UI — see web/README.md for layout and live-vs-demo data
+db/             Schema and role grants
+tests/          230 tests
+BREAKS.md       15 documented failures, written as found
+```
+
+---
+
+## Quickstart
 
 ```bash
 git clone https://github.com/Mithurn/RecoveryOps.git
 cd RecoveryOps
-
-# 1. Environment
 cp .env.example .env
-# Fill in:
-#   OPENROUTER_API_KEY (or GOOGLE_GENERATIVE_AI_API_KEY)
-#   RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET (test mode)
-#   RAZORPAY_WEBHOOK_SECRET
+# fill: OPENROUTER_API_KEY (or GOOGLE_GENERATIVE_AI_API_KEY)
+#       RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET (test mode keys)
+#       RAZORPAY_WEBHOOK_SECRET
 
-# 2. Infrastructure
-docker compose up -d    # Postgres :5434, Redis :6381
-
-# 3. Install
+docker compose up -d          # Postgres :5434, Redis :6381
 npm install
-
-# 4. Database + seed
-npm run db:schema       # Apply schema
-npm run seed:room       # Seed from recorded benchmark
-
-# 5. Run
-npm run dev             # API :3000, Web :5173
-
-# 6. Tests
-npm test                # All 223 tests
-
-# 7. Specific safety regression tests
-npm test -- pipeline.integration.test.ts -t "escalates a risk-hold case"
-npm test -- safety-gate.test.ts -t "risk hold"
+npm run db:schema             # apply schema + role grants
+npm run seed:room             # seed Recovery Room from recorded bench
+npm run dev                   # API :3000, web :5173
+npm test                      # 230 tests
 ```
 
-### Evaluation
+### Reproduce the evaluation
 
 ```bash
-# Replay the recorded benchmark (free, ~1s)
-AGENT_MODEL=google/gemini-3.6-flash npm run bench -- --size 60 --mock
+# Replay recorded runs — free, ~1s
+AGENT_MODEL=google/gemini-3.6-flash npm run bench -- --size 60 --seed 42 --mock
 
-# Run a fresh agent evaluation ($1.20-1.35, ~5min)
-AGENT_MODEL=google/gemini-3.6-flash npm run bench -- --size 60 --cap-usd 3.00
+# Blind-reason control
+AGENT_MODEL=google/gemini-3.6-flash npm run bench -- --size 60 --seed 42 --mock --blind-reason
 
-# Rules baseline only (no model, free)
-npm run bench -- --arm rules --size 60 --mock
+# Live run with token metering (~$3, ~5min)
+AGENT_MODEL=google/gemini-3.6-flash npm run bench -- --size 60 --seed 2025 --cap-usd 5.00
 ```
 
 ---
 
-## Limitations
+**Backend deep-dive:** [`src/README.md`](./src/README.md)
 
-- **Razorpay test mode.** No real merchant traffic. Incoming failures are synthetic.
-- **60-case benchmark.** Small corpus, templated. Rules baseline wins because the template's `failureReason` is the answer key.
-- **One merchant, one currency.** No multi-tenancy.
-- **Card-focused.** No UPI/netbanking origination, no subscriptions or mandates.
-- **Human intervention required.** Escalated cases need manual resolution.
-- **`CUSTOMER_NUDGE` is a labeled stub.** No email/SMS/WhatsApp provider is wired.
-- **Not production-ready.** This is a bounded evaluation system, not a production payment recovery platform.
+**Frontend deep-dive:** [`web/README.md`](./web/README.md)
 
----
-
-## Conclusion
-
-RecoveryOps demonstrates where AI judgment adds value in payment recovery: diagnosing root causes and adapting strategy to context. The agent reached 73% root-cause accuracy on a synthetic benchmark. A simpler rules table recovered more revenue.
-
-The separation of concerns remains:
-
-> **AI owns recovery strategy.**
->
-> **Deterministic code owns authority.**
-
-**Built for Razorpay AI Buildathon 2026** by [Mithurn](https://github.com/Mithurn).
+**Failure log:** [`BREAKS.md`](./BREAKS.md)

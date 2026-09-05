@@ -39,6 +39,19 @@ export type ExceptionRow = {
   attempts: string;
 };
 
+// What the agent arm actually cost to run, read off the provider's own usage blocks. Only a live
+// run produces one — a --mock replay makes no model calls, so there is nothing to report and the
+// section is omitted rather than printed as zero.
+export type SpendSummary = {
+  calls: number;
+  inputTokens: number;
+  outputTokens: number;
+  callsWithoutUsage: number;
+  usdUsed: number;
+  usdPerMInput: number;
+  usdPerMOutput: number;
+};
+
 const div = (a: number, b: number) => (b === 0 ? 0 : a / b);
 
 function moneyMoves(a: Attempt): boolean {
@@ -108,12 +121,32 @@ export function exceptionList(records: CaseRecord[]): ExceptionRow[] {
     }));
 }
 
+function spendLines(spend: SpendSummary, agent: ArmMetrics): string[] {
+  const pad = (label: string, v: string) => `  ${label.padEnd(28)}${v.padStart(16)}`;
+  // Counts, not money — en-IN lakh grouping on a token total reads as a typo.
+  const n = (v: number) => v.toLocaleString("en-US");
+  return [
+    "",
+    `model spend — agent arm, measured from provider usage:`,
+    pad("model calls", n(spend.calls)),
+    pad("input tokens", n(spend.inputTokens)),
+    pad("output tokens", n(spend.outputTokens)),
+    // Surfaced even at zero: a nonzero count means part of the bill below is the flat per-call
+    // fallback rather than metered tokens, and the reader has to know which.
+    pad("calls with no usage block", n(spend.callsWithoutUsage)),
+    pad(`cost @ $${spend.usdPerMInput}/$${spend.usdPerMOutput} per M`, `$${spend.usdUsed.toFixed(4)}`),
+    pad("cost per recovery", agent.recovered === 0 ? "—" : `$${(spend.usdUsed / agent.recovered).toFixed(4)}`),
+    pad("₹ recovered per $1 spent", spend.usdUsed === 0 ? "—" : `₹${Math.round(agent.recoveredPaise / 100 / spend.usdUsed).toLocaleString("en-IN")}`),
+  ];
+}
+
 export function formatReport(
   agent: ArmMetrics,
   fixed: ArmMetrics,
   exceptions: ExceptionRow[],
   rules?: ArmMetrics,
   exceptionArm?: string,
+  spend?: SpendSummary,
 ): string {
   const rupees = (p: number) => `₹${(p / 100).toLocaleString("en-IN")}`;
   const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
@@ -139,6 +172,7 @@ export function formatReport(
     row("over-nudge rate", (m) => pct(m.overNudgeRate)),
     row("root-cause accuracy", (m) => (m.rootCauseAccuracy === null ? "— (no diagnosis)" : pct(m.rootCauseAccuracy))),
     row("undiagnosed (degraded)", (m) => (m.rootCauseAccuracy === null ? "—" : `${m.undiagnosed}/${m.cases}`)),
+    ...(spend && spend.calls > 0 ? spendLines(spend, agent) : []),
     "",
     exceptionArm ? `exceptions — ${exceptionArm} arm (${exceptions.length}):` : "exceptions (no arm ran):",
     ...exceptions.slice(0, 40).map((e) => `  ${e.customerRef}  ${e.failureReason}  ${e.lane}  — ${e.groundTruthNote}`),

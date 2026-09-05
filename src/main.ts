@@ -73,7 +73,10 @@ const pipeline = new RecoveryPipeline({
             openRouterApiKey: config.OPENROUTER_API_KEY,
             googleApiKey: config.GOOGLE_GENERATIVE_AI_API_KEY,
           }),
-          createBudget(config.AGENT_SESSION_CAP_USD),
+          createBudget(config.AGENT_SESSION_CAP_USD, {
+            usdPerMInput: config.AGENT_USD_PER_M_INPUT,
+            usdPerMOutput: config.AGENT_USD_PER_M_OUTPUT,
+          }),
         ),
         stepBudget: config.AGENT_STEP_BUDGET,
         deadlineMs: config.AGENT_TIMEOUT_MS,

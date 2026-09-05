@@ -37,6 +37,7 @@ The most consequential failures, grouped by impact:
 **Infrastructure:**
 11. **Benchmark cache replayed stale recordings** — Zero model calls looked like a valid result
 12. **Schema bind-mount served truncated file** — GRANT statements past line 97 were skipped
+13. **Spend cap charged a flat constant, 2.1x low** — No code path had ever read a token count
 
 Each failure below documents what broke, how it was found, and what prevents recurrence.
 
@@ -425,3 +426,33 @@ generated with it present. The README states the echo explicitly next to the eva
 **Safeguard:** the disclosure; and the real fix for a future corpus is diversifying settle hours
 per template (per-case jitter on the ground-truth `atHour`), which would blur the echo without
 touching any tool.
+
+---
+
+## The spend cap was guessing, and it guessed 2.1x low
+
+**Expected:** `AGENT_SESSION_CAP_USD` bounds what a session can spend, and the cost figures this
+repo quotes are close enough to the bill to be worth printing.
+**Actual:** `agent/budget.ts` charged a flat `costPerCallUsd = 0.0025` per call and never read a
+single token count. Its own comment claimed the constant was "calibrated against a real measured
+run," which was not true of anything in the repo : there was no measurement to calibrate against,
+because no code path had ever looked at a usage block. Metered against the provider for the first
+time, a call on this workload costs **$0.0052**. The constant was **2.1x low**, so the cap
+permitted roughly twice the spend it advertised, and every cost figure the README carried was an
+underestimate of the same factor.
+**Why it's dangerous:** a budget guard that under-charges is worse than none, because it reports a
+comfortable number while the real bill runs ahead of it. This is the same class of error as the
+fallback-constant entry above : a number the codebase asserted about itself, that nothing checked.
+And it was quoted publicly, in a README section whose entire purpose was honesty about cost.
+**How diagnosed:** writing the meter, then comparing what it reported on a live 8-case slice
+against what the old constant would have charged for the same 89 calls : $0.4627 against $0.2225.
+**Fix:** tokens are read off the terminal `finish` part of the stream (and off the result on the
+non-streaming path), priced with declared per-million rates from `AGENT_USD_PER_M_INPUT` /
+`AGENT_USD_PER_M_OUTPUT`. A call whose response carries no usage block is counted in
+`callsWithoutUsage` and still charged the flat fallback : a silent zero would both understate the
+bill and disarm the cap, which is the failure this entry is about. The five committed seed runs
+predate the meter, so their cost is stated as not measured rather than back-filled by
+extrapolation.
+**Safeguard:** `tests/budget.test.ts` pins the nested v3/v4 and flat v2 usage shapes, the stream
+path, a reported zero as distinct from a missing block, the fallback charge, and the cap refusing
+the next call once measured spend passes it.

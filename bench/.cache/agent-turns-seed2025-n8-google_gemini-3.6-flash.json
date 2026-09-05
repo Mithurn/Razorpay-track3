@@ -1,0 +1,3080 @@
+{
+  "cust_1000#1": {
+    "proposal": {
+      "action": {
+        "kind": "RETRY_SCHEDULED",
+        "atHoursFromNow": 72
+      },
+      "diagnosisRootCause": "insufficient_funds",
+      "confidence": 0.9,
+      "reasoning": "The customer has 6 prior successful subscription payments with 0 failures, showing good payment history. The failure reason is insufficient_funds on an HDFC card, and there is no active bank downtime. For insufficient_funds, a scheduled retry is recommended. Setting retryDelayHours to 72 hours allows time for salary/account deposit or customer top-up.",
+      "toolCalls": 5,
+      "degraded": false
+    },
+    "trace": [
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_customer_payment_history",
+          "callId": "call_2930298",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_customer_payment_history",
+          "callId": "call_2930298",
+          "source": "local",
+          "raw": {
+            "totalPayments": 6,
+            "successfulPayments": 6,
+            "failedPayments": 0,
+            "lastSuccessfulAt": "2026-08-02T00:00:00.000Z",
+            "daysSinceLastSuccess": 30,
+            "methodsUsed": [
+              "card"
+            ],
+            "medianDaysBetweenPayments": 31
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "check_bank_downtime",
+          "callId": "call_2382723",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "check_bank_downtime",
+          "callId": "call_2382723",
+          "source": "razorpay-live",
+          "raw": {
+            "method": "card",
+            "instrument": "HDFC",
+            "matched": false,
+            "activeDowntimes": [],
+            "methodWideOutages": [
+              {
+                "id": "down_T8xxbch1uvYaeg",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "BKID"
+                },
+                "startedAt": "2026-07-03T08:36:31.000Z"
+              },
+              {
+                "id": "down_TJaePDulbxEnO0",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "PUNB"
+                },
+                "startedAt": "2026-07-30T04:57:25.000Z"
+              },
+              {
+                "id": "down_TJcETGAh2KrjaD",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "CNRB"
+                },
+                "startedAt": "2026-07-30T06:30:15.000Z"
+              },
+              {
+                "id": "down_TRtFk8Bh9VCEd5",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "CITI"
+                },
+                "startedAt": "2026-08-20T04:21:15.000Z"
+              }
+            ]
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2082637",
+          "args": {
+            "method": "card"
+          }
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2082637",
+          "source": "local",
+          "raw": {
+            "failureReason": "insufficient_funds",
+            "cases": []
+          },
+          "ms": 11
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2026470",
+          "args": {
+            "limit": 10
+          }
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2026470",
+          "source": "local",
+          "raw": {
+            "failureReason": "insufficient_funds",
+            "cases": []
+          },
+          "ms": 3
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_this_case_prior_attempts",
+          "callId": "call_1556016",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_this_case_prior_attempts",
+          "callId": "call_1556016",
+          "source": "local",
+          "raw": {
+            "attempts": []
+          },
+          "ms": 0
+        }
+      }
+    ]
+  },
+  "cust_1006#1": {
+    "proposal": {
+      "action": {
+        "kind": "RETRY_SCHEDULED",
+        "atHoursFromNow": 72
+      },
+      "diagnosisRootCause": "insufficient_funds",
+      "confidence": 0.85,
+      "reasoning": "The failure reason is insufficient_funds on an AXIS card. Bank downtime check shows no outage for AXIS bank. Historical data shows customer has 2 successful and 2 failed payments, with successful payments happening earlier. For insufficient_funds, standard playbook recommends RETRY_SCHEDULED. Scheduling retry for 72 hours (3 days) to allow funds to become available or payday cycle to clear.",
+      "toolCalls": 5,
+      "degraded": false
+    },
+    "trace": [
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_customer_payment_history",
+          "callId": "call_2172325",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_customer_payment_history",
+          "callId": "call_2172325",
+          "source": "local",
+          "raw": {
+            "totalPayments": 4,
+            "successfulPayments": 2,
+            "failedPayments": 2,
+            "lastSuccessfulAt": "2026-07-05T00:00:00.000Z",
+            "daysSinceLastSuccess": 59,
+            "methodsUsed": [
+              "card"
+            ],
+            "medianDaysBetweenPayments": 46
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "check_bank_downtime",
+          "callId": "call_2045587",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "check_bank_downtime",
+          "callId": "call_2045587",
+          "source": "razorpay-live",
+          "raw": {
+            "method": "card",
+            "instrument": "AXIS",
+            "matched": false,
+            "activeDowntimes": [],
+            "methodWideOutages": [
+              {
+                "id": "down_T8xxbch1uvYaeg",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "BKID"
+                },
+                "startedAt": "2026-07-03T08:36:31.000Z"
+              },
+              {
+                "id": "down_TJaePDulbxEnO0",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "PUNB"
+                },
+                "startedAt": "2026-07-30T04:57:25.000Z"
+              },
+              {
+                "id": "down_TJcETGAh2KrjaD",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "CNRB"
+                },
+                "startedAt": "2026-07-30T06:30:15.000Z"
+              },
+              {
+                "id": "down_TRtFk8Bh9VCEd5",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "CITI"
+                },
+                "startedAt": "2026-08-20T04:21:15.000Z"
+              }
+            ]
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2611039",
+          "args": {
+            "method": "card"
+          }
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2611039",
+          "source": "local",
+          "raw": {
+            "failureReason": "insufficient_funds",
+            "cases": []
+          },
+          "ms": 8
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_1917022",
+          "args": {
+            "limit": 8
+          }
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_1917022",
+          "source": "local",
+          "raw": {
+            "failureReason": "insufficient_funds",
+            "cases": []
+          },
+          "ms": 5
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_this_case_prior_attempts",
+          "callId": "call_2720376",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_this_case_prior_attempts",
+          "callId": "call_2720376",
+          "source": "local",
+          "raw": {
+            "attempts": []
+          },
+          "ms": 0
+        }
+      }
+    ]
+  },
+  "cust_1007#1": {
+    "proposal": {
+      "action": {
+        "kind": "RETRY_SCHEDULED",
+        "atHoursFromNow": 72
+      },
+      "diagnosisRootCause": "insufficient_funds",
+      "confidence": 0.9,
+      "reasoning": "Customer has a strong payment history with 6 out of 6 successful previous card payments and no prior failures. The failure reason is insufficient_funds on an HDFC card, with no active bank downtime detected. For insufficient funds on a reliable customer with a monthly recurring cycle, scheduling a retry (RETRY_SCHEDULED) allows time for funds to be added or salary/income to be credited. Scheduling retry for 72 hours later is standard practice for insufficient funds.",
+      "toolCalls": 5,
+      "degraded": false
+    },
+    "trace": [
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_customer_payment_history",
+          "callId": "call_2614139",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_customer_payment_history",
+          "callId": "call_2614139",
+          "source": "local",
+          "raw": {
+            "totalPayments": 6,
+            "successfulPayments": 6,
+            "failedPayments": 0,
+            "lastSuccessfulAt": "2026-07-23T00:00:00.000Z",
+            "daysSinceLastSuccess": 41,
+            "methodsUsed": [
+              "card"
+            ],
+            "medianDaysBetweenPayments": 27
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "check_bank_downtime",
+          "callId": "call_2839855",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "check_bank_downtime",
+          "callId": "call_2839855",
+          "source": "razorpay-live",
+          "raw": {
+            "method": "card",
+            "instrument": "HDFC",
+            "matched": false,
+            "activeDowntimes": [],
+            "methodWideOutages": [
+              {
+                "id": "down_T8xxbch1uvYaeg",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "BKID"
+                },
+                "startedAt": "2026-07-03T08:36:31.000Z"
+              },
+              {
+                "id": "down_TJaePDulbxEnO0",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "PUNB"
+                },
+                "startedAt": "2026-07-30T04:57:25.000Z"
+              },
+              {
+                "id": "down_TJcETGAh2KrjaD",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "CNRB"
+                },
+                "startedAt": "2026-07-30T06:30:15.000Z"
+              },
+              {
+                "id": "down_TRtFk8Bh9VCEd5",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "CITI"
+                },
+                "startedAt": "2026-08-20T04:21:15.000Z"
+              }
+            ]
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2924396",
+          "args": {
+            "method": "card"
+          }
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2924396",
+          "source": "local",
+          "raw": {
+            "failureReason": "insufficient_funds",
+            "cases": []
+          },
+          "ms": 6
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2417518",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2417518",
+          "source": "local",
+          "raw": {
+            "failureReason": "insufficient_funds",
+            "cases": []
+          },
+          "ms": 3
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_this_case_prior_attempts",
+          "callId": "call_2045635",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_this_case_prior_attempts",
+          "callId": "call_2045635",
+          "source": "local",
+          "raw": {
+            "attempts": []
+          },
+          "ms": 0
+        }
+      }
+    ]
+  },
+  "cust_1003#1": {
+    "proposal": {
+      "action": {
+        "kind": "RETRY_SCHEDULED",
+        "atHoursFromNow": 4
+      },
+      "diagnosisRootCause": "bank_downtime",
+      "confidence": 0.95,
+      "reasoning": "The customer payment failed due to issuer_technical_error / GATEWAY_ERROR. Investigation revealed an active high-severity bank downtime on BKID (Bank of India) for card payments. Since this is a temporary bank outage, the optimal recovery action is RETRY_SCHEDULED to re-attempt the charge once the bank issue clears. Setting retry delay to 4 hours.",
+      "toolCalls": 5,
+      "degraded": false
+    },
+    "trace": [
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_customer_payment_history",
+          "callId": "call_2464498",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_customer_payment_history",
+          "callId": "call_2464498",
+          "source": "local",
+          "raw": {
+            "totalPayments": 5,
+            "successfulPayments": 4,
+            "failedPayments": 1,
+            "lastSuccessfulAt": "2026-06-30T00:00:00.000Z",
+            "daysSinceLastSuccess": 63,
+            "methodsUsed": [
+              "card"
+            ],
+            "medianDaysBetweenPayments": 34
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "check_bank_downtime",
+          "callId": "call_2783365",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "check_bank_downtime",
+          "callId": "call_2783365",
+          "source": "razorpay-live",
+          "raw": {
+            "method": "card",
+            "instrument": "BKID",
+            "matched": true,
+            "activeDowntimes": [
+              {
+                "id": "down_T8xxbch1uvYaeg",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "BKID"
+                },
+                "startedAt": "2026-07-03T08:36:31.000Z"
+              }
+            ],
+            "methodWideOutages": [
+              {
+                "id": "down_TJaePDulbxEnO0",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "PUNB"
+                },
+                "startedAt": "2026-07-30T04:57:25.000Z"
+              },
+              {
+                "id": "down_TJcETGAh2KrjaD",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "CNRB"
+                },
+                "startedAt": "2026-07-30T06:30:15.000Z"
+              },
+              {
+                "id": "down_TRtFk8Bh9VCEd5",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "CITI"
+                },
+                "startedAt": "2026-08-20T04:21:15.000Z"
+              }
+            ]
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2027800",
+          "args": {
+            "method": "card"
+          }
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2027800",
+          "source": "local",
+          "raw": {
+            "failureReason": "issuer_technical_error",
+            "cases": []
+          },
+          "ms": 4
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_628715",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_628715",
+          "source": "local",
+          "raw": {
+            "failureReason": "issuer_technical_error",
+            "cases": []
+          },
+          "ms": 3
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_this_case_prior_attempts",
+          "callId": "call_2954174",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_this_case_prior_attempts",
+          "callId": "call_2954174",
+          "source": "local",
+          "raw": {
+            "attempts": []
+          },
+          "ms": 0
+        }
+      }
+    ]
+  },
+  "cust_1002#1": {
+    "proposal": {
+      "action": {
+        "kind": "CUSTOMER_NUDGE",
+        "channel": "email"
+      },
+      "diagnosisRootCause": "hard_decline",
+      "confidence": 0.95,
+      "reasoning": "The card used for subscription payment has expired (error code: BAD_REQUEST_ERROR, reason: card_expired). Standard retries will not succeed on an expired card. A customer nudge via email is required for the customer to update their card details.",
+      "toolCalls": 5,
+      "degraded": false
+    },
+    "trace": [
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_customer_payment_history",
+          "callId": "call_2813176",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_customer_payment_history",
+          "callId": "call_2813176",
+          "source": "local",
+          "raw": {
+            "totalPayments": 6,
+            "successfulPayments": 4,
+            "failedPayments": 2,
+            "lastSuccessfulAt": "2026-07-20T00:00:00.000Z",
+            "daysSinceLastSuccess": 43,
+            "methodsUsed": [
+              "card"
+            ],
+            "medianDaysBetweenPayments": 30
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "check_bank_downtime",
+          "callId": "call_2818803",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "check_bank_downtime",
+          "callId": "call_2818803",
+          "source": "razorpay-live",
+          "raw": {
+            "method": "card",
+            "instrument": "ICIC",
+            "matched": true,
+            "activeDowntimes": [
+              {
+                "id": "down_TYT1svNYEwm994",
+                "method": "netbanking",
+                "severity": "high",
+                "instrument": {
+                  "bank": "ICIC"
+                },
+                "startedAt": "2026-09-05T19:15:07.000Z"
+              }
+            ],
+            "methodWideOutages": [
+              {
+                "id": "down_T8xxbch1uvYaeg",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "BKID"
+                },
+                "startedAt": "2026-07-03T08:36:31.000Z"
+              },
+              {
+                "id": "down_TJaePDulbxEnO0",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "PUNB"
+                },
+                "startedAt": "2026-07-30T04:57:25.000Z"
+              },
+              {
+                "id": "down_TJcETGAh2KrjaD",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "CNRB"
+                },
+                "startedAt": "2026-07-30T06:30:15.000Z"
+              },
+              {
+                "id": "down_TRtFk8Bh9VCEd5",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "CITI"
+                },
+                "startedAt": "2026-08-20T04:21:15.000Z"
+              }
+            ]
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_628699",
+          "args": {
+            "method": "card"
+          }
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_628699",
+          "source": "local",
+          "raw": {
+            "failureReason": "card_expired",
+            "cases": []
+          },
+          "ms": 3
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2452336",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2452336",
+          "source": "local",
+          "raw": {
+            "failureReason": "card_expired",
+            "cases": []
+          },
+          "ms": 2
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_this_case_prior_attempts",
+          "callId": "call_2770416",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_this_case_prior_attempts",
+          "callId": "call_2770416",
+          "source": "local",
+          "raw": {
+            "attempts": []
+          },
+          "ms": 0
+        }
+      }
+    ]
+  },
+  "cust_1001#1": {
+    "proposal": {
+      "action": {
+        "kind": "CUSTOMER_NUDGE",
+        "channel": "email"
+      },
+      "diagnosisRootCause": "hard_decline",
+      "confidence": 0.85,
+      "reasoning": "Customer has 4 prior successful card payments, but the last successful payment was 93 days ago (2026-05-31). There is no active HDFC bank downtime. A card decline on an established customer with no recent success in over 3 months strongly indicates an expired card, block, or changed card details requiring customer action to update payment details.",
+      "toolCalls": 5,
+      "degraded": false
+    },
+    "trace": [
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_customer_payment_history",
+          "callId": "call_2813164",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_customer_payment_history",
+          "callId": "call_2813164",
+          "source": "local",
+          "raw": {
+            "totalPayments": 4,
+            "successfulPayments": 4,
+            "failedPayments": 0,
+            "lastSuccessfulAt": "2026-05-31T00:00:00.000Z",
+            "daysSinceLastSuccess": 93,
+            "methodsUsed": [
+              "card"
+            ],
+            "medianDaysBetweenPayments": 28
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "check_bank_downtime",
+          "callId": "call_2058698",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "check_bank_downtime",
+          "callId": "call_2058698",
+          "source": "razorpay-live",
+          "raw": {
+            "method": "card",
+            "instrument": "HDFC",
+            "matched": false,
+            "activeDowntimes": [],
+            "methodWideOutages": [
+              {
+                "id": "down_T8xxbch1uvYaeg",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "BKID"
+                },
+                "startedAt": "2026-07-03T08:36:31.000Z"
+              },
+              {
+                "id": "down_TJaePDulbxEnO0",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "PUNB"
+                },
+                "startedAt": "2026-07-30T04:57:25.000Z"
+              },
+              {
+                "id": "down_TJcETGAh2KrjaD",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "CNRB"
+                },
+                "startedAt": "2026-07-30T06:30:15.000Z"
+              },
+              {
+                "id": "down_TRtFk8Bh9VCEd5",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "CITI"
+                },
+                "startedAt": "2026-08-20T04:21:15.000Z"
+              }
+            ]
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_this_case_prior_attempts",
+          "callId": "call_2604530",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_this_case_prior_attempts",
+          "callId": "call_2604530",
+          "source": "local",
+          "raw": {
+            "attempts": []
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2594429",
+          "args": {
+            "method": "card"
+          }
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2594429",
+          "source": "local",
+          "raw": {
+            "failureReason": "card_declined",
+            "cases": []
+          },
+          "ms": 4
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_1882064",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_1882064",
+          "source": "local",
+          "raw": {
+            "failureReason": "card_declined",
+            "cases": []
+          },
+          "ms": 3
+        }
+      }
+    ]
+  },
+  "cust_1005#1": {
+    "proposal": {
+      "action": {
+        "kind": "CUSTOMER_NUDGE",
+        "channel": "email"
+      },
+      "diagnosisRootCause": "risk_hold",
+      "confidence": 0.9,
+      "reasoning": "The payment failed due to a payment risk check failure (payment_risk_check_failed), which corresponds to a risk hold root cause. For risk hold failures, automatic re-charging or direct payment retries are inappropriate as risk systems flagged the transaction. A customer nudge via email is recommended so the customer can verify/update their payment details or authorize the payment with their issuing bank.",
+      "toolCalls": 5,
+      "degraded": false
+    },
+    "trace": [
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_customer_payment_history",
+          "callId": "call_2223569",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_customer_payment_history",
+          "callId": "call_2223569",
+          "source": "local",
+          "raw": {
+            "totalPayments": 2,
+            "successfulPayments": 2,
+            "failedPayments": 0,
+            "lastSuccessfulAt": "2026-04-03T00:00:00.000Z",
+            "daysSinceLastSuccess": 151,
+            "methodsUsed": [
+              "card"
+            ],
+            "medianDaysBetweenPayments": 29
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "check_bank_downtime",
+          "callId": "call_2413103",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "check_bank_downtime",
+          "callId": "call_2413103",
+          "source": "razorpay-live",
+          "raw": {
+            "method": "card",
+            "instrument": "SBIN",
+            "matched": true,
+            "activeDowntimes": [
+              {
+                "id": "down_TYTe5uWpppK6BD",
+                "method": "netbanking",
+                "severity": "high",
+                "instrument": {
+                  "bank": "SBIN"
+                },
+                "startedAt": "2026-09-05T19:51:17.000Z"
+              }
+            ],
+            "methodWideOutages": [
+              {
+                "id": "down_T8xxbch1uvYaeg",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "BKID"
+                },
+                "startedAt": "2026-07-03T08:36:31.000Z"
+              },
+              {
+                "id": "down_TJaePDulbxEnO0",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "PUNB"
+                },
+                "startedAt": "2026-07-30T04:57:25.000Z"
+              },
+              {
+                "id": "down_TJcETGAh2KrjaD",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "CNRB"
+                },
+                "startedAt": "2026-07-30T06:30:15.000Z"
+              },
+              {
+                "id": "down_TRtFk8Bh9VCEd5",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "CITI"
+                },
+                "startedAt": "2026-08-20T04:21:15.000Z"
+              }
+            ]
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2154614",
+          "args": {
+            "method": "card"
+          }
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2154614",
+          "source": "local",
+          "raw": {
+            "failureReason": "payment_risk_check_failed",
+            "cases": []
+          },
+          "ms": 2
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2008743",
+          "args": {
+            "limit": 8
+          }
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2008743",
+          "source": "local",
+          "raw": {
+            "failureReason": "payment_risk_check_failed",
+            "cases": []
+          },
+          "ms": 2
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_this_case_prior_attempts",
+          "callId": "call_2614207",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_this_case_prior_attempts",
+          "callId": "call_2614207",
+          "source": "local",
+          "raw": {
+            "attempts": []
+          },
+          "ms": 0
+        }
+      }
+    ]
+  },
+  "cust_1004#1": {
+    "proposal": {
+      "action": {
+        "kind": "RETRY_SCHEDULED",
+        "atHoursFromNow": 24
+      },
+      "diagnosisRootCause": "soft_decline",
+      "confidence": 0.85,
+      "reasoning": "Customer has a solid history of 3 successful card payments. HDFC bank is online with no active downtime. The generic payment_failed error on recurring card billing is characteristic of a soft decline or temporary insufficient funds. Scheduling a retry in 24 hours gives sufficient time for transient card processor issuer limits/soft declines to clear.",
+      "toolCalls": 5,
+      "degraded": false
+    },
+    "trace": [
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_customer_payment_history",
+          "callId": "call_1960633",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_customer_payment_history",
+          "callId": "call_1960633",
+          "source": "local",
+          "raw": {
+            "totalPayments": 3,
+            "successfulPayments": 3,
+            "failedPayments": 0,
+            "lastSuccessfulAt": "2026-04-29T00:00:00.000Z",
+            "daysSinceLastSuccess": 125,
+            "methodsUsed": [
+              "card"
+            ],
+            "medianDaysBetweenPayments": 27
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "check_bank_downtime",
+          "callId": "call_2289456",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "check_bank_downtime",
+          "callId": "call_2289456",
+          "source": "razorpay-live",
+          "raw": {
+            "method": "card",
+            "instrument": "HDFC",
+            "matched": false,
+            "activeDowntimes": [],
+            "methodWideOutages": [
+              {
+                "id": "down_T8xxbch1uvYaeg",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "BKID"
+                },
+                "startedAt": "2026-07-03T08:36:31.000Z"
+              },
+              {
+                "id": "down_TJaePDulbxEnO0",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "PUNB"
+                },
+                "startedAt": "2026-07-30T04:57:25.000Z"
+              },
+              {
+                "id": "down_TJcETGAh2KrjaD",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "CNRB"
+                },
+                "startedAt": "2026-07-30T06:30:15.000Z"
+              },
+              {
+                "id": "down_TRtFk8Bh9VCEd5",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "CITI"
+                },
+                "startedAt": "2026-08-20T04:21:15.000Z"
+              }
+            ]
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_this_case_prior_attempts",
+          "callId": "call_2855540",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_this_case_prior_attempts",
+          "callId": "call_2855540",
+          "source": "local",
+          "raw": {
+            "attempts": []
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_628727",
+          "args": {
+            "method": "card"
+          }
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_628727",
+          "source": "local",
+          "raw": {
+            "failureReason": "payment_failed",
+            "cases": []
+          },
+          "ms": 9
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2452372",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2452372",
+          "source": "local",
+          "raw": {
+            "failureReason": "payment_failed",
+            "cases": []
+          },
+          "ms": 3
+        }
+      }
+    ]
+  },
+  "cust_1006#2": {
+    "proposal": {
+      "action": {
+        "kind": "CUSTOMER_NUDGE",
+        "channel": "email"
+      },
+      "diagnosisRootCause": "insufficient_funds",
+      "confidence": 0.85,
+      "reasoning": "Customer payment failed due to insufficient funds. A scheduled retry was already attempted and failed. Repeating scheduled retries after a failed retry is ineffective. Therefore, requesting the customer to update their payment method or add funds via email nudge is the optimal recovery action.",
+      "toolCalls": 5,
+      "degraded": false
+    },
+    "trace": [
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_customer_payment_history",
+          "callId": "call_2991642",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_customer_payment_history",
+          "callId": "call_2991642",
+          "source": "local",
+          "raw": {
+            "totalPayments": 4,
+            "successfulPayments": 2,
+            "failedPayments": 2,
+            "lastSuccessfulAt": "2026-07-05T00:00:00.000Z",
+            "daysSinceLastSuccess": 62,
+            "methodsUsed": [
+              "card"
+            ],
+            "medianDaysBetweenPayments": 46
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "check_bank_downtime",
+          "callId": "call_2571771",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "check_bank_downtime",
+          "callId": "call_2571771",
+          "source": "razorpay-live",
+          "raw": {
+            "method": "card",
+            "instrument": "AXIS",
+            "matched": false,
+            "activeDowntimes": [],
+            "methodWideOutages": [
+              {
+                "id": "down_T8xxbch1uvYaeg",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "BKID"
+                },
+                "startedAt": "2026-07-03T08:36:31.000Z"
+              },
+              {
+                "id": "down_TJaePDulbxEnO0",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "PUNB"
+                },
+                "startedAt": "2026-07-30T04:57:25.000Z"
+              },
+              {
+                "id": "down_TJcETGAh2KrjaD",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "CNRB"
+                },
+                "startedAt": "2026-07-30T06:30:15.000Z"
+              },
+              {
+                "id": "down_TRtFk8Bh9VCEd5",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "CITI"
+                },
+                "startedAt": "2026-08-20T04:21:15.000Z"
+              }
+            ]
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_this_case_prior_attempts",
+          "callId": "call_2114737",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_this_case_prior_attempts",
+          "callId": "call_2114737",
+          "source": "local",
+          "raw": {
+            "attempts": [
+              {
+                "attemptNo": 1,
+                "action": "RETRY_SCHEDULED",
+                "outcome": "FAILED",
+                "detail": "payment declined"
+              }
+            ]
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2360781",
+          "args": {
+            "method": "card"
+          }
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2360781",
+          "source": "local",
+          "raw": {
+            "failureReason": "insufficient_funds",
+            "cases": [
+              {
+                "failureReason": "insufficient_funds",
+                "action": "RETRY_SCHEDULED",
+                "outcome": "RECOVERED",
+                "hoursToResolution": 112.16761878555556
+              }
+            ]
+          },
+          "ms": 3
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2570160",
+          "args": {
+            "limit": 10
+          }
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2570160",
+          "source": "local",
+          "raw": {
+            "failureReason": "insufficient_funds",
+            "cases": [
+              {
+                "failureReason": "insufficient_funds",
+                "action": "RETRY_SCHEDULED",
+                "outcome": "RECOVERED",
+                "hoursToResolution": 112.16761878555556
+              }
+            ]
+          },
+          "ms": 2
+        }
+      }
+    ]
+  },
+  "cust_1004#2": {
+    "proposal": {
+      "action": {
+        "kind": "CUSTOMER_NUDGE",
+        "channel": "email"
+      },
+      "diagnosisRootCause": "soft_decline",
+      "confidence": 0.85,
+      "reasoning": "Customer card payment failed initially and a scheduled retry also failed with payment declined. HDFC bank has no active downtime. Since a scheduled retry already failed, repeating a retry is ineffective. A customer nudge via email to update payment details/card is the appropriate next recovery step.",
+      "toolCalls": 5,
+      "degraded": false
+    },
+    "trace": [
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_customer_payment_history",
+          "callId": "call_2223744",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_customer_payment_history",
+          "callId": "call_2223744",
+          "source": "local",
+          "raw": {
+            "totalPayments": 3,
+            "successfulPayments": 3,
+            "failedPayments": 0,
+            "lastSuccessfulAt": "2026-04-29T00:00:00.000Z",
+            "daysSinceLastSuccess": 126,
+            "methodsUsed": [
+              "card"
+            ],
+            "medianDaysBetweenPayments": 27
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "check_bank_downtime",
+          "callId": "call_2505086",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "check_bank_downtime",
+          "callId": "call_2505086",
+          "source": "razorpay-live",
+          "raw": {
+            "method": "card",
+            "instrument": "HDFC",
+            "matched": false,
+            "activeDowntimes": [],
+            "methodWideOutages": [
+              {
+                "id": "down_T8xxbch1uvYaeg",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "BKID"
+                },
+                "startedAt": "2026-07-03T08:36:31.000Z"
+              },
+              {
+                "id": "down_TJaePDulbxEnO0",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "PUNB"
+                },
+                "startedAt": "2026-07-30T04:57:25.000Z"
+              },
+              {
+                "id": "down_TJcETGAh2KrjaD",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "CNRB"
+                },
+                "startedAt": "2026-07-30T06:30:15.000Z"
+              },
+              {
+                "id": "down_TRtFk8Bh9VCEd5",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "CITI"
+                },
+                "startedAt": "2026-08-20T04:21:15.000Z"
+              }
+            ]
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_this_case_prior_attempts",
+          "callId": "call_2435649",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_this_case_prior_attempts",
+          "callId": "call_2435649",
+          "source": "local",
+          "raw": {
+            "attempts": [
+              {
+                "attemptNo": 1,
+                "action": "RETRY_SCHEDULED",
+                "outcome": "FAILED",
+                "detail": "payment declined"
+              }
+            ]
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2718451",
+          "args": {
+            "method": "card"
+          }
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2718451",
+          "source": "local",
+          "raw": {
+            "failureReason": "payment_failed",
+            "cases": []
+          },
+          "ms": 2
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2407733",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2407733",
+          "source": "local",
+          "raw": {
+            "failureReason": "payment_failed",
+            "cases": []
+          },
+          "ms": 4
+        }
+      }
+    ]
+  },
+  "cust_1003#2": {
+    "proposal": {
+      "action": {
+        "kind": "RETRY_SCHEDULED",
+        "atHoursFromNow": 24
+      },
+      "diagnosisRootCause": "bank_downtime",
+      "confidence": 0.95,
+      "reasoning": "The customer has a strong payment history with 4 successful payments out of 5 total payments. The initial payment failure was caused by an issuer_technical_error. Checking live bank downtime confirms an active high-severity downtime on the customer's card issuer (BKID). Attempt #1 was a scheduled retry that failed because the downtime had not cleared yet. Since the downtime remains active upon re-checking, the guidelines dictate rescheduling further out (24 hours) to allow the bank outage window to clear before re-attempting the charge.",
+      "toolCalls": 6,
+      "degraded": false
+    },
+    "trace": [
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_customer_payment_history",
+          "callId": "call_940963",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_this_case_prior_attempts",
+          "callId": "call_940967",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_customer_payment_history",
+          "callId": "call_940963",
+          "source": "local",
+          "raw": {
+            "totalPayments": 5,
+            "successfulPayments": 4,
+            "failedPayments": 1,
+            "lastSuccessfulAt": "2026-06-30T00:00:00.000Z",
+            "daysSinceLastSuccess": 64,
+            "methodsUsed": [
+              "card"
+            ],
+            "medianDaysBetweenPayments": 34
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_this_case_prior_attempts",
+          "callId": "call_940967",
+          "source": "local",
+          "raw": {
+            "attempts": [
+              {
+                "attemptNo": 1,
+                "action": "RETRY_SCHEDULED",
+                "outcome": "FAILED",
+                "detail": "payment declined"
+              }
+            ]
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "check_bank_downtime",
+          "callId": "call_2381786",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "check_bank_downtime",
+          "callId": "call_2381786",
+          "source": "razorpay-live",
+          "raw": {
+            "method": "card",
+            "instrument": "BKID",
+            "matched": true,
+            "activeDowntimes": [
+              {
+                "id": "down_T8xxbch1uvYaeg",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "BKID"
+                },
+                "startedAt": "2026-07-03T08:36:31.000Z"
+              }
+            ],
+            "methodWideOutages": [
+              {
+                "id": "down_TJaePDulbxEnO0",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "PUNB"
+                },
+                "startedAt": "2026-07-30T04:57:25.000Z"
+              },
+              {
+                "id": "down_TJcETGAh2KrjaD",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "CNRB"
+                },
+                "startedAt": "2026-07-30T06:30:15.000Z"
+              },
+              {
+                "id": "down_TRtFk8Bh9VCEd5",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "CITI"
+                },
+                "startedAt": "2026-08-20T04:21:15.000Z"
+              }
+            ]
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2848192",
+          "args": {
+            "method": "card"
+          }
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_recovery_playbook",
+          "callId": "call_2848196",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_recovery_playbook",
+          "callId": "call_2848196",
+          "source": "local",
+          "raw": {
+            "playbook": [
+              {
+                "rootCause": "soft_decline",
+                "defaultAction": "RETRY_SCHEDULED",
+                "note": "Clean-history customer, generic decline, no downtime — a recoverable payment. Time the retry from the customer's own payment cadence."
+              },
+              {
+                "rootCause": "insufficient_funds",
+                "defaultAction": "RETRY_SCHEDULED",
+                "note": "Time it toward when the customer historically has money — read that from their payment history, not a fixed guess."
+              },
+              {
+                "rootCause": "bank_downtime",
+                "defaultAction": "RETRY_SCHEDULED",
+                "note": "Time it to when the downtime feed shows the window clearing. Never a nudge — the customer did nothing wrong."
+              },
+              {
+                "rootCause": "hard_decline",
+                "defaultAction": "CUSTOMER_NUDGE",
+                "note": "Card expired or blocked. A retry is pointless; the customer must act. If the merchant's record shows links on another rail recovering these, use PAYMENT_LINK instead."
+              },
+              {
+                "rootCause": "technical",
+                "defaultAction": "RETRY_NOW",
+                "note": "Transient technical failure. Use RETRY_SCHEDULED instead if a downtime window is open."
+              },
+              {
+                "rootCause": "risk_hold",
+                "defaultAction": "ESCALATE",
+                "note": "Risk-flagged or fraud-shaped pattern. Never auto-retry."
+              },
+              {
+                "rootCause": "unrecoverable",
+                "defaultAction": "WRITE_OFF",
+                "note": "Thin or failing history, an account that never funds, a decline that will not clear."
+              }
+            ]
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2848192",
+          "source": "local",
+          "raw": {
+            "failureReason": "issuer_technical_error",
+            "cases": []
+          },
+          "ms": 10
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2026568",
+          "args": {
+            "limit": 10
+          }
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2026568",
+          "source": "local",
+          "raw": {
+            "failureReason": "issuer_technical_error",
+            "cases": []
+          },
+          "ms": 3
+        }
+      }
+    ]
+  },
+  "cust_1001#2": {
+    "proposal": {
+      "action": {
+        "kind": "PAYMENT_LINK",
+        "rail": "netbanking"
+      },
+      "diagnosisRootCause": "hard_decline",
+      "confidence": 0.85,
+      "reasoning": "Investigation summary:\n1. Customer History: Customer has 4 successful prior payments and 0 failed payments (median 28 days apart). Last successful payment was on 2026-05-31.\n2. Bank Downtime: Live check for HDFC card rail shows matched: false (no active bank downtime for HDFC).\n3. Prior Attempts: Attempt 1 was a CUSTOMER_NUDGE which failed due to 'payment declined'.\n4. Root Cause & Action: The persistent card decline without active bank downtime indicates a hard decline (such as an expired or blocked card). Since CUSTOMER_NUDGE was already attempted and failed, we must not repeat the same move. Providing a PAYMENT_LINK via netbanking allows the customer to successfully complete the payment using an alternative payment rail.",
+      "toolCalls": 6,
+      "degraded": false
+    },
+    "trace": [
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_customer_payment_history",
+          "callId": "call_2888654",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_this_case_prior_attempts",
+          "callId": "call_2888658",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_customer_payment_history",
+          "callId": "call_2888654",
+          "source": "local",
+          "raw": {
+            "totalPayments": 4,
+            "successfulPayments": 4,
+            "failedPayments": 0,
+            "lastSuccessfulAt": "2026-05-31T00:00:00.000Z",
+            "daysSinceLastSuccess": 94,
+            "methodsUsed": [
+              "card"
+            ],
+            "medianDaysBetweenPayments": 28
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_this_case_prior_attempts",
+          "callId": "call_2888658",
+          "source": "local",
+          "raw": {
+            "attempts": [
+              {
+                "attemptNo": 1,
+                "action": "CUSTOMER_NUDGE",
+                "outcome": "FAILED",
+                "detail": "payment declined"
+              }
+            ]
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "check_bank_downtime",
+          "callId": "call_2570120",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2570124",
+          "args": {
+            "method": "card"
+          }
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "check_bank_downtime",
+          "callId": "call_2570120",
+          "source": "razorpay-live",
+          "raw": {
+            "method": "card",
+            "instrument": "HDFC",
+            "matched": false,
+            "activeDowntimes": [],
+            "methodWideOutages": [
+              {
+                "id": "down_T8xxbch1uvYaeg",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "BKID"
+                },
+                "startedAt": "2026-07-03T08:36:31.000Z"
+              },
+              {
+                "id": "down_TJaePDulbxEnO0",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "PUNB"
+                },
+                "startedAt": "2026-07-30T04:57:25.000Z"
+              },
+              {
+                "id": "down_TJcETGAh2KrjaD",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "CNRB"
+                },
+                "startedAt": "2026-07-30T06:30:15.000Z"
+              },
+              {
+                "id": "down_TRtFk8Bh9VCEd5",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "CITI"
+                },
+                "startedAt": "2026-08-20T04:21:15.000Z"
+              }
+            ]
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2570124",
+          "source": "local",
+          "raw": {
+            "failureReason": "card_declined",
+            "cases": []
+          },
+          "ms": 4
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2724908",
+          "args": {
+            "limit": 10
+          }
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2724908",
+          "source": "local",
+          "raw": {
+            "failureReason": "card_declined",
+            "cases": []
+          },
+          "ms": 2
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_recovery_playbook",
+          "callId": "call_2594616",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_recovery_playbook",
+          "callId": "call_2594616",
+          "source": "local",
+          "raw": {
+            "playbook": [
+              {
+                "rootCause": "soft_decline",
+                "defaultAction": "RETRY_SCHEDULED",
+                "note": "Clean-history customer, generic decline, no downtime — a recoverable payment. Time the retry from the customer's own payment cadence."
+              },
+              {
+                "rootCause": "insufficient_funds",
+                "defaultAction": "RETRY_SCHEDULED",
+                "note": "Time it toward when the customer historically has money — read that from their payment history, not a fixed guess."
+              },
+              {
+                "rootCause": "bank_downtime",
+                "defaultAction": "RETRY_SCHEDULED",
+                "note": "Time it to when the downtime feed shows the window clearing. Never a nudge — the customer did nothing wrong."
+              },
+              {
+                "rootCause": "hard_decline",
+                "defaultAction": "CUSTOMER_NUDGE",
+                "note": "Card expired or blocked. A retry is pointless; the customer must act. If the merchant's record shows links on another rail recovering these, use PAYMENT_LINK instead."
+              },
+              {
+                "rootCause": "technical",
+                "defaultAction": "RETRY_NOW",
+                "note": "Transient technical failure. Use RETRY_SCHEDULED instead if a downtime window is open."
+              },
+              {
+                "rootCause": "risk_hold",
+                "defaultAction": "ESCALATE",
+                "note": "Risk-flagged or fraud-shaped pattern. Never auto-retry."
+              },
+              {
+                "rootCause": "unrecoverable",
+                "defaultAction": "WRITE_OFF",
+                "note": "Thin or failing history, an account that never funds, a decline that will not clear."
+              }
+            ]
+          },
+          "ms": 0
+        }
+      }
+    ]
+  },
+  "cust_1004#3": {
+    "proposal": {
+      "action": {
+        "kind": "WRITE_OFF",
+        "reason": "Multiple recovery attempts (scheduled retry and customer nudge) have failed due to persistent card decline. Card hasn't been successfully billed in 127 days."
+      },
+      "diagnosisRootCause": "hard_decline",
+      "confidence": 0.85,
+      "reasoning": "The initial payment failed with payment_failed on an HDFC card. No bank downtime was detected. Prior recovery attempts including RETRY_SCHEDULED and CUSTOMER_NUDGE both failed with continued payment declines. Since automated retries and customer nudges have already been exhausted and failed, repeating them would violate guidelines. The payment is unrecoverable via automated means and marked for WRITE_OFF under root cause hard_decline or unrecoverable. Given persistent declines across multiple attempts after nudge, root cause is hard_decline/unrecoverable, proposing WRITE_OFF.",
+      "toolCalls": 5,
+      "degraded": false
+    },
+    "trace": [
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_customer_payment_history",
+          "callId": "call_2689756",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_customer_payment_history",
+          "callId": "call_2689756",
+          "source": "local",
+          "raw": {
+            "totalPayments": 3,
+            "successfulPayments": 3,
+            "failedPayments": 0,
+            "lastSuccessfulAt": "2026-04-29T00:00:00.000Z",
+            "daysSinceLastSuccess": 127,
+            "methodsUsed": [
+              "card"
+            ],
+            "medianDaysBetweenPayments": 27
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "check_bank_downtime",
+          "callId": "call_209305",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "check_bank_downtime",
+          "callId": "call_209305",
+          "source": "razorpay-live",
+          "raw": {
+            "method": "card",
+            "instrument": "HDFC",
+            "matched": false,
+            "activeDowntimes": [],
+            "methodWideOutages": [
+              {
+                "id": "down_T8xxbch1uvYaeg",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "BKID"
+                },
+                "startedAt": "2026-07-03T08:36:31.000Z"
+              },
+              {
+                "id": "down_TJaePDulbxEnO0",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "PUNB"
+                },
+                "startedAt": "2026-07-30T04:57:25.000Z"
+              },
+              {
+                "id": "down_TJcETGAh2KrjaD",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "CNRB"
+                },
+                "startedAt": "2026-07-30T06:30:15.000Z"
+              },
+              {
+                "id": "down_TRtFk8Bh9VCEd5",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "CITI"
+                },
+                "startedAt": "2026-08-20T04:21:15.000Z"
+              }
+            ]
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_this_case_prior_attempts",
+          "callId": "call_1992667",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_this_case_prior_attempts",
+          "callId": "call_1992667",
+          "source": "local",
+          "raw": {
+            "attempts": [
+              {
+                "attemptNo": 1,
+                "action": "RETRY_SCHEDULED",
+                "outcome": "FAILED",
+                "detail": "payment declined"
+              },
+              {
+                "attemptNo": 2,
+                "action": "CUSTOMER_NUDGE",
+                "outcome": "FAILED",
+                "detail": "payment declined"
+              }
+            ]
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2367457",
+          "args": {
+            "method": "card"
+          }
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2367457",
+          "source": "local",
+          "raw": {
+            "failureReason": "payment_failed",
+            "cases": []
+          },
+          "ms": 5
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2732847",
+          "args": {
+            "limit": 10
+          }
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2732847",
+          "source": "local",
+          "raw": {
+            "failureReason": "payment_failed",
+            "cases": []
+          },
+          "ms": 7
+        }
+      }
+    ]
+  },
+  "cust_1006#3": {
+    "proposal": {
+      "action": {
+        "kind": "PAYMENT_LINK",
+        "rail": "netbanking"
+      },
+      "diagnosisRootCause": "insufficient_funds",
+      "confidence": 0.85,
+      "reasoning": "The payment failed with BAD_REQUEST_ERROR (insufficient_funds) on the customer's Axis card. Bank downtime check confirms no active downtime for Axis bank. The customer has a record of 2 successful and 2 failed payments. According to the recovery playbook, the default move for insufficient_funds is RETRY_SCHEDULED. However, prior attempts show that Attempt 1 (RETRY_SCHEDULED) and Attempt 2 (CUSTOMER_NUDGE) both failed. Following the directive not to repeat failed moves, we deviate from the default playbook move and propose PAYMENT_LINK via netbanking to allow the customer to complete payment using an alternate bank account or rail.",
+      "toolCalls": 5,
+      "degraded": false
+    },
+    "trace": [
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_customer_payment_history",
+          "callId": "call_2846563",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_customer_payment_history",
+          "callId": "call_2846563",
+          "source": "local",
+          "raw": {
+            "totalPayments": 4,
+            "successfulPayments": 2,
+            "failedPayments": 2,
+            "lastSuccessfulAt": "2026-07-05T00:00:00.000Z",
+            "daysSinceLastSuccess": 62,
+            "methodsUsed": [
+              "card"
+            ],
+            "medianDaysBetweenPayments": 46
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_this_case_prior_attempts",
+          "callId": "call_2343248",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_this_case_prior_attempts",
+          "callId": "call_2343248",
+          "source": "local",
+          "raw": {
+            "attempts": [
+              {
+                "attemptNo": 1,
+                "action": "RETRY_SCHEDULED",
+                "outcome": "FAILED",
+                "detail": "payment declined"
+              },
+              {
+                "attemptNo": 2,
+                "action": "CUSTOMER_NUDGE",
+                "outcome": "FAILED",
+                "detail": "payment declined"
+              }
+            ]
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "check_bank_downtime",
+          "callId": "call_2753388",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "check_bank_downtime",
+          "callId": "call_2753388",
+          "source": "razorpay-live",
+          "raw": {
+            "method": "card",
+            "instrument": "AXIS",
+            "matched": false,
+            "activeDowntimes": [],
+            "methodWideOutages": [
+              {
+                "id": "down_T8xxbch1uvYaeg",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "BKID"
+                },
+                "startedAt": "2026-07-03T08:36:31.000Z"
+              },
+              {
+                "id": "down_TJaePDulbxEnO0",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "PUNB"
+                },
+                "startedAt": "2026-07-30T04:57:25.000Z"
+              },
+              {
+                "id": "down_TJcETGAh2KrjaD",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "CNRB"
+                },
+                "startedAt": "2026-07-30T06:30:15.000Z"
+              },
+              {
+                "id": "down_TRtFk8Bh9VCEd5",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "CITI"
+                },
+                "startedAt": "2026-08-20T04:21:15.000Z"
+              }
+            ]
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_1956329",
+          "args": {
+            "method": "card"
+          }
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_1956329",
+          "source": "local",
+          "raw": {
+            "failureReason": "insufficient_funds",
+            "cases": [
+              {
+                "failureReason": "insufficient_funds",
+                "action": "RETRY_SCHEDULED",
+                "outcome": "RECOVERED",
+                "hoursToResolution": 112.16761878555556
+              }
+            ]
+          },
+          "ms": 4
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_recovery_playbook",
+          "callId": "call_2629240",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_recovery_playbook",
+          "callId": "call_2629240",
+          "source": "local",
+          "raw": {
+            "playbook": [
+              {
+                "rootCause": "soft_decline",
+                "defaultAction": "RETRY_SCHEDULED",
+                "note": "Clean-history customer, generic decline, no downtime — a recoverable payment. Time the retry from the customer's own payment cadence."
+              },
+              {
+                "rootCause": "insufficient_funds",
+                "defaultAction": "RETRY_SCHEDULED",
+                "note": "Time it toward when the customer historically has money — read that from their payment history, not a fixed guess."
+              },
+              {
+                "rootCause": "bank_downtime",
+                "defaultAction": "RETRY_SCHEDULED",
+                "note": "Time it to when the downtime feed shows the window clearing. Never a nudge — the customer did nothing wrong."
+              },
+              {
+                "rootCause": "hard_decline",
+                "defaultAction": "CUSTOMER_NUDGE",
+                "note": "Card expired or blocked. A retry is pointless; the customer must act. If the merchant's record shows links on another rail recovering these, use PAYMENT_LINK instead."
+              },
+              {
+                "rootCause": "technical",
+                "defaultAction": "RETRY_NOW",
+                "note": "Transient technical failure. Use RETRY_SCHEDULED instead if a downtime window is open."
+              },
+              {
+                "rootCause": "risk_hold",
+                "defaultAction": "ESCALATE",
+                "note": "Risk-flagged or fraud-shaped pattern. Never auto-retry."
+              },
+              {
+                "rootCause": "unrecoverable",
+                "defaultAction": "WRITE_OFF",
+                "note": "Thin or failing history, an account that never funds, a decline that will not clear."
+              }
+            ]
+          },
+          "ms": 0
+        }
+      }
+    ]
+  },
+  "cust_1006#4": {
+    "proposal": {
+      "action": {
+        "kind": "WRITE_OFF",
+        "reason": "All prior recovery moves (scheduled retry, customer nudge, payment link) have failed."
+      },
+      "diagnosisRootCause": "insufficient_funds",
+      "confidence": 0.9,
+      "reasoning": "The payment failed due to insufficient_funds on an AXIS card. Bank downtime feed shows no active downtime for AXIS. Customer payment history shows 2 successes out of 4 total attempts, with the last success 63 days ago. Investigation of prior attempts reveals that Attempt 1 (RETRY_SCHEDULED), Attempt 2 (CUSTOMER_NUDGE), and Attempt 3 (PAYMENT_LINK) have all been executed and failed. While the recovery playbook defaults to RETRY_SCHEDULED for insufficient_funds, we must deviate from this default move because all primary recovery channels (retry, nudge, payment link) have already been exhausted on this specific case without success, and repeating previously failed moves is disallowed. Consequently, the payment is deemed unrecoverable and should be written off.",
+      "toolCalls": 5,
+      "degraded": false
+    },
+    "trace": [
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_customer_payment_history",
+          "callId": "call_2189860",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "check_bank_downtime",
+          "callId": "call_2189861",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2189865",
+          "args": {
+            "limit": 8
+          }
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_this_case_prior_attempts",
+          "callId": "call_2189869",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_customer_payment_history",
+          "callId": "call_2189860",
+          "source": "local",
+          "raw": {
+            "totalPayments": 4,
+            "successfulPayments": 2,
+            "failedPayments": 2,
+            "lastSuccessfulAt": "2026-07-05T00:00:00.000Z",
+            "daysSinceLastSuccess": 63,
+            "methodsUsed": [
+              "card"
+            ],
+            "medianDaysBetweenPayments": 46
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_this_case_prior_attempts",
+          "callId": "call_2189869",
+          "source": "local",
+          "raw": {
+            "attempts": [
+              {
+                "attemptNo": 1,
+                "action": "RETRY_SCHEDULED",
+                "outcome": "FAILED",
+                "detail": "payment declined"
+              },
+              {
+                "attemptNo": 2,
+                "action": "CUSTOMER_NUDGE",
+                "outcome": "FAILED",
+                "detail": "payment declined"
+              },
+              {
+                "attemptNo": 3,
+                "action": "PAYMENT_LINK",
+                "outcome": "FAILED",
+                "detail": "payment declined"
+              }
+            ]
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "check_bank_downtime",
+          "callId": "call_2189861",
+          "source": "razorpay-live",
+          "raw": {
+            "method": "card",
+            "instrument": "AXIS",
+            "matched": false,
+            "activeDowntimes": [],
+            "methodWideOutages": [
+              {
+                "id": "down_T8xxbch1uvYaeg",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "BKID"
+                },
+                "startedAt": "2026-07-03T08:36:31.000Z"
+              },
+              {
+                "id": "down_TJaePDulbxEnO0",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "PUNB"
+                },
+                "startedAt": "2026-07-30T04:57:25.000Z"
+              },
+              {
+                "id": "down_TJcETGAh2KrjaD",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "CNRB"
+                },
+                "startedAt": "2026-07-30T06:30:15.000Z"
+              },
+              {
+                "id": "down_TRtFk8Bh9VCEd5",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "CITI"
+                },
+                "startedAt": "2026-08-20T04:21:15.000Z"
+              }
+            ]
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2189865",
+          "source": "local",
+          "raw": {
+            "failureReason": "insufficient_funds",
+            "cases": [
+              {
+                "failureReason": "insufficient_funds",
+                "action": "RETRY_SCHEDULED",
+                "outcome": "RECOVERED",
+                "hoursToResolution": 112.16761878555556
+              }
+            ]
+          },
+          "ms": 6
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_recovery_playbook",
+          "callId": "call_2103071",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_recovery_playbook",
+          "callId": "call_2103071",
+          "source": "local",
+          "raw": {
+            "playbook": [
+              {
+                "rootCause": "soft_decline",
+                "defaultAction": "RETRY_SCHEDULED",
+                "note": "Clean-history customer, generic decline, no downtime — a recoverable payment. Time the retry from the customer's own payment cadence."
+              },
+              {
+                "rootCause": "insufficient_funds",
+                "defaultAction": "RETRY_SCHEDULED",
+                "note": "Time it toward when the customer historically has money — read that from their payment history, not a fixed guess."
+              },
+              {
+                "rootCause": "bank_downtime",
+                "defaultAction": "RETRY_SCHEDULED",
+                "note": "Time it to when the downtime feed shows the window clearing. Never a nudge — the customer did nothing wrong."
+              },
+              {
+                "rootCause": "hard_decline",
+                "defaultAction": "CUSTOMER_NUDGE",
+                "note": "Card expired or blocked. A retry is pointless; the customer must act. If the merchant's record shows links on another rail recovering these, use PAYMENT_LINK instead."
+              },
+              {
+                "rootCause": "technical",
+                "defaultAction": "RETRY_NOW",
+                "note": "Transient technical failure. Use RETRY_SCHEDULED instead if a downtime window is open."
+              },
+              {
+                "rootCause": "risk_hold",
+                "defaultAction": "ESCALATE",
+                "note": "Risk-flagged or fraud-shaped pattern. Never auto-retry."
+              },
+              {
+                "rootCause": "unrecoverable",
+                "defaultAction": "WRITE_OFF",
+                "note": "Thin or failing history, an account that never funds, a decline that will not clear."
+              }
+            ]
+          },
+          "ms": 0
+        }
+      }
+    ]
+  },
+  "cust_1001#3": {
+    "proposal": {
+      "action": {
+        "kind": "WRITE_OFF",
+        "reason": "Both prior recovery attempts (CUSTOMER_NUDGE and PAYMENT_LINK) failed for this card decline, making the payment unrecoverable."
+      },
+      "diagnosisRootCause": "hard_decline",
+      "confidence": 0.92,
+      "reasoning": "Investigation Summary:\n1. Customer History: The customer has 4 successful payments with 0 prior failures before this incident, with the last success on 2026-05-31.\n2. Downtime Check: Checked live Razorpay downtime feed for HDFC card; matched is false (no active downtime for this instrument).\n3. Prior Attempt History: This payment has already undergone two recovery attempts: Attempt 1 was a CUSTOMER_NUDGE (failed) and Attempt 2 was a PAYMENT_LINK (failed).\n4. Analysis & Decision: The root cause remains a hard_decline (card expired or blocked). While the playbook default for hard_decline is CUSTOMER_NUDGE (or PAYMENT_LINK), both moves have already been attempted and failed on this payment. Following the rule to never repeat an attempt that has already failed, and with no active bank downtime or viable recovery rail remaining, we deviate from the playbook default and submit a WRITE_OFF proposal.",
+      "toolCalls": 6,
+      "degraded": false
+    },
+    "trace": [
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_customer_payment_history",
+          "callId": "call_2505882",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_this_case_prior_attempts",
+          "callId": "call_2505883",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_customer_payment_history",
+          "callId": "call_2505882",
+          "source": "local",
+          "raw": {
+            "totalPayments": 4,
+            "successfulPayments": 4,
+            "failedPayments": 0,
+            "lastSuccessfulAt": "2026-05-31T00:00:00.000Z",
+            "daysSinceLastSuccess": 94,
+            "methodsUsed": [
+              "card"
+            ],
+            "medianDaysBetweenPayments": 28
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_this_case_prior_attempts",
+          "callId": "call_2505883",
+          "source": "local",
+          "raw": {
+            "attempts": [
+              {
+                "attemptNo": 1,
+                "action": "CUSTOMER_NUDGE",
+                "outcome": "FAILED",
+                "detail": "payment declined"
+              },
+              {
+                "attemptNo": 2,
+                "action": "PAYMENT_LINK",
+                "outcome": "FAILED",
+                "detail": "payment declined"
+              }
+            ]
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "check_bank_downtime",
+          "callId": "call_2107848",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2107856",
+          "args": {
+            "method": "card"
+          }
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "check_bank_downtime",
+          "callId": "call_2107848",
+          "source": "razorpay-live",
+          "raw": {
+            "method": "card",
+            "instrument": "HDFC",
+            "matched": false,
+            "activeDowntimes": [],
+            "methodWideOutages": [
+              {
+                "id": "down_T8xxbch1uvYaeg",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "BKID"
+                },
+                "startedAt": "2026-07-03T08:36:31.000Z"
+              },
+              {
+                "id": "down_TJaePDulbxEnO0",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "PUNB"
+                },
+                "startedAt": "2026-07-30T04:57:25.000Z"
+              },
+              {
+                "id": "down_TJcETGAh2KrjaD",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "CNRB"
+                },
+                "startedAt": "2026-07-30T06:30:15.000Z"
+              },
+              {
+                "id": "down_TRtFk8Bh9VCEd5",
+                "method": "card",
+                "severity": "high",
+                "instrument": {
+                  "issuer": "CITI"
+                },
+                "startedAt": "2026-08-20T04:21:15.000Z"
+              }
+            ]
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_2107856",
+          "source": "local",
+          "raw": {
+            "failureReason": "card_declined",
+            "cases": []
+          },
+          "ms": 3
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_1967941",
+          "args": {
+            "limit": 10
+          }
+        }
+      },
+      {
+        "type": "TOOL_CALLED",
+        "payload": {
+          "name": "get_recovery_playbook",
+          "callId": "call_1967942",
+          "args": {}
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_recovery_playbook",
+          "callId": "call_1967942",
+          "source": "local",
+          "raw": {
+            "playbook": [
+              {
+                "rootCause": "soft_decline",
+                "defaultAction": "RETRY_SCHEDULED",
+                "note": "Clean-history customer, generic decline, no downtime — a recoverable payment. Time the retry from the customer's own payment cadence."
+              },
+              {
+                "rootCause": "insufficient_funds",
+                "defaultAction": "RETRY_SCHEDULED",
+                "note": "Time it toward when the customer historically has money — read that from their payment history, not a fixed guess."
+              },
+              {
+                "rootCause": "bank_downtime",
+                "defaultAction": "RETRY_SCHEDULED",
+                "note": "Time it to when the downtime feed shows the window clearing. Never a nudge — the customer did nothing wrong."
+              },
+              {
+                "rootCause": "hard_decline",
+                "defaultAction": "CUSTOMER_NUDGE",
+                "note": "Card expired or blocked. A retry is pointless; the customer must act. If the merchant's record shows links on another rail recovering these, use PAYMENT_LINK instead."
+              },
+              {
+                "rootCause": "technical",
+                "defaultAction": "RETRY_NOW",
+                "note": "Transient technical failure. Use RETRY_SCHEDULED instead if a downtime window is open."
+              },
+              {
+                "rootCause": "risk_hold",
+                "defaultAction": "ESCALATE",
+                "note": "Risk-flagged or fraud-shaped pattern. Never auto-retry."
+              },
+              {
+                "rootCause": "unrecoverable",
+                "defaultAction": "WRITE_OFF",
+                "note": "Thin or failing history, an account that never funds, a decline that will not clear."
+              }
+            ]
+          },
+          "ms": 0
+        }
+      },
+      {
+        "type": "TOOL_RESULT",
+        "payload": {
+          "name": "get_similar_resolved_cases",
+          "callId": "call_1967941",
+          "source": "local",
+          "raw": {
+            "failureReason": "card_declined",
+            "cases": []
+          },
+          "ms": 4
+        }
+      }
+    ]
+  }
+}
