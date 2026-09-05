@@ -5,8 +5,6 @@ import "./styles/tokens.css";
 import "./styles/base.css";
 import { App } from "./App";
 
-document.body.setAttribute("data-surface", "room");
-
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <App />

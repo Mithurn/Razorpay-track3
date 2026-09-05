@@ -1,4 +1,3 @@
-import { customerLabel } from "../ui/format.js";
 import type { RecoveryCase } from "../types.js";
 
 const rupees = (paise: number) => `₹${Math.round(paise / 100).toLocaleString("en-IN")}`;
@@ -15,7 +14,7 @@ export function CustomerPanel({ kase }: { kase: RecoveryCase }) {
   return (
     <div className="cust-panel">
       <div className="cust-panel__grid">
-        <Field label="customer" value={customerLabel(kase.customerRef)} />
+        <Field label="customer" value={kase.customerRef} />
         <Field label="merchant" value={kase.merchantRef} />
         <Field label="current failure" value={`${kase.failureReason} (${kase.failureCode})`} />
         <Field label="instrument" value={kase.instrument?.issuer ?? kase.method ?? "card"} />

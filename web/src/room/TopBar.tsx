@@ -67,7 +67,7 @@ export function TopBar({
     <header className="topbar">
       <div className="topbar__metrics">
         <Metric
-          label="Recovered in 60-case batch"
+          label="Recovered — 60-case batch"
           value={rupees(recoveredSimulatedPaise)}
           tone="recovered"
           note={
@@ -87,7 +87,7 @@ export function TopBar({
       <div className="topbar__controls">
         {braked ? (
           <div className="topbar__halted">
-            <span>Every live case stopped permanently. Resume unblocks new cases only, it does not revive these.</span>
+            <span>Every live case stopped — permanently. Resume unblocks new cases only, it does not revive these.</span>
             <button className="btn btn--ghost" onClick={resume}>
               Resume new activity
             </button>
@@ -95,12 +95,12 @@ export function TopBar({
         ) : confirmingStop ? (
           <div className="topbar__confirm-stop">
             <span>
-              Permanently stop all {active} live case{active === 1 ? "" : "s"}? This cannot be undone. Resume only
+              Permanently stop all {active} live case{active === 1 ? "" : "s"}? This cannot be undone — Resume only
               allows new cases to start afterward.
             </span>
             <button className="btn btn--danger-solid" onClick={emergencyStop} disabled={stopping}>
               {stopping ? <Spinner size={13} /> : <Square size={13} />}
-              {stopping ? "Stopping…" : "Confirm stop permanently"}
+              {stopping ? "Stopping…" : "Confirm — stop permanently"}
             </button>
             <button className="btn btn--ghost" onClick={() => setConfirmingStop(false)} aria-label="Cancel">
               <X size={13} />
@@ -188,7 +188,7 @@ function BenchPanel({ agent, fixed, rules }: { agent: RunSummary; fixed: RunSumm
       <div className="eval-panel__row">
         {arms.map(({ label, m }) => (
           <span key={label} className={"eval-panel__arm" + (m === best.m ? "" : " eval-panel__arm--dim")}>
-            {label}: {rupees(m.recoveredPaise)} recovered · {pct(m.recoveryRate)} rate · {pct(m.escalationRate)}{" "}
+            {label} — {rupees(m.recoveredPaise)} recovered · {pct(m.recoveryRate)} rate · {pct(m.escalationRate)}{" "}
             escalated
             {m.rootCauseAccuracy !== null && ` · ${pct(m.rootCauseAccuracy)} root-cause accuracy`}
           </span>
@@ -196,7 +196,7 @@ function BenchPanel({ agent, fixed, rules }: { agent: RunSummary; fixed: RunSumm
       </div>
       {rules && (
         <span className="eval-panel__label" style={{ opacity: 0.7 }}>
-          {best.label} recovers the most on this batch. Root-cause accuracy is the agent-only figure. A fixed
+          {best.label} recovers the most on this batch. Root-cause accuracy is the agent-only figure — a fixed
           schedule or a rules table never diagnoses at all, it only picks an action off the error code.
         </span>
       )}

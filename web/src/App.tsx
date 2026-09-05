@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import "./styles/room.css";
 import "./loop/loop.css";
 import "./room/room-extra.css";
@@ -8,7 +8,7 @@ import { deriveLoopState, type StageId } from "./loop/useCaseLoopState.js";
 import { useLiveRun } from "./loop/useLiveRun.js";
 import { ActivityStream } from "./loop/ActivityStream.js";
 import { deriveActivities, type RawEvent } from "./loop/activities.js";
-import { customerLabel, rupees } from "./ui/format.js";
+import { rupees } from "./ui/format.js";
 import { TopBar } from "./room/TopBar.js";
 import { Sidebar } from "./room/Sidebar.js";
 import { CustomerPanel } from "./room/CustomerPanel.js";
@@ -141,7 +141,6 @@ export function App() {
         freshCase={freshCase?.id ?? null}
         cfg={cfg}
         onRecover={recoverGuarded}
-        onWatchLive={watchLive}
         onSimulateCapture={simulateCaptureGuarded}
         onStop={stopCaseGuarded}
       />
@@ -162,13 +161,15 @@ const STAGE_LABEL: Record<StageId, string> = {
 function toRaw(events: CaseDetail["events"]): RawEvent[] {
   return events.map((e) => ({ type: e.type, payload: e.payload, at: e.createdAt }));
 }
+function liveToRaw(audit: ReturnType<typeof useLiveRun>["audit"]): RawEvent[] {
+  return audit.map((e) => ({ type: e.eventType, payload: e.payload, at: e.at }));
+}
 
 function Stage({
   caseId,
   freshCase,
   cfg,
   onRecover,
-  onWatchLive,
   onSimulateCapture,
   onStop,
 }: {
@@ -176,7 +177,6 @@ function Stage({
   freshCase: string | null;
   cfg: RuntimeConfig | null;
   onRecover: (id: string) => Promise<void>;
-  onWatchLive: () => Promise<void>;
   onSimulateCapture: (id: string) => Promise<void>;
   onStop: (id: string) => Promise<void>;
 }) {
@@ -186,7 +186,6 @@ function Stage({
   const [confirmingStop, setConfirmingStop] = useState(false);
   const [elapsedMs, setElapsedMs] = useState(0);
   const run = useLiveRun(caseId);
-  const auditCount = run.audit.length;
   const limits = cfg?.limits ?? DEFAULT_LIMITS;
 
   useEffect(() => {
@@ -195,27 +194,16 @@ function Stage({
     setConfirmingStop(false);
   }, [caseId]);
 
-  const refreshDetail = useCallback(() => {
-    if (!caseId) return;
-    caseDetail(caseId).then(setDetail).catch(() => undefined);
-  }, [caseId]);
-
   useEffect(() => {
     if (!caseId) {
       setDetail(null);
       return;
     }
-    refreshDetail();
-    const poll = setInterval(refreshDetail, 1500);
+    const load = () => caseDetail(caseId).then(setDetail).catch(() => undefined);
+    load();
+    const poll = setInterval(load, 1500);
     return () => clearInterval(poll);
-  }, [caseId, refreshDetail]);
-
-  // The stored log is the stream's only source, so a streamed audit event pulls the log forward
-  // instead of rendering itself. Two sources meant two timestamps for one event, which rebuilt
-  // every block's key and made the list jump.
-  useEffect(() => {
-    if (auditCount > 0) refreshDetail();
-  }, [auditCount, refreshDetail]);
+  }, [caseId]);
 
   useEffect(() => {
     if (!run.live || !run.startedAt) {
@@ -233,12 +221,12 @@ function Stage({
     return (
       <section className="stage stage--empty">
         <p className="empty">
-          Pick a case on the left to watch how the agent worked it: the signals it pulled, what
+          Pick a case on the left to watch how the agent worked it — the signals it pulled, what
           it concluded, how the safety gate ruled, and what actually happened.
           {freshCase && (
             <>
               <br />
-              <button className="btn btn--primary" onClick={onWatchLive}>
+              <button className="btn btn--primary" onClick={() => onRecover(freshCase)}>
                 <Play size={13} /> Watch a live recovery
               </button>
             </>
@@ -262,7 +250,10 @@ function Stage({
     doneLane: run.doneLane,
   });
 
-  const activities = useMemo(() => deriveActivities(toRaw(events)), [events]);
+  const fromEvents = toRaw(events);
+  const fromLive = liveToRaw(run.audit);
+  const rawEvents = fromLive.length > fromEvents.length ? fromLive : fromEvents;
+  const activities = deriveActivities(rawEvents);
   const liveStepStatus = run.live
     ? { step: run.tools.length + (run.proposal ? 1 : 0), budget: cfg?.stepBudget ?? 6, elapsedMs }
     : null;
@@ -272,55 +263,50 @@ function Stage({
   return (
     <section className="stage">
       <div className="stage__topbar">
-        <div className="stage__head">
-          <div className="stage__id">
-            <span className="case__kicker">Customer</span>
-            <span className="case__cust">
-              {run.live && <span className="dot" />}
-              {kase ? customerLabel(kase.customerRef) : "…"}
-            </span>
-            {kase && (
-              <span className="case__facts">
-                <span className="case__fact">
-                  <span className="case__fact-v">{rupees(kase.amountPaise)}</span> at risk
-                </span>
-                <span className="case__fact">{kase.failureReason.replace(/_/g, " ")}</span>
-                <span className="case__fact">{kase.instrument?.issuer ?? kase.method ?? "card"}</span>
-                <span className="case__fact">
-                  {kase.customerHistory.filter((h) => h.status === "captured").length}/
-                  {kase.customerHistory.length} clean payments
-                </span>
-              </span>
-            )}
-          </div>
+        <div className="stage__id">
+          <span className="case__kicker">Customer</span>
+          <span className="case__cust">
+            {run.live && <span className="dot" />}
+            {kase?.customerRef ?? "…"}
+          </span>
           {kase && (
-            <div className="fence">
-              <span className="fence__k">Deterministic limits on this case</span>
-              <div className="fence__cells">
-                <span className="fence__cell">
-                  <span className="fence__label">Attempt</span>
-                  <span className="fence__v">
-                    {attempt?.attemptNo ?? 0} / {limits.maxAttempts}
-                  </span>
-                </span>
-                <span className="fence__cell">
-                  <span className="fence__label">Exposure</span>
-                  <span className={"fence__v" + (kase.amountPaise > limits.maxExposurePaise ? " fence--over" : "")}>
-                    {rupees(kase.amountPaise)} of {rupees(limits.maxExposurePaise)}
-                  </span>
-                </span>
-                <span className="fence__cell">
-                  <span className="fence__label">Cooldown</span>
-                  <span className="fence__v">{limits.cooldownHours}h</span>
-                </span>
-                <span className="fence__cell">
-                  <span className="fence__label">Lane</span>
-                  <span className="stage__lane">{kase.lane.replace(/_/g, " ")}</span>
-                </span>
-              </div>
-            </div>
+            <span className="case__facts">
+              <span className="case__fact">
+                <span className="case__fact-v">{rupees(kase.amountPaise)}</span> at risk
+              </span>
+              <span className="case__fact">{kase.failureReason.replace(/_/g, " ")}</span>
+              <span className="case__fact">{kase.instrument?.issuer ?? kase.method ?? "card"}</span>
+              <span className="case__fact">
+                {kase.customerHistory.filter((h) => h.status === "captured").length}/
+                {kase.customerHistory.length} clean payments
+              </span>
+            </span>
           )}
         </div>
+        {kase && (
+          <div className="fence">
+            <span className="fence__cell">
+              <span className="fence__k">Attempt</span>
+              <span className="fence__v">
+                {attempt?.attemptNo ?? 0} / {limits.maxAttempts}
+              </span>
+            </span>
+            <span className="fence__cell">
+              <span className="fence__k">Exposure</span>
+              <span className={"fence__v" + (kase.amountPaise > limits.maxExposurePaise ? " fence--over" : "")}>
+                {rupees(kase.amountPaise)} of {rupees(limits.maxExposurePaise)}
+              </span>
+            </span>
+            <span className="fence__cell">
+              <span className="fence__k">Cooldown</span>
+              <span className="fence__v">{limits.cooldownHours}h</span>
+            </span>
+            <span className="fence__cell">
+              <span className="fence__k">Lane</span>
+              <span className="stage__lane">{kase.lane.replace(/_/g, " ")}</span>
+            </span>
+          </div>
+        )}
         <div className="stage__actions">
           {kase && (
             <button className="btn btn--ghost" onClick={() => setShowCustomer(true)}>
@@ -347,7 +333,7 @@ function Stage({
           )}
           {canStop && confirmingStop && (
             <span className="topbar__confirm-stop">
-              <span>Stop permanently. Cannot be resumed.</span>
+              <span>Stop permanently — cannot be resumed.</span>
               <button
                 className="btn btn--danger-solid"
                 onClick={() => {
@@ -377,7 +363,7 @@ function Stage({
           onClose={() => setShowCustomer(false)}
           title={
             <>
-              Customer <span className="mono">{customerLabel(kase.customerRef)}</span>
+              Customer <span className="mono">{kase.customerRef}</span>
             </>
           }
         >
@@ -434,7 +420,7 @@ function VerifyAuditButton({ caseId }: { caseId: string }) {
         className="btn btn--ghost"
         onClick={run}
         disabled={result === "pending"}
-        title="Connects to Postgres as the app's own restricted role and tries to edit the event log. The database refuses. Proves the audit trail can't be altered, even by us."
+        title="Connects to Postgres as the app's own restricted role and tries to edit the event log — the database refuses. Proves the audit trail can't be altered, even by us."
       >
         {result === "pending" ? <Spinner size={13} /> : null}
         {result === "pending" ? "Checking…" : "Check log is tamper-proof"}
@@ -442,7 +428,7 @@ function VerifyAuditButton({ caseId }: { caseId: string }) {
       {result && result !== "pending" && (
         <span className={"verify-audit__result" + (result.enforced ? " verify-audit__result--ok" : " verify-audit__result--bad")}>
           {result.enforced ? <Check size={13} /> : <X size={13} />}
-          {result.enforced ? "Event log is append-only. The database enforces it." : result.error ?? "not enforced"}
+          {result.enforced ? "Event log is append-only — the database enforces it" : result.error ?? "not enforced"}
         </span>
       )}
     </span>
