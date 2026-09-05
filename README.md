@@ -382,11 +382,23 @@ npx tsx --env-file=.env bench/seed-demo.ts
 npx tsx --env-file=.env bench/smoke.ts                 # one real agent run against a known case
 ```
 
-## Stack
+## Tech Stack
 
-Node 20+ / TypeScript (ESM) · Fastify · PostgreSQL 16 · Redis + BullMQ · a hand-rolled bounded
-agent loop on the Vercel AI SDK (`ai` v7) · `@openrouter/ai-sdk-provider` · Zod at every boundary ·
-Razorpay test-mode APIs and Checkout · React + Vite · Docker Compose · Vitest.
+| Layer | Technology | Why | At scale |
+|-------|-----------|-----|----------|
+| **Runtime** | Node 20+ / TypeScript (ESM) | Type safety at boundaries, ESM for clean imports | Keep - production-ready |
+| **API** | Fastify | Fastest Node HTTP server, schema validation built-in | Keep - handles high throughput |
+| **Database** | PostgreSQL 16 | ACID transactions, row-level locks for concurrency, role-based grants for append-only enforcement | Keep - add read replicas, partition by merchant |
+| **Queue** | Redis + BullMQ | Durable job queue, supports priorities and delays | Keep - cluster Redis, separate queue per tenant |
+| **Agent** | Vercel AI SDK v7 + hand-rolled loop | Tool-use standardized, streaming built-in. Loop is owned code (step budget, deadline, degrade-to-safe) | Keep SDK, keep owned loop - framework would hide the critical bounds |
+| **LLM** | OpenRouter + Google Gemini | No minimum spend, no cloud billing. Model is env-configurable | At scale: direct provider APIs, tenant-specific model choice |
+| **Validation** | Zod | Runtime schema validation at every external boundary | Keep - catches malformed gateway responses |
+| **Gateway** | Razorpay test mode | Real Orders, Payment Links, Checkout, webhook signatures | Production: same APIs, live mode |
+| **Frontend** | React + Vite | Fast dev loop, standard streaming hooks | Keep - add React Query for cache |
+| **Containerization** | Docker Compose | Single-command dev environment | At scale: Kubernetes, separate worker/API pods |
+| **Testing** | Vitest | Fast, native ESM support | Keep - add contract tests for Razorpay |
+
+**12 runtime dependencies, deliberately.** No agent framework (the bounds are the product). No ORM (would cost the DB-grant proof). No DI container (`src/main.ts` is 130 lines). No state machine library (nine lane constants + compare-and-set). Each dependency earns its place.
 
 ## What broke, and how we got out
 
