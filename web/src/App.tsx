@@ -141,6 +141,7 @@ export function App() {
         freshCase={freshCase?.id ?? null}
         cfg={cfg}
         onRecover={recoverGuarded}
+        onWatchLive={watchLive}
         onSimulateCapture={simulateCaptureGuarded}
         onStop={stopCaseGuarded}
       />
@@ -167,6 +168,7 @@ function Stage({
   freshCase,
   cfg,
   onRecover,
+  onWatchLive,
   onSimulateCapture,
   onStop,
 }: {
@@ -174,6 +176,7 @@ function Stage({
   freshCase: string | null;
   cfg: RuntimeConfig | null;
   onRecover: (id: string) => Promise<void>;
+  onWatchLive: () => Promise<void>;
   onSimulateCapture: (id: string) => Promise<void>;
   onStop: (id: string) => Promise<void>;
 }) {
@@ -235,7 +238,7 @@ function Stage({
           {freshCase && (
             <>
               <br />
-              <button className="btn btn--primary" onClick={() => onRecover(freshCase)}>
+              <button className="btn btn--primary" onClick={onWatchLive}>
                 <Play size={13} /> Watch a live recovery
               </button>
             </>
