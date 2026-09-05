@@ -1,6 +1,35 @@
 # What broke, and how we got out
 
-Kept as a live log during the build, not reconstructed at the end.
+This is the live engineering failure log for RecoveryOps.
+
+It is intentionally not a polished postmortem. Entries were added as failures were discovered during implementation, testing, benchmarking, and final audit.
+
+The purpose is to preserve:
+- What we expected
+- What actually happened
+- Why it mattered
+- How it was diagnosed
+- What changed
+- What regression test or safeguard prevents recurrence
+
+---
+
+## The short version
+
+The most consequential failures were:
+
+1. **Risk-hold veto was wired to nothing** - A misdiagnosed risk-flagged payment would have bypassed human review
+2. **WRITE_OFF could bypass human visibility on risk holds** - Risk cases could be permanently closed without escalation
+3. **Benchmark answers leaked through prior-attempt data** - Agent was reading its own answer key
+4. **Benchmark settlement timing was wrong** - Graded actions at creation time, not settlement time
+5. **Fixed baseline was structurally unfair** - Only proposed retries, lost every case needing a different rail
+6. **Downtime matching was incorrectly implemented** - Matched on payment method instead of specific issuing bank
+7. **Degraded diagnoses were being fabricated as `technical`** - Null diagnoses became correct by accident
+8. **Human escalation was a dead end** - Directives were written but never read
+9. **Benchmark cache replayed stale recordings** - Zero model calls reported as a valid result
+10. **Audit/schema enforcement had a deployment-time failure mode** - Bind-mount served stale file content
+
+Each failure below documents what broke, how it was found, and what prevents recurrence.
 
 ---
 
