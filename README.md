@@ -253,8 +253,20 @@ stated otherwise here:
 
 ## Architecture
 
-The recovery loop, one failed payment at a time — the agent proposes, the gate can only add
-caution, the executor is the only thing that ever touches Razorpay:
+One sentence: a failed payment enters a bounded agent loop, the agent proposes an action, a pure-function safety gate can only add caution, and the executor is the only thing that ever touches Razorpay.
+
+```
+Failed payment
+    → Agent (investigate: history · downtime · similar cases · playbook)
+    → Proposal  (root cause · action · confidence)
+    → Safety Gate  (pure function — clamp or veto only, never picks the action)
+    → Executor  (one idempotency key, re-checks on 5xx, never double-charges)
+    → Razorpay test mode
+         ↓
+    Append-only audit log  (DB role cannot UPDATE/DELETE)
+```
+
+Full data-flow with every path (escalate / reschedule / recover):
 
 ```mermaid
 flowchart LR
