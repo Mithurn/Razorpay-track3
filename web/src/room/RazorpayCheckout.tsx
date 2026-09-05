@@ -73,7 +73,7 @@ export function RazorpayCheckout({
         amount: info.amountPaise,
         currency: info.currency,
         name: "Acme Subscriptions",
-        description: "Recovery Room — customer completes payment",
+        description: "RecoveryOps: customer completes payment",
         prefill: { email: customerRef.includes("@") ? customerRef : undefined },
         theme: { color: "#3b82f6" },
         // Razorpay's own webhook is authoritative; this is only for the room's own responsiveness

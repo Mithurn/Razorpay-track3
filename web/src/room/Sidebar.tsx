@@ -173,7 +173,7 @@ export function Sidebar({
         <span className="sidebar__mark" aria-hidden>
           <RotateCw size={14} />
         </span>
-        <span className="brand__name">Recovery Room</span>
+        <span className="brand__name">RecoveryOps</span>
         <span className={`live-pill live-pill--${status.key}`}>
           <span className="live-pill__dot" />
           {status.label}
