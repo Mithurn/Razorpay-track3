@@ -83,8 +83,11 @@
 .topbar__controls {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-xs);
-  flex: none;
+  flex: 1 1 auto;
+  min-width: 0;
+  justify-content: flex-end;
   margin-left: auto;
 }
 .topbar__halted {
@@ -102,7 +105,9 @@
 .topbar__confirm-stop {
   display: inline-flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-xs);
+  max-width: 100%;
   padding: 4px 4px 4px var(--space-sm);
   border: 1px solid var(--deny-border);
   border-radius: var(--radius-sm);
@@ -296,6 +301,10 @@
   color: var(--agent);
   margin-left: auto;
   font-variant-numeric: tabular-nums;
+  /* Pinned so the ticking elapsed counter cannot reflow the row it sits in. */
+  min-width: 16ch;
+  text-align: right;
+  white-space: nowrap;
 }
 .act__chevron {
   flex: none;

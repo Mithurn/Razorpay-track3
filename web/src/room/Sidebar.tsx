@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { decide } from "../api.js";
 import { Play, PanelLeftClose, PanelLeftOpen, LayoutList, Inbox, RotateCw } from "../ui/icons.js";
 import type { Lane, RecoveryCase } from "../types.js";
-import { rupees } from "../ui/format.js";
+import { customerLabel, rupees } from "../ui/format.js";
 
 const LANE_ORDER: Lane[] = [
   "INCOMING",
@@ -301,7 +301,7 @@ function CaseCard({
       <div className="card__row">
         <span className="card__cust">
           {LANE_DOT[c.lane] && <span className={`card__dot card__dot--${LANE_DOT[c.lane]}`} aria-hidden />}
-          {c.customerRef}
+          {customerLabel(c.customerRef)}
         </span>
         <span className="card__amount">
           {c.lane === "RECOVERED" ? rupees(c.recoveredPaise) : rupees(c.amountPaise)}
@@ -337,7 +337,7 @@ function EscalationRow({
   return (
     <div className="rail-item">
       <div className="card__row" onClick={onOpen} style={{ cursor: "pointer" }}>
-        <span className="card__cust">{kase.customerRef}</span>
+        <span className="card__cust">{customerLabel(kase.customerRef)}</span>
         <span className="card__amount">{rupees(kase.amountPaise)}</span>
       </div>
       <span className="card__reason">{kase.failureReason.replace(/_/g, " ")}</span>

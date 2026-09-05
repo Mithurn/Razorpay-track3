@@ -67,7 +67,7 @@ export function TopBar({
     <header className="topbar">
       <div className="topbar__metrics">
         <Metric
-          label="Recovered — 60-case batch"
+          label="Recovered in 60-case batch"
           value={rupees(recoveredSimulatedPaise)}
           tone="recovered"
           note={

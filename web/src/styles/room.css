@@ -313,11 +313,16 @@
 }
 .stage__topbar {
   display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding-bottom: var(--space-md);
+  border-bottom: 1px solid var(--line);
+}
+.stage__head {
+  display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
   gap: var(--space-md);
-  padding-bottom: var(--space-md);
-  border-bottom: 1px solid var(--line);
 }
 .stage__id {
   display: flex;
@@ -362,8 +367,9 @@
 .stage__actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-xs);
-  margin-left: auto;
+  max-width: 100%;
 }
 .stage__body {
   flex: 1;
@@ -566,26 +572,35 @@
 /* Guardrail strip — the limits the deterministic gate holds the agent to, all real from /config */
 .fence {
   display: flex;
-  align-items: stretch;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
   flex: none;
+  margin-left: auto;
+  font-family: var(--font-sans);
+}
+.fence__cells {
+  display: flex;
+  align-items: stretch;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
   background: var(--bg-inset);
   overflow: hidden;
-  font-family: var(--font-sans);
 }
 .fence__cell {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 6px 12px;
+  justify-content: space-between;
+  gap: 3px;
+  padding: 7px 14px;
   border-right: 1px solid var(--line);
   white-space: nowrap;
 }
 .fence__cell:last-child {
   border-right: 0;
 }
-.fence__k {
+.fence__k,
+.fence__label {
   font-size: var(--text-2xs);
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -593,13 +608,20 @@
 }
 .fence__v {
   font-size: var(--text-xs);
-  color: var(--text-muted);
+  font-weight: var(--w-medium);
+  color: var(--text);
   font-variant-numeric: tabular-nums;
 }
 .fence__v.fence--over {
   color: var(--deny);
-  font-weight: var(--w-medium);
 }
 .fence .stage__lane {
   color: var(--text);
+}
+
+@media (max-width: 1100px) {
+  .fence {
+    align-items: flex-start;
+    margin-left: 0;
+  }
 }
