@@ -8,7 +8,7 @@ import { deriveLoopState, type StageId } from "./loop/useCaseLoopState.js";
 import { useLiveRun } from "./loop/useLiveRun.js";
 import { ActivityStream } from "./loop/ActivityStream.js";
 import { deriveActivities, type RawEvent } from "./loop/activities.js";
-import { rupees } from "./ui/format.js";
+import { bankName, customerLabel, rupees } from "./ui/format.js";
 import { TopBar } from "./room/TopBar.js";
 import { Sidebar } from "./room/Sidebar.js";
 import { CustomerPanel } from "./room/CustomerPanel.js";
@@ -161,9 +161,6 @@ const STAGE_LABEL: Record<StageId, string> = {
 function toRaw(events: CaseDetail["events"]): RawEvent[] {
   return events.map((e) => ({ type: e.type, payload: e.payload, at: e.createdAt }));
 }
-function liveToRaw(audit: ReturnType<typeof useLiveRun>["audit"]): RawEvent[] {
-  return audit.map((e) => ({ type: e.eventType, payload: e.payload, at: e.at }));
-}
 
 function Stage({
   caseId,
@@ -204,6 +201,16 @@ function Stage({
     const poll = setInterval(load, 1500);
     return () => clearInterval(poll);
   }, [caseId]);
+
+  // Immediately refetch detail when live SSE audit events arrive so the activity
+  // stream updates fast without waiting for the 1.5s poll tick.
+  const auditLen = run.audit.length;
+  useEffect(() => {
+    if (auditLen > 0 && caseId) {
+      caseDetail(caseId).then(setDetail).catch(() => undefined);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auditLen]);
 
   useEffect(() => {
     if (!run.live || !run.startedAt) {
@@ -251,9 +258,7 @@ function Stage({
   });
 
   const fromEvents = toRaw(events);
-  const fromLive = liveToRaw(run.audit);
-  const rawEvents = fromLive.length > fromEvents.length ? fromLive : fromEvents;
-  const activities = deriveActivities(rawEvents);
+  const activities = deriveActivities(fromEvents);
   const liveStepStatus = run.live
     ? { step: run.tools.length + (run.proposal ? 1 : 0), budget: cfg?.stepBudget ?? 6, elapsedMs }
     : null;
@@ -267,7 +272,7 @@ function Stage({
           <span className="case__kicker">Customer</span>
           <span className="case__cust">
             {run.live && <span className="dot" />}
-            {kase?.customerRef ?? "…"}
+            {kase ? customerLabel(kase.customerRef) : "…"}
           </span>
           {kase && (
             <span className="case__facts">
@@ -275,7 +280,13 @@ function Stage({
                 <span className="case__fact-v">{rupees(kase.amountPaise)}</span> at risk
               </span>
               <span className="case__fact">{kase.failureReason.replace(/_/g, " ")}</span>
-              <span className="case__fact">{kase.instrument?.issuer ?? kase.method ?? "card"}</span>
+              <span
+                className="case__fact"
+                data-tooltip={kase.instrument?.issuer ? bankName(kase.instrument.issuer) : undefined}
+                style={kase.instrument?.issuer ? { cursor: "help" } : undefined}
+              >
+                {kase.instrument?.issuer ?? kase.method ?? "card"}
+              </span>
               <span className="case__fact">
                 {kase.customerHistory.filter((h) => h.status === "captured").length}/
                 {kase.customerHistory.length} clean payments
@@ -363,7 +374,7 @@ function Stage({
           onClose={() => setShowCustomer(false)}
           title={
             <>
-              Customer <span className="mono">{kase.customerRef}</span>
+              Customer <span className="mono">{customerLabel(kase.customerRef)}</span>
             </>
           }
         >

@@ -1,4 +1,5 @@
 import type { RecoveryCase } from "../types.js";
+import { bankName, customerLabel } from "../ui/format.js";
 
 const rupees = (paise: number) => `₹${Math.round(paise / 100).toLocaleString("en-IN")}`;
 const dateFmt = (iso: string) => new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
@@ -14,10 +15,10 @@ export function CustomerPanel({ kase }: { kase: RecoveryCase }) {
   return (
     <div className="cust-panel">
       <div className="cust-panel__grid">
-        <Field label="customer" value={kase.customerRef} />
+        <Field label="customer" value={customerLabel(kase.customerRef)} />
         <Field label="merchant" value={kase.merchantRef} />
         <Field label="current failure" value={`${kase.failureReason} (${kase.failureCode})`} />
-        <Field label="instrument" value={kase.instrument?.issuer ?? kase.method ?? "card"} />
+        <Field label="instrument" value={kase.instrument?.issuer ?? kase.method ?? "card"} valueTitle={kase.instrument?.issuer ? bankName(kase.instrument.issuer) : undefined} />
         <Field label="amount at risk" value={rupees(kase.amountPaise)} />
         <Field label="already recovered" value={kase.recoveredPaise > 0 ? rupees(kase.recoveredPaise) : "—"} />
         <Field label="failed at" value={dateFmt(kase.failedAt)} />
@@ -48,11 +49,13 @@ export function CustomerPanel({ kase }: { kase: RecoveryCase }) {
   );
 }
 
-function Field({ label, value }: { label: string; value: string }) {
+function Field({ label, value, valueTitle }: { label: string; value: string; valueTitle?: string }) {
   return (
     <div className="cust-panel__field">
       <span className="cust-panel__field-label">{label}</span>
-      <span className="cust-panel__field-value">{value}</span>
+      <span className="cust-panel__field-value" data-tooltip={valueTitle} style={valueTitle ? { cursor: "help" } : undefined}>
+        {value}
+      </span>
     </div>
   );
 }

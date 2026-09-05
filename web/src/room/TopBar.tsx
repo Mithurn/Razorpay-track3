@@ -25,7 +25,7 @@ export function TopBar({
   onError: (message: string) => void;
 }) {
   const recoveredLivePaise = metrics?.recoveredLivePaise ?? 0;
-  const recoveredSimulatedPaise = metrics?.recoveredSimulatedPaise ?? 0;
+  const recoveredTotal = metrics?.recoveredPaise ?? 0;
   // The 60-case batch total is the hero figure — the number Track 3's bar grades. A live on-camera
   // capture is real money too, shown as a separate accent, never blended into the batch total.
   const recoveredLive = useTweenedNumber(recoveredLivePaise);
@@ -67,15 +67,15 @@ export function TopBar({
     <header className="topbar">
       <div className="topbar__metrics">
         <Metric
-          label="Recovered — 60-case batch"
-          value={rupees(recoveredSimulatedPaise)}
+          label="Recovered"
+          value={rupees(recoveredTotal)}
           tone="recovered"
           note={
             recoveredDelta
               ? `${recoveredDelta} just captured, live`
               : recoveredLivePaise > 0
                 ? `+ ${rupees(recoveredLive)} live this session`
-                : "no live captures yet this session"
+                : null
           }
         />
         <Metric label="Exposure at risk" value={rupees(exposure)} tone="plain" />
@@ -172,32 +172,35 @@ function useRecoveredDelta(recoveredPaise: number | null): string | null {
 // Recorded, not live. Whichever arm actually recovers the most is shown as the finding — not
 // hardcoded to the agent.
 function BenchPanel({ agent, fixed, rules }: { agent: RunSummary; fixed: RunSummary; rules?: RunSummary }) {
-  const arms: { label: string; m: RunSummary }[] = [
-    { label: "Agent", m: agent },
-    { label: "Fixed schedule", m: fixed },
-    ...(rules ? [{ label: "Rules table", m: rules }] : []),
+  const arms: { label: string; m: RunSummary; role: "agent" | "fixed" | "rules" }[] = [
+    { label: "Agent", m: agent, role: "agent" },
+    { label: "Fixed schedule", m: fixed, role: "fixed" },
+    ...(rules ? [{ label: "Rules table", m: rules, role: "rules" as const }] : []),
   ];
   const best = arms.reduce((a, b) => (b.m.recoveredPaise > a.m.recoveredPaise ? b : a));
 
   return (
     <div className="eval-panel">
       <span className="eval-panel__label">
-        Recorded benchmark · {agent.cases}-case batch · not live · same gate, executor and ledger, only the brain
-        swapped
+        Recorded benchmark · {agent.cases}-case batch · not live · same gate, executor and ledger, only the brain swapped
       </span>
-      <div className="eval-panel__row">
-        {arms.map(({ label, m }) => (
-          <span key={label} className={"eval-panel__arm" + (m === best.m ? "" : " eval-panel__arm--dim")}>
-            {label} — {rupees(m.recoveredPaise)} recovered · {pct(m.recoveryRate)} rate · {pct(m.escalationRate)}{" "}
-            escalated
-            {m.rootCauseAccuracy !== null && ` · ${pct(m.rootCauseAccuracy)} root-cause accuracy`}
-          </span>
+      <div className="eval-panel__rows">
+        {arms.map(({ label, m, role }) => (
+          <div key={label} className={`eval-panel__arm eval-panel__arm--${role}${m === best.m ? " eval-panel__arm--best" : ""}`}>
+            <span className="eval-panel__arm-label">{label}</span>
+            <span className="eval-panel__arm-stat">{rupees(m.recoveredPaise)} recovered</span>
+            <span className="eval-panel__arm-stat">{pct(m.recoveryRate)} rate</span>
+            <span className="eval-panel__arm-stat">{pct(m.escalationRate)} escalated</span>
+            {m.rootCauseAccuracy !== null && (
+              <span className="eval-panel__arm-stat eval-panel__arm-accuracy">{pct(m.rootCauseAccuracy)} root-cause accuracy</span>
+            )}
+            {m === best.m && <span className="eval-panel__arm-winner">most recovered</span>}
+          </div>
         ))}
       </div>
       {rules && (
-        <span className="eval-panel__label" style={{ opacity: 0.7 }}>
-          {best.label} recovers the most on this batch. Root-cause accuracy is the agent-only figure — a fixed
-          schedule or a rules table never diagnoses at all, it only picks an action off the error code.
+        <span className="eval-panel__label" style={{ opacity: 0.6 }}>
+          Root-cause accuracy is agent-only — a fixed schedule or rules table never diagnoses, it only picks an action off the error code.
         </span>
       )}
     </div>
