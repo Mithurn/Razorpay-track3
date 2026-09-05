@@ -42,7 +42,7 @@ Every proposal passes through a pure function that enforces nine rules:
 
 The gate reads risk holds and hard declines directly from the case's `failureReason`, independent of what the agent diagnosed. It can clamp (retry → escalate), skip (cooldown violation), or allow. It cannot make a proposal less cautious.
 
-**3. Execution (exactly-once)**
+**3. Idempotent execution**
 
 One attempt = one `idempotency_key` = at most one Razorpay order/link. The key is unique at the DB level. The attempt row is inserted before any Razorpay call, so a crash mid-flight leaves a durable claim.
 
@@ -69,7 +69,7 @@ bank downtime tool: Bank of India, active high-severity outage
      ↓
 agent conclusion: payment link would fail if issuing bank is down
      ↓
-proposed action: 24h retry instead of following the 4/5 pattern
+proposed action: retry after downtime window instead of following the 4/5 pattern
 ```
 
 **Same failure code. Different context. Different action.**
@@ -187,7 +187,7 @@ A 5xx or timeout mid-create does not tell us whether the order/link was created.
 
 **Principle**: Never assume an ambiguous payment attempt succeeded or failed without reconciliation.
 
-### Exactly-once execution
+### Idempotent execution
 
 One attempt = one `idempotency_key` = at most one Razorpay order/link. The key is unique at the DB level. The attempt row is inserted *before* any Razorpay call, so a crash mid-flight leaves a durable claim, never a lost or doubled attempt.
 
@@ -210,7 +210,7 @@ An integration test connects as `recovery_app`, tries to UPDATE the event log, a
 | Layer | Technology | Why |
 |-------|-----------|-----|
 | Runtime | Node 20+ / TypeScript (ESM) | Type safety at boundaries, ESM for clean imports |
-| API | Fastify | Fastest Node HTTP server, schema validation built-in |
+| API | Fastify | HTTP API and schema validation |
 | Database | PostgreSQL 16 | ACID transactions, row-level locks for concurrency, role-based grants for append-only |
 | Queue | Redis + BullMQ | Durable job queue, supports priorities and delays |
 | Agent | Vercel AI SDK v7 + hand-rolled loop | Tool-use standardized, streaming built-in. Loop is owned code (step budget, deadline, degrade-to-safe) |
@@ -221,7 +221,7 @@ An integration test connects as `recovery_app`, tries to UPDATE the event log, a
 | Container | Docker Compose | Single-command dev environment |
 | Testing | Vitest | Fast, native ESM support, 223 tests |
 
-**13 runtime dependencies, deliberately.** No agent framework (the bounds are the product, not framework config). No ORM (would cost the DB-grant proof). No DI container. Each dependency earns its place.
+No agent framework (the bounds are the product, not framework config). No ORM (would cost the DB-grant proof). No DI container.
 
 ---
 
