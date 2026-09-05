@@ -420,15 +420,15 @@ function VerifyAuditButton({ caseId }: { caseId: string }) {
         className="btn btn--ghost"
         onClick={run}
         disabled={result === "pending"}
-        title="Connects to Postgres as the app's own restricted role and tries to edit the event log — the database refuses. Proves the audit trail can't be altered, even by us."
+        title="Connects to Postgres as the app's own restricted role and tries to UPDATE the event log. The database refuses: the role has SELECT and INSERT only, no UPDATE or DELETE."
       >
         {result === "pending" ? <Spinner size={13} /> : null}
-        {result === "pending" ? "Checking…" : "Check log is tamper-proof"}
+        {result === "pending" ? "Checking…" : "Check audit log permissions"}
       </button>
       {result && result !== "pending" && (
         <span className={"verify-audit__result" + (result.enforced ? " verify-audit__result--ok" : " verify-audit__result--bad")}>
           {result.enforced ? <Check size={13} /> : <X size={13} />}
-          {result.enforced ? "Event log is append-only — the database enforces it" : result.error ?? "not enforced"}
+          {result.enforced ? "App role denied: SELECT and INSERT only, no UPDATE or DELETE" : result.error ?? "not enforced"}
         </span>
       )}
     </span>
