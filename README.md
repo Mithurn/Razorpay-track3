@@ -253,47 +253,57 @@ stated otherwise here:
 
 ## Architecture
 
-One sentence: a failed payment enters a bounded agent loop, the agent proposes an action, a pure-function safety gate can only add caution, and the executor is the only thing that ever touches Razorpay.
-
-```
-Failed payment
-    → Agent (investigate: history · downtime · similar cases · playbook)
-    → Proposal  (root cause · action · confidence)
-    → Safety Gate  (pure function — clamp or veto only, never picks the action)
-    → Executor  (one idempotency key, re-checks on 5xx, never double-charges)
-    → Razorpay test mode
-         ↓
-    Append-only audit log  (DB role cannot UPDATE/DELETE)
-```
-
-Full data-flow with every path (escalate / reschedule / recover):
-
 ```mermaid
-flowchart LR
-    F["Failed payment\n(webhook / synthetic)"] --> AG
+flowchart TD
+    FP(["💳 Failed Payment\nwebhook · synthetic · queue"])
 
-    subgraph AG["Recovery Agent — bounded tool loop"]
-        direction TB
-        T1[get_customer_payment_history]
-        T2[check_bank_downtime — live]
-        T3[get_similar_resolved_cases]
-        T4[get_this_case_prior_attempts]
-        T5[get_recovery_playbook]
+    FP --> AGT
+
+    subgraph AGT["🤖 Recovery Agent   bounded tool loop · step budget · wall-clock deadline"]
+        direction LR
+        H["📋 customer history"]
+        D["🏦 bank downtime\n<i>live Razorpay feed</i>"]
+        S["🔁 similar resolved cases"]
+        P["📖 recovery playbook"]
+        H ~~~ D ~~~ S ~~~ P
     end
 
-    AG --> PR["Proposal\nroot cause · confidence · action"]
-    PR --> SG{{"Safety Gate\npure function — clamp or veto only,\nnever picks the action"}}
-    SG -- allow --> EX["Attempt Executor\none idempotency key per attempt"]
-    SG -- "clamp / veto\n(risk hold, exposure cap,\nhard decline, attempt cap...)" --> ESC["Escalate to a human"]
-    SG -- "skip\n(cooldown, RBI contact window)" --> RS["Reschedule"]
-    EX --> RZ[("Razorpay\ntest mode")]
-    RZ -- "webhook or re-check\n(never assumes success\non a 5xx / timeout)" --> EX
-    EX --> OUT["Recovered / Failed"]
+    AGT --> PROP["📝 Proposal\nroot cause · action · confidence"]
 
-    AG -.append.-> LOG[("Append-only audit log\nDB role cannot UPDATE/DELETE")]
-    SG -.append.-> LOG
-    EX -.append.-> LOG
+    PROP --> GATE
+
+    subgraph GATE["🔒 Safety Gate   pure function · no I/O"]
+        direction LR
+        R1["attempt cap"]
+        R2["exposure cap"]
+        R3["risk hold veto"]
+        R4["cooldown / contact window"]
+        R1 ~~~ R2 ~~~ R3 ~~~ R4
+    end
+
+    GATE -- "✅ allow" --> EX["⚡ Attempt Executor\none idempotency key · re-check on 5xx"]
+    GATE -- "🚨 veto / clamp" --> ESC["👤 Escalate to human"]
+    GATE -- "⏸ skip" --> RS["🕐 Reschedule"]
+
+    EX <--> RZ[("🔵 Razorpay\ntest mode")]
+    EX --> OUT(["✅ Recovered / ❌ Failed"])
+
+    AGT -. "append" .-> LOG[("🗂 Audit Log\nINSERT only · no UPDATE/DELETE\nenforced at the DB grant")]
+    GATE -. "append" .-> LOG
+    EX -. "append" .-> LOG
+
+    style AGT fill:#1e1b4b,stroke:#6366f1,color:#e0e7ff
+    style GATE fill:#1a2e1a,stroke:#22c55e,color:#dcfce7
+    style LOG fill:#1c1917,stroke:#78716c,color:#d6d3d1
+    style RZ fill:#0c1a2e,stroke:#3b82f6,color:#dbeafe
+    style FP fill:#2d1b1b,stroke:#ef4444,color:#fecaca
+    style ESC fill:#2d2006,stroke:#f59e0b,color:#fef3c7
+    style RS fill:#1a1a2e,stroke:#8b5cf6,color:#ede9fe
+    style OUT fill:#1a2e1a,stroke:#22c55e,color:#dcfce7
+    style PROP fill:#1e1e2e,stroke:#6366f1,color:#e0e7ff
+    style EX fill:#1e2030,stroke:#3b82f6,color:#dbeafe
 ```
+
 
 No LLM-originated proposal can lower caution, move money twice, or move it past the exposure cap
 or attempt cap — see "What it does" above and `src/safety/safety-gate.ts` for exactly what the
