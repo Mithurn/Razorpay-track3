@@ -16,24 +16,39 @@ The purpose is to preserve:
 
 ## The short version
 
-The most consequential failures were:
+The most consequential failures, grouped by impact:
 
-1. **Risk-hold veto was wired to nothing** - A misdiagnosed risk-flagged payment would have bypassed human review
-2. **WRITE_OFF could bypass human visibility on risk holds** - Risk cases could be permanently closed without escalation
-3. **Benchmark answers leaked through prior-attempt data** - Agent was reading its own answer key
-4. **Benchmark settlement timing was wrong** - Graded actions at creation time, not settlement time
-5. **Fixed baseline was structurally unfair** - Only proposed retries, lost every case needing a different rail
-6. **Downtime matching was incorrectly implemented** - Matched on payment method instead of specific issuing bank
-7. **Degraded diagnoses were being fabricated as `technical`** - Null diagnoses became correct by accident
-8. **Human escalation was a dead end** - Directives were written but never read
-9. **Benchmark cache replayed stale recordings** - Zero model calls reported as a valid result
-10. **Audit/schema enforcement had a deployment-time failure mode** - Bind-mount served stale file content
+**Safety & financial control:**
+1. **Risk-hold veto wasn't wired** — Optional callback was never passed; misdiagnosed risk-flagged payments could bypass human review
+2. **WRITE_OFF could close risk holds permanently** — CAUTION_RANK measured money movement, not human visibility
+3. **Risk-hold veto couples to `failureReason`** — Blinding the label (benchmark experiment) disables the deterministic veto
+
+**Benchmark integrity:**
+4. **Benchmark leaked answers through prior-attempt data** — Agent read recovery hints from `outcome_detail`
+5. **Benchmark graded actions at creation, not settlement** — Punished timing and rail-switching
+6. **Fixed baseline was structurally unfair** — Only proposed retries, lost all link/nudge cases
+7. **Downtime matching was incorrect** — Matched on method (card) instead of specific issuer (Bank of India)
+8. **Degraded diagnoses fabricated as `technical`** — Null → "technical" inflated root-cause accuracy
+
+**Reliability:**
+9. **Duplicate webhook could drop a real capture** — Dedupe assumed first delivery finished
+10. **Human escalation was a dead end** — Directives were written but never read
+
+**Infrastructure:**
+11. **Benchmark cache replayed stale recordings** — Zero model calls looked like a valid result
+12. **Schema bind-mount served truncated file** — GRANT statements past line 97 were skipped
 
 Each failure below documents what broke, how it was found, and what prevents recurrence.
 
 ---
 
-## Day 0 - the stack on paper was wrong on four counts before a line was written
+## Detailed failure log
+
+Entries are organized chronologically as they were discovered. Each documents what broke, why it mattered, how it was diagnosed, what changed, and what safeguard prevents recurrence.
+
+---
+
+## Day 0: Stack assumptions
 
 Probed every external assumption against the live APIs instead of trusting the plan.
 - The planned model (`gemini-2.5-flash`) was retired : `404`, points at `gemini-3.6-flash`.
