@@ -232,6 +232,21 @@ describe.runIf(adminUrl)("WebhookHandler", () => {
     expect((await cases.byId(caseId))!.lane).toBe("RECOVERED");
   });
 
+  it("does not credit a redelivered capture whose attempt already settled FAILED", async () => {
+    await seedPendingAttempt();
+    const { handler, attempts, cases } = build(new PaidOnceResolver());
+    const evt = signed(capturedEvent());
+    await new PostgresWebhookInbox(db).recordIfNew(evt.eventId, "payment.captured", JSON.parse(evt.rawBody));
+
+    const attempt = (await attempts.listByCase(caseId))[0]!;
+    await attempts.resolve(attempt.id, { status: "FAILED", detail: "declined" });
+
+    const redelivery = await handler.handle(evt);
+    expect(redelivery.status).toBe("duplicate");
+    expect((await cases.byId(caseId))!.lane).not.toBe("RECOVERED");
+    expect((await cases.byId(caseId))!.recoveredPaise).toBe(0);
+  });
+
   it("does not credit a capture whose amount does not match the case", async () => {
     await seedPendingAttempt();
     const { handler, cases } = build(new PaidOnceResolver());

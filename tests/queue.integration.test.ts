@@ -55,6 +55,24 @@ describe.runIf(redisUrl)("recovery queue dedupe", () => {
     await waitFor(() => processed.length === 2);
     expect(processed).toEqual([caseId, caseId]);
   }, 15_000);
+
+  it("force enqueues a case whose existing job is only delayed, not active", async () => {
+    queue = new Queue<RecoveryJob>(QUEUE_NAME, {
+      connection,
+      defaultJobOptions: { removeOnComplete: true, removeOnFail: 200 },
+    });
+    const caseId = randomUUID();
+    const processed: string[] = [];
+
+    worker = new Worker<RecoveryJob>(QUEUE_NAME, async (job) => processed.push(job.data.caseId), { connection });
+    await worker.waitUntilReady();
+
+    await enqueueRecovery(queue, caseId, { delay: 60_000 });
+    await enqueueRecovery(queue, caseId, { force: true });
+
+    await waitFor(() => processed.length === 1);
+    expect(processed).toEqual([caseId]);
+  }, 15_000);
 });
 
 async function waitFor(check: () => boolean, timeoutMs = 10_000): Promise<void> {

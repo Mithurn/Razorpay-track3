@@ -50,8 +50,9 @@ describe("reconcile sweep", () => {
       listStaleInLane: async () => [],
     } as unknown as CaseRepository;
     const add = vi.fn(async () => undefined);
+    const removeDeduplicationKey = vi.fn(async () => undefined);
 
-    const { stop } = startReconcileSweep(attempts, cases, { add } as never, 10);
+    const { stop } = startReconcileSweep(attempts, cases, { add, removeDeduplicationKey } as never, 10);
     await new Promise((r) => setTimeout(r, 30));
     stop();
 
@@ -67,8 +68,9 @@ describe("reconcile sweep", () => {
       listStaleInLane: async () => [],
     } as unknown as CaseRepository;
     const add = vi.fn(async () => undefined);
+    const removeDeduplicationKey = vi.fn(async () => undefined);
 
-    const { stop } = startReconcileSweep(attempts, cases, { add } as never, 10);
+    const { stop } = startReconcileSweep(attempts, cases, { add, removeDeduplicationKey } as never, 10);
     await new Promise((r) => setTimeout(r, 30));
     stop();
 
@@ -82,8 +84,9 @@ describe("reconcile sweep", () => {
       listStaleInLane: async () => [kase({ lane: "DIAGNOSING" })],
     } as unknown as CaseRepository;
     const add = vi.fn(async () => undefined);
+    const removeDeduplicationKey = vi.fn(async () => undefined);
 
-    const { stop } = startReconcileSweep(attempts, cases, { add } as never, 10);
+    const { stop } = startReconcileSweep(attempts, cases, { add, removeDeduplicationKey } as never, 10);
     await new Promise((r) => setTimeout(r, 30));
     stop();
 

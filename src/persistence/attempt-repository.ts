@@ -145,10 +145,17 @@ export class PostgresAttemptRepository implements AttemptRepository {
     return rows.length === 1;
   }
 
+  // run_id IS NULL excludes bench-corpus attempts, matching CaseRepository.listStaleInLane — the
+  // reconcile sweep must never pull a synthetic bench case into the live worker.
   async listUnsettled(): Promise<Attempt[]> {
+    const qualified = COLUMNS.split(",")
+      .map((c) => `a.${c.trim()}`)
+      .join(", ");
     const { rows } = await this.db.query(
-      `SELECT ${COLUMNS} FROM recovery_attempts
-        WHERE outcome IN ('PENDING','AWAITING_RECONCILIATION') ORDER BY created_at`,
+      `SELECT ${qualified} FROM recovery_attempts a
+        JOIN recovery_cases c ON c.id = a.case_id
+        WHERE a.outcome IN ('PENDING','AWAITING_RECONCILIATION') AND c.run_id IS NULL
+        ORDER BY a.created_at`,
     );
     return rows.map((r) => toAttempt(r as Row));
   }

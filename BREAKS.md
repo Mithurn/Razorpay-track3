@@ -12,6 +12,10 @@ The purpose is to preserve:
 - What changed
 - What regression test or safeguard prevents recurrence
 
+Figures quoted inside individual entries below are what was measured at the time each entry was
+written, and are not updated retroactively. The current published numbers are always in
+[`README.md` → Evaluation](./README.md#evaluation).
+
 ---
 
 ## The short version
@@ -38,6 +42,14 @@ The most consequential failures, grouped by impact:
 11. **Benchmark cache replayed stale recordings** — Zero model calls looked like a valid result
 12. **Schema bind-mount served truncated file** — GRANT statements past line 97 were skipped
 13. **Spend cap charged a flat constant, 2.1x low** — No code path had ever read a token count
+
+**Found after the buildathon submission deadline, fixed and re-benchmarked:**
+14. **The agent's own evidence tool only ever showed it winning** — `get_similar_resolved_cases`
+    filtered to cases that ended `RECOVERED`; escalated and written-off cases were invisible
+15. **The blind-reason control silently breaks a second tool, not just the label** —
+    `get_similar_resolved_cases` also keys off `failureReason`, so blinding collapses it into an
+    undifferentiated pool across every root cause, confounding the blind-mode comparison further
+    than documented
 
 Each failure below documents what broke, how it was found, and what prevents recurrence.
 
@@ -344,8 +356,8 @@ already carry the real signal (the customer's own payment cadence, the downtime 
 window). Re-recorded on the harder corpus and the de-spoonfed prompt, root-cause accuracy held at
 71.7–75.0% across five seeds : the diagnosis capability survived losing the crutch. The action-
 policy money numbers, honestly, did not improve; they were never the row this project is staking
-its AI-judgment claim on. See the root-level README's "The number" section for the full table,
-including where the free-tier model, run under the identical harder conditions, collapses to
+its AI-judgment claim on. See [`README.md` → Evaluation](./README.md#evaluation) for the full
+table, including where the free-tier model, run under the identical harder conditions, collapses to
 8.3% root-cause accuracy and an 86.7% degrade rate : the size of the model-quality tax this
 project is not paying for its headline result.
 
@@ -456,3 +468,93 @@ extrapolation.
 **Safeguard:** `tests/budget.test.ts` pins the nested v3/v4 and flat v2 usage shapes, the stream
 path, a reported zero as distinct from a missing block, the fallback charge, and the cap refusing
 the next call once measured spend passes it.
+
+---
+
+## The agent's own evidence tool only ever showed it winning
+
+**Found:** after the buildathon submission deadline, during an independent post-submission audit.
+
+**Expected:** `get_similar_resolved_cases` (`src/persistence/case-repository.ts`) does what its
+tool description promises the model — shows "how past cases with this same error reason actually
+ended: the action taken, whether it recovered the money, and how long that took."
+
+**Actual:** the query filtered on `c.lane = 'RECOVERED'`. A case that ended `ESCALATED`,
+`WRITTEN_OFF`, or `STOPPED` was invisible to the tool, no matter how many of them shared the same
+failure reason. The agent's own description of the tool claimed a full record; the query handed it
+a record of wins only.
+
+**Why it's dangerous:** survivorship bias in an agent's own evidence tool pushes it toward
+concluding "this looks recoverable" on genuinely ambiguous cases, because the only history it can
+see is history that worked out. `README.md`'s own published finding — every genuinely-unfunded
+account misdiagnosed as `insufficient_funds` — is exactly the failure shape this bias would
+produce.
+
+**How diagnosed:** reading the tool's description against the SQL behind it, line by line, the
+same way the risk-hold wiring bug above was found.
+
+**Fix:** the query now matches any case in `TERMINAL_LANES` (`RECOVERED`, `ESCALATED`,
+`WRITTEN_OFF`, `STOPPED`), not `RECOVERED` alone. A case still mid-investigation is still excluded
+— it has no settled history to report.
+
+**Measured effect, seed 42, before → after (same corpus, same code otherwise):**
+
+| | Before | After |
+|---|---:|---:|
+| Recovered | 33/60 (55.0%) | 34/60 (56.7%) |
+| ₹ recovered | ₹51,967 | ₹53,966 |
+| Root-cause accuracy | 73.3% | 73.3% |
+| Degraded (agent gave up) | 1/60 | 0/60 |
+
+The fix made the agent better, not worse: cases that previously reached `WRITTEN_OFF` on a
+misplaced "this is unrecoverable" conclusion now correctly `ESCALATE` instead, because the agent
+can finally see that similar-looking cases don't always resolve well. All five published seeds and
+the blind-reason control were re-run against the fixed query; the numbers in
+[`README.md` → Evaluation](./README.md#evaluation) are the fixed ones. The buildathon pitch video
+was recorded before this fix, against the old numbers.
+
+**Safeguard:** `tests/pipeline.integration.test.ts` — "similarResolved also surfaces a failed
+attempt from a case that ended escalated, not just recovered ones" — seeds an escalated and a
+written-off case and asserts both are returned.
+
+---
+
+## The blind-reason control silently breaks a second tool, not just the label
+
+**Found:** after the buildathon submission deadline, during the same audit as the entry above.
+
+**Expected:** `--blind-reason` replaces `failureCode`/`failureReason` with one generic value before
+any arm sees it, to test whether the agent's edge comes from reasoning or from reading a label. The
+history, downtime, and prior-attempts tools were understood to keep working underneath the
+blinding — only the label itself was meant to disappear.
+
+**Actual:** `get_similar_resolved_cases` also keys its lookup on `failureReason`
+(`src/agent/tools.ts` → `src/persistence/case-repository.ts`). Under blinding every case in the run
+shares the same literal string, so the query no longer returns cases with the same *true* root
+cause — it returns an undifferentiated mix of every failure type in the run. This is a second tool
+losing real signal, not the label being hidden; the already-documented risk-hold veto coupling
+(`isRiskHold` keys off the same field) is a third.
+
+**Why it matters:** the blind-reason number is supposed to isolate reasoning from label-reading. As
+built, part of any score drop in blind mode reflects a crippled evidence tool, not weaker
+reasoning. It's a real confound in the control experiment, not in the live pipeline — blinding is
+an evaluation instrument, never a deployment mode.
+
+**Measured, seed 42:** fixing the survivorship bias above raised the labeled numbers (55.0% →
+56.7% recovered) and *lowered* the blind ones (45.0% → 38.3% recovered, 31.7% → 30.0% root-cause
+accuracy) in the same run, from the same fix. That is this confound made visible: the fixed query
+now returns a wider, less-differentiated mix of outcomes under blinding, since every case shares
+one blinded reason instead of being grouped by the real one it used to filter on. The agent still
+leads fixed/rules blind (38.3% vs 33.3%/33.3%), just by less than the pre-fix number suggested.
+
+**How diagnosed:** same line-by-line pass as the entry above, once it was clear one field drove
+more than one behaviour.
+
+**Fix:** not made. A correct fix means giving `similarResolved` something to bucket on that
+survives blinding without leaking ground truth — grouping by `(method, instrument, amount band)`
+or by the deterministic case-shape helpers instead of the raw string — and that's a schema and
+corpus change, not a query tweak. Flagged here rather than rushed in, the same call made for the
+risk-hold coupling above.
+
+**Safeguard:** none yet. The blind-reason numbers in the README are published with this confound
+disclosed rather than hidden.

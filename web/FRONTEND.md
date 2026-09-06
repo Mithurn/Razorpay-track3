@@ -4,7 +4,7 @@ The web UI (`web/`) is the Recovery Room: a real-time dashboard for watching pay
 through the recovery pipeline and inspecting what the agent decided and why.
 
 For the product overview and backend architecture, see the [root README](../README.md) and
-[`src/README.md`](../src/README.md).
+[`src/BACKEND.md`](../src/BACKEND.md).
 
 ---
 
@@ -40,7 +40,7 @@ For the product overview and backend architecture, see the [root README](../READ
 
 ### TopBar — `web/src/room/TopBar.tsx`
 
-Live recovery metrics (pulled from `/api/room` SSE stream) and the evaluation scoreboard
+Live recovery metrics (pulled from the `/api/stream` SSE stream) and the evaluation scoreboard
 (fetched from `/api/scoreboard`). The scoreboard shows the three-arm comparison (agent / fixed /
 rules) from the most recent bench run stored in the database.
 
@@ -59,7 +59,7 @@ through it. Powered by `useCaseLoopState` which derives the current stage from t
 ### ActivityStream — `web/src/loop/ActivityStream.tsx`
 
 The live agent reasoning stream. Tool calls and their results appear in real time as the agent
-works, sourced from the SSE stream (`/api/stream/:caseId`). After the agent finishes, the full
+works, sourced from the SSE stream (`/api/cases/:id/stream`). After the agent finishes, the full
 tool-call trace is replayed from the event log so the same view works for historical cases.
 
 For a case seeded from the recorded benchmark (`npm run seed:room`), the tool-call trace comes
@@ -74,7 +74,7 @@ after escalation resolution.
 ### CustomerPanel — `web/src/room/CustomerPanel.tsx`
 
 Customer context: payment history summary, failure code, failure reason, amount, case lane,
-time since failure. This is what the agent sees when it calls `get_customer_history`.
+time since failure. This is what the agent sees when it calls `get_customer_payment_history`.
 
 ### RazorpayCheckout — `web/src/room/RazorpayCheckout.tsx`
 
@@ -93,17 +93,21 @@ injects a synthetic `payment.captured` webhook with a `pay_sim_` prefixed paymen
 
 **This does not touch Razorpay.** The server generates a fake payment ID
 (`pay_sim_<uuid>`), injects it through the same webhook handler as a real capture, and marks the
-resulting event as `simulated: true` in the audit log. The UI displays a "Simulated" label on
-recoveries settled this way. See `src/domain/simulated-payment.ts` and
-`src/execution/webhook-handler.ts` lines 135–141.
+resulting event as `simulated: true` in the audit log, and the backend separates simulated money
+from live money in `recoveredSimulatedPaise` vs `recoveredLivePaise` (`GET /metrics`). The UI does
+not yet render that split anywhere — the recovered-total figure in `TopBar` is unlabelled either
+way. See `src/domain/simulated-payment.ts` and `src/execution/webhook-handler.ts`.
 
 ---
 
 ## SSE stream
 
-The UI connects to `/api/room` (room-wide events) and `/api/stream/:caseId` (per-case events)
-via Server-Sent Events. Both streams replay the event log from the beginning on connect, then
-follow live updates. `web/src/loop/reconnectingStream.ts` handles reconnection with backoff.
+The UI connects to `/api/stream` (room-wide events) and `/api/cases/:id/stream` (per-case events)
+via Server-Sent Events. Neither stream replays history: each sends an `open` frame, then one
+snapshot frame (room metrics, or the case's current lane), then only events from that point
+forward. A client that needs everything before it connected fetches it over plain HTTP first
+(`GET /cases/:id`, which returns the full attempt and event history) and treats the stream as the
+live tail. `web/src/loop/reconnectingStream.ts` handles reconnection with backoff.
 
 There is no WebSocket. SSE is enough for a read-only event feed.
 
@@ -173,8 +177,8 @@ recoveries with bench evaluation would conflate controlled evaluation with opera
 
 ## Tech
 
-- React 18, TypeScript, Vite
-- No component framework (Tailwind for utility classes, hand-written layout)
+- React 19, TypeScript, Vite
+- No component framework, no CSS framework — hand-written CSS, one file per view
 - `useRoomStream` — SSE hook for real-time room state
 - `useLiveRun` — per-case agent trace hook
 - `useCaseLoopState` — derives `StageId` from raw events for the LoopGraph

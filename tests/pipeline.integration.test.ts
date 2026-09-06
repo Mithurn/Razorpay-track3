@@ -83,8 +83,8 @@ describe.runIf(adminUrl)("RecoveryPipeline", () => {
 
   afterEach(async () => {
     now = new Date("2026-09-02T09:00:00.000Z");
-    await db.query("DELETE FROM recovery_attempts WHERE case_id IN (SELECT id FROM recovery_cases WHERE customer_ref = 'similar-test')");
-    await db.query("DELETE FROM recovery_cases WHERE customer_ref = 'similar-test'");
+    await db.query("DELETE FROM recovery_attempts WHERE case_id IN (SELECT id FROM recovery_cases WHERE customer_ref LIKE 'similar-test%')");
+    await db.query("DELETE FROM recovery_cases WHERE customer_ref LIKE 'similar-test%'");
     if (caseId) {
       await db.query("DELETE FROM recovery_events WHERE case_id = $1", [caseId]);
       await db.query("DELETE FROM recovery_attempts WHERE case_id = $1", [caseId]);
@@ -472,5 +472,45 @@ describe.runIf(adminUrl)("RecoveryPipeline", () => {
       limit: 8,
     });
     expect(cardsOnly).toHaveLength(2);
+  });
+
+  it("similarResolved also surfaces a failed attempt from a case that ended escalated, not just recovered ones", async () => {
+    const reason = "risk_hold_" + randomUUID().slice(0, 8);
+    await seed({ failureReason: reason });
+    const escalatedCase = randomUUID();
+    const writtenOffCase = randomUUID();
+    const stillOpenCase = randomUUID();
+    for (const [id, lane] of [
+      [escalatedCase, "ESCALATED"],
+      [writtenOffCase, "WRITTEN_OFF"],
+      [stillOpenCase, "DIAGNOSING"],
+    ] as const) {
+      await db.query(
+        `INSERT INTO recovery_cases (id, merchant_ref, customer_ref, amount_paise, currency,
+           failure_code, failure_reason, failed_at, method, lane)
+         VALUES ($1, 'm', 'similar-test-2', 149900, 'INR', 'BAD_REQUEST_ERROR', $2,
+           $3::timestamptz - interval '48h', 'card', $4)`,
+        [id, reason, now.toISOString(), lane],
+      );
+    }
+    await db.query(
+      `INSERT INTO recovery_attempts (id, case_id, attempt_no, root_cause, action, idempotency_key, outcome)
+       VALUES
+         ($1, $4, 1, 'risk_hold', 'ESCALATE', 'k4', 'FAILED'),
+         ($2, $5, 1, 'risk_hold', 'RETRY_NOW', 'k5', 'FAILED'),
+         ($3, $6, 1, 'risk_hold', 'RETRY_NOW', 'k6', 'FAILED')`,
+      [randomUUID(), randomUUID(), randomUUID(), escalatedCase, writtenOffCase, stillOpenCase],
+    );
+
+    const repo = new PostgresCaseRepository(db);
+    const results = await repo.similarResolved(reason, {
+      method: null,
+      beforeFailedAt: now.toISOString(),
+      runId: null,
+      limit: 8,
+    });
+
+    expect(results).toHaveLength(2);
+    expect(results.every((r) => r.outcome === "FAILED")).toBe(true);
   });
 });

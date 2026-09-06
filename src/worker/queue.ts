@@ -23,12 +23,19 @@ export function recoveryQueue(connection: ConnectionOptions): Queue<RecoveryJob>
   });
 }
 
-// A duplicate id on an active job is stored and materialized as a new job once it finishes.
+// A duplicate id on an active job is stored and materialized as a new job once it finishes. But
+// BullMQ only does that coalescing when the existing holder is active — a dedup id held by a
+// merely *delayed* job (e.g. a scheduled retry hours out) makes a plain add a silent no-op: the
+// call returns as if queued, and nothing new is ever enqueued. `force` clears the dedup key first
+// so a human-triggered "recover now" always lands a job. Two overlapping runs on one case are
+// still safe: the pipeline's compare-and-swap lane claim (case-repository.ts) drops whichever one
+// loses the race rather than running the case twice.
 export async function enqueueRecovery(
   queue: Queue<RecoveryJob>,
   caseId: string,
-  opts: { delay?: number; reclaim?: boolean } = {},
+  opts: { delay?: number; reclaim?: boolean; force?: boolean } = {},
 ): Promise<void> {
+  if (opts.force) await queue.removeDeduplicationKey(caseId);
   await queue.add(
     RECOVERY_QUEUE,
     { caseId, reclaim: opts.reclaim },

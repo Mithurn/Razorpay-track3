@@ -47,6 +47,19 @@ const outcomeResolver = new RazorpayOutcomeResolver(razorpay);
 const notifier = new LoggingNotifier(events);
 const executor = new AttemptExecutor(attempts, events, razorpay, outcomeResolver, notifier);
 
+// One budget for the life of the process, not one per case — the cap is a process-wide ceiling.
+const agentBudget = createBudget(config.AGENT_SESSION_CAP_USD, {
+  usdPerMInput: config.AGENT_USD_PER_M_INPUT,
+  usdPerMOutput: config.AGENT_USD_PER_M_OUTPUT,
+});
+const agentModel = guardModel(
+  resolveModel(config.AGENT_MODEL, {
+    openRouterApiKey: config.OPENROUTER_API_KEY,
+    googleApiKey: config.GOOGLE_GENERATIVE_AI_API_KEY,
+  }),
+  agentBudget,
+);
+
 const pipeline = new RecoveryPipeline({
   cases,
   attempts,
@@ -68,16 +81,7 @@ const pipeline = new RecoveryPipeline({
     runRecoveryAgent(
       deps,
       {
-        model: guardModel(
-          resolveModel(config.AGENT_MODEL, {
-            openRouterApiKey: config.OPENROUTER_API_KEY,
-            googleApiKey: config.GOOGLE_GENERATIVE_AI_API_KEY,
-          }),
-          createBudget(config.AGENT_SESSION_CAP_USD, {
-            usdPerMInput: config.AGENT_USD_PER_M_INPUT,
-            usdPerMOutput: config.AGENT_USD_PER_M_OUTPUT,
-          }),
-        ),
+        model: agentModel,
         stepBudget: config.AGENT_STEP_BUDGET,
         deadlineMs: config.AGENT_TIMEOUT_MS,
       },

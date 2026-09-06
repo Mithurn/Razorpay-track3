@@ -177,13 +177,13 @@ export class PostgresCaseRepository implements CaseRepository {
        FROM recovery_cases c
        JOIN recovery_attempts a ON a.case_id = c.id AND a.outcome IN ('RECOVERED', 'FAILED')
        WHERE c.failure_reason = $1
-         AND c.lane = 'RECOVERED'
+         AND c.lane = ANY($6::text[])
          AND c.run_id IS NOT DISTINCT FROM $2
          AND c.failed_at < $3::timestamptz
          AND ($4::text IS NULL OR c.method = $4)
        ORDER BY c.failed_at DESC, a.attempt_no DESC
        LIMIT $5`,
-      [failureReason, opts.runId, opts.beforeFailedAt, opts.method, opts.limit],
+      [failureReason, opts.runId, opts.beforeFailedAt, opts.method, opts.limit, TERMINAL_LANES],
     );
     return rows.map((row) => ({
       failureReason: row.failureReason,

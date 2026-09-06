@@ -16,7 +16,7 @@ export function startReconcileSweep(
     for (const caseId of new Set(parked.map((a) => a.caseId))) {
       const kase = await cases.byId(caseId);
       if (!kase || TERMINAL_LANES.includes(kase.lane)) continue;
-      await enqueueRecovery(queue, caseId);
+      await enqueueRecovery(queue, caseId, { force: true });
     }
 
     const staleDiagnosing = await cases.listStaleInLane("DIAGNOSING", new Date(Date.now() - intervalMs));

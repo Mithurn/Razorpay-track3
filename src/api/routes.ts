@@ -148,7 +148,7 @@ export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Pro
     const id = parseIdParam(req, reply);
     if (id === null) return;
     if (!(await deps.cases.byId(id))) return reply.code(404).send({ error: "not found" });
-    await enqueueRecovery(deps.queue, id);
+    await enqueueRecovery(deps.queue, id, { force: true });
     return reply.code(202).send({ queued: true });
   });
 
@@ -214,7 +214,7 @@ export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Pro
       },
     });
     await deps.cases.moveLane(id, "ESCALATED", "RETRY_SCHEDULED");
-    await enqueueRecovery(deps.queue, id);
+    await enqueueRecovery(deps.queue, id, { force: true });
     return { applied: body.data.decision, action: action.kind };
   });
 

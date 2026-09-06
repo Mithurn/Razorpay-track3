@@ -1,8 +1,8 @@
-# Backend — Engineering Deep-dive
+# Backend
 
-This document covers the backend (`src/`) in detail: agent design, safety contract, execution
-semantics, persistence guarantees, and how the evaluation harness works. For a product overview
-and evaluation results, see the [root README](../README.md).
+Agent design, the safety contract, execution semantics, persistence guarantees, and how the
+evaluation harness works. For the product overview and evaluation results, see the
+[root README](../README.md).
 
 ---
 
@@ -64,8 +64,8 @@ abortSignal: AbortSignal.timeout(config.deadlineMs)
 
 - **Step budget:** 6 steps (env: `AGENT_STEP_BUDGET`). On the final step the system prompt
   forces a `submit_proposal` call — the agent cannot consume its last step on a tool call.
-- **Wall-clock deadline:** 60 seconds (env: `AGENT_TIMEOUT_MS`). `AbortSignal.timeout` is passed
-  directly to the SDK stream.
+- **Wall-clock deadline:** 90 seconds by default (env: `AGENT_TIMEOUT_MS`). `AbortSignal.timeout`
+  is passed directly to the SDK stream.
 - **Degrade path:** any exception, timeout, or malformed proposal calls `degrade()`, which returns
   a `RETRY_SCHEDULED +48h` with `diagnosisRootCause: null` and `degraded: true`. The root cause
   is never guessed.
@@ -74,11 +74,11 @@ abortSignal: AbortSignal.timeout(config.deadlineMs)
 
 | Tool | Source | What it does not expose |
 |------|--------|------------------------|
-| `get_customer_history` | Postgres | No ground-truth recoverability flag |
+| `get_customer_payment_history` | Postgres | No ground-truth recoverability flag |
 | `check_bank_downtime` | Razorpay live API | No timing hint from corpus templates |
 | `get_similar_resolved_cases` | Postgres | Returns `hoursToResolution` (see BREAKS.md for leakage note) |
 | `get_recovery_playbook` | Static lookup | No timing hints; mechanism-level guidance only |
-| `get_prior_attempts` | Postgres | Returns `"payment declined"` on failures, never outcome detail |
+| `get_this_case_prior_attempts` | Postgres | Returns `"payment declined"` on failures, never outcome detail |
 
 The prior-attempts tool was the source of a critical benchmark leak: it originally returned
 failure detail strings like `"too early, recovers at +72h"` which contained ground truth. It now
@@ -90,15 +90,16 @@ The agent outputs a `submit_proposal` tool call with this structure (validated b
 
 ```typescript
 {
-  rootCause: z.enum(["bank_downtime", "soft_decline", "hard_decline", "insufficient_funds",
-                      "risk_hold", "card_expired", "technical", "unknown"]),
+  rootCause: z.enum(["hard_decline", "insufficient_funds", "bank_downtime", "soft_decline",
+                      "risk_hold", "technical", "unrecoverable"]),
   confidence: z.number().min(0).max(1),
   actionKind: z.enum(["RETRY_NOW", "RETRY_SCHEDULED", "PAYMENT_LINK",
                        "CUSTOMER_NUDGE", "ESCALATE", "WRITE_OFF"]),
-  retryDelayHours: z.number().optional(),   // required for RETRY_SCHEDULED
-  linkRail: z.enum(["card", "netbanking"]).optional(),  // required for PAYMENT_LINK
-  channel: z.enum(["email", "sms"]).optional(),         // required for CUSTOMER_NUDGE
-  reasoning: z.string()
+  retryDelayHours: z.number().positive().max(720).optional(),   // required for RETRY_SCHEDULED
+  paymentLinkRail: z.enum(["card", "netbanking"]).optional(),   // required for PAYMENT_LINK
+  nudgeChannel: z.enum(["email", "sms"]).optional(),            // required for CUSTOMER_NUDGE
+  reason: z.string().max(300).optional(),
+  reasoning: z.string().min(20).max(1500),
 }
 ```
 
@@ -144,15 +145,15 @@ export const CAUTION_RANK: Record<RecoveryAction["kind"], number> = {
 
 | Rule | Code | Test |
 |------|------|------|
-| Risk hold | `failureReason` check, line ~89 | `"ends every risk-hold case at ESCALATE"` |
-| Hard decline | `CAUTION_RANK` + `MOVES_MONEY`, line ~95 | `"clamps an automatic reattempt on a hard-declined card"` |
-| Attempt cap | `ctx.attemptNo > limits.maxAttempts`, line ~105 | `"forces ESCALATE past the attempt cap"` |
-| Exposure cap | `ctx.totalSpentPaise + amount > limits.exposureCapPaise`, line ~128 | `"forces ESCALATE over the exposure cap"` |
-| Confidence floor | `proposal.confidence < limits.confidenceFloor`, line ~110 | `"clamps a money-moving proposal whose confidence is below the floor"` |
-| Charge cooldown | `ctx.hoursSinceLastAttempt < limits.cooldownHours`, line ~136 | `"skips a money-moving proposal inside the cooldown"` |
-| Contact cooldown | `ctx.hoursSinceLastContact < limits.contactCooldownHours`, line ~120 | `"skips a nudge inside the contact cooldown"` |
-| Contact window | `isWithinContactWindow(ctx.now)` | `"skips a nudge proposed outside the window"` |
-| Write-off gate | `proposal.kind === "WRITE_OFF" && !isUnrecoverable(proposal.rootCause)` | `"clamps a write-off with no unrecoverable diagnosis"` |
+| Risk hold | `ctx.riskHold`, line 88 | `"ends every risk-hold case at ESCALATE, whatever was proposed"` |
+| Write-off gate | `proposal.kind === "WRITE_OFF" && !ctx.unrecoverableDiagnosis`, line 93 | `"clamps a write-off with no unrecoverable diagnosis to ESCALATE"` |
+| Hard decline | `ctx.hardDecline && AUTO_REATTEMPT.has(proposal.kind)`, line 99 | `"clamps an automatic reattempt on a hard-declined card, whatever the confidence"` |
+| Attempt cap | `ctx.attemptNo > limits.maxAttempts`, line 105 | `"forces ESCALATE past the attempt cap"` |
+| Contact window | `isWithinContactWindow(ctx.now)`, line 110 | `"skips a nudge proposed outside the window, and does not touch any other action"` |
+| Contact cooldown | `ctx.hoursSinceLastContact < limits.contactCooldownHours`, line 115 | `"skips a second nudge inside the contact cooldown"` |
+| Exposure cap | `ctx.case.amountPaise > limits.maxExposurePaise`, line 126 | `"forces ESCALATE over the exposure cap, but only for money-moving proposals"` |
+| Confidence floor | `ctx.confidence < limits.minConfidence`, line 131 | `"clamps a money-moving proposal whose confidence is below the floor"` |
+| Charge cooldown | `ctx.hoursSinceLastAttempt < limits.cooldownHours`, line 136 | `"skips a money-moving proposal inside the cooldown, and lets it through outside"` |
 
 The risk-hold check reads `failureReason` from the *case*, not from `proposal.diagnosisRootCause`.
 This was fixed after a real bug where a misdiagnosed case could bypass human review.
@@ -178,6 +179,11 @@ goes out.
 This is exactly-once recovery attempt semantics at the execution boundary. We do not claim
 end-to-end exactly-once in the broader sense — queue processing and network partitions can produce
 duplicate worker activations, and the claim-before-call pattern is what handles them.
+
+That guarantee holds fully for a payment link, where Razorpay enforces `reference_id` uniqueness
+server-side. It does not hold as cleanly for an order: `receipt` has no server-side uniqueness at
+all, so a reperform after a crash (see below) that misses an already-created order due to list-read
+lag can create a second one. See [`BREAKS.md`](../BREAKS.md).
 
 ### Ambiguous 5xx
 
@@ -213,9 +219,9 @@ Tests in [`tests/attempt-executor.integration.test.ts`](../tests/attempt-executo
 
 **File:** `src/execution/razorpay-client.ts`
 
-- `receipt` is not a unique field at Razorpay. We use `reference_id`.
-- Throttling returns `400`, not `429`. Classified as `GatewayRejectedError`, not
-  `GatewayUnavailableError`.
+- `receipt` is not a unique field at Razorpay. `reference_id` is, but only on payment links.
+- Throttling returns `400`, not `429`. Classified as `GatewayUnavailableError`, the same as a 5xx —
+  a throttled call is retryable, not a rejection of the request itself.
 - `GatewayUnavailableError` (5xx, timeout, parse failure) → `AWAITING_RECONCILIATION`
 - `GatewayRejectedError` (4xx) → `FAILED`
 
@@ -299,14 +305,22 @@ Three arms run against the same corpus, same gate, same executor (mocked Razorpa
 
 - **`agent`** — the bounded investigation agent
 - **`fixed`** — fixed schedule (retry at T+24h for all failure types)
-- **`rules`** — 6-line switch on `error_reason`
+- **`rules`** — a 6-case switch on `error_reason` (`bench/rules-arm.ts`) plus a second-attempt
+  escalation rule — the agent's own system-prompt playbook, transcribed into code, no model
 
 ### Corpus
 
-**File:** `bench/corpus.ts`. 60 cases generated from templates (`bank_downtime`,
-`soft_decline`, `hard_decline`, `risk_hold`, `insufficient_funds`, `unfunded`). Ground truth
+**File:** `bench/corpus.ts`. 60 cases generated from 7 templates keyed by Razorpay `error_reason`
+(`insufficient_funds` appears twice, with opposite ground truth — see below): `insufficient_funds`,
+`card_declined`, `card_expired`, `issuer_technical_error`, `payment_failed`,
+`payment_risk_check_failed`, and a second `insufficient_funds` template. A separate ~20% override
+reassigns some `card_declined`/`payment_failed` cases to a live bank-downtime pairing. Ground truth
 (`recoverable`, `trueCause`, `selfRecovers`) is set per template and is **never accessible to any
 arm at run time** — only the `GroundTruthResolver` reads it after execution to grade the outcome.
+
+The two `insufficient_funds` templates carry the same `error_reason` and opposite ground truth
+(funds arrive by day 3 vs. never) — the only separating signal is a rising failure trend in
+customer history, not the failure code or a record count.
 
 ### Ground truth leakage guards
 

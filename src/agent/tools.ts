@@ -69,12 +69,12 @@ const PLAYBOOK: { rootCause: string; defaultAction: string; note: string }[] = [
   {
     rootCause: "hard_decline",
     defaultAction: "CUSTOMER_NUDGE",
-    note: "Card expired or blocked. A retry is pointless; the customer must act. If the merchant's record shows links on another rail recovering these, use PAYMENT_LINK instead.",
+    note: "Card expired. A retry is pointless; the customer must act. If the merchant's record shows links on another rail recovering these, use PAYMENT_LINK instead.",
   },
   {
     rootCause: "technical",
     defaultAction: "RETRY_NOW",
-    note: "Transient technical failure. Use RETRY_SCHEDULED instead if a downtime window is open.",
+    note: "Transient technical failure. Use RETRY_SCHEDULED instead if a downtime window is open, or PAYMENT_LINK if the merchant's record shows the original rail stuck but another rail recovering these.",
   },
   {
     rootCause: "risk_hold",

@@ -142,9 +142,10 @@ export class WebhookHandler {
       });
     }
 
-    // A redelivery is a true no-op only once its attempt is settled — the move is still idempotent.
+    // A non-RECOVERED terminal attempt (FAILED/COMPLETED/SKIPPED) must never be flipped to
+    // RECOVERED by a stale redelivery.
     if (!fresh && attempt.status !== "PENDING" && attempt.status !== "AWAITING_RECONCILIATION") {
-      await this.moveToRecovered(kase, simulated);
+      if (attempt.status === "RECOVERED") await this.moveToRecovered(kase, simulated);
       return { status: "duplicate" };
     }
 
