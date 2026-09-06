@@ -205,7 +205,7 @@ npm test -- pipeline.integration.test.ts -t "escalates a risk-hold case"
 | API | Fastify | HTTP, schema validation, SSE |
 | Database | PostgreSQL 16 | ACID, row-level locks, role-based grants |
 | Queue | Redis + BullMQ | Durable jobs, delay scheduling |
-| Agent loop | Vercel AI SDK v7 + hand-rolled loop | SDK handles tool-call transport; bounds are owned code |
+| Agent | Vercel AI SDK v7 + hand-rolled bounded loop | SDK handles tool-call transport; step budget, deadline, and degrade path are owned code |
 | LLM | OpenRouter / Google Gemini | Env-configurable; no vendor lock-in |
 | Validation | Zod | Runtime schema at every external boundary |
 | Gateway | Razorpay test mode | Real API calls, real HMAC |
@@ -222,7 +222,7 @@ No agent framework for the decision loop — the step budget, wall-clock deadlin
 | Razorpay | Test mode keys | Live keys — same API surface |
 | Database | Docker Compose Postgres | Managed Postgres — schema and grants identical |
 | Queue | Docker Compose Redis | Managed Redis (Upstash, ElastiCache) |
-| LLM | OpenRouter / AI Studio key | Same providers, production keys |
+| Agent (Vercel AI SDK) | OpenRouter / Google Gemini — model is env-configurable | Swap to production API keys; model ID is a single env var |
 | Auth | Soft gate: bearer token enforced when `DEMO_ACCESS_TOKEN` is set; open when unset so reviewers run without setup | Per-merchant JWT |
 | Outreach | `CUSTOMER_NUDGE` logged, not dispatched | Messaging provider (Twilio, Exotel, MSG91) |
 
