@@ -9,7 +9,9 @@ Built for Razorpay AI Buildathon 2026 — Track 3: AI Revenue Recovery.
 ![CI](https://github.com/Mithurn/RecoveryOps/actions/workflows/ci.yml/badge.svg)
 ![Razorpay](https://img.shields.io/badge/Razorpay-Test%20Mode-blue)
 
-![RecoveryOps: a case moving from investigation through the safety gate to a scheduled retry](./demo.gif)
+[![Demo video](./demo.gif)](https://www.tella.tv/video/fixing-failed-payments-with-recovery-ops-ddbz)
+
+▶ [Watch the demo on Tella](https://www.tella.tv/video/fixing-failed-payments-with-recovery-ops-ddbz)
 
 ---
 
