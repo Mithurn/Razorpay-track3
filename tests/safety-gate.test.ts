@@ -256,7 +256,7 @@ describe("safetyGate", () => {
     }
   });
 
-  it("allows a write-off backed by an unrecoverable diagnosis", () => {
+  it("escalates a write-off that has no independent hard-decline signal and no human auth", () => {
     const ctx: GateContext = {
       case: buildCase(149900),
       attemptNo: 1,
@@ -269,10 +269,45 @@ describe("safetyGate", () => {
       confidence: 1,
       now: IN_WINDOW,
     };
-    const result = safetyGate(
-      { kind: "WRITE_OFF", reason: "account never funds" },
-      ctx,
-    );
+    const result = safetyGate({ kind: "WRITE_OFF", reason: "account never funds" }, ctx);
+    expect(result.outcome).toBe("clamp");
+    if (result.outcome === "clamp") {
+      expect(result.action.kind).toBe("ESCALATE");
+      expect(result.rule).toBe("write_off_unsupported");
+    }
+  });
+
+  it("allows a write-off backed by an unrecoverable diagnosis and an independent hard-decline signal", () => {
+    const ctx: GateContext = {
+      case: buildCase(149900),
+      attemptNo: 1,
+      humanAuthorization: null,
+      hoursSinceLastContact: null,
+      hoursSinceLastAttempt: null,
+      riskHold: false,
+      hardDecline: true,
+      unrecoverableDiagnosis: true,
+      confidence: 1,
+      now: IN_WINDOW,
+    };
+    const result = safetyGate({ kind: "WRITE_OFF", reason: "card permanently declined" }, ctx);
+    expect(result.outcome).toBe("allow");
+  });
+
+  it("allows a write-off on human authorization even without a hard-decline signal", () => {
+    const ctx: GateContext = {
+      case: buildCase(149900),
+      attemptNo: 1,
+      humanAuthorization: { approver: "ops@merchant.com", at: new Date().toISOString() },
+      hoursSinceLastContact: null,
+      hoursSinceLastAttempt: null,
+      riskHold: false,
+      hardDecline: false,
+      unrecoverableDiagnosis: true,
+      confidence: 1,
+      now: IN_WINDOW,
+    };
+    const result = safetyGate({ kind: "WRITE_OFF", reason: "operator confirmed unrecoverable" }, ctx);
     expect(result.outcome).toBe("allow");
   });
 

@@ -12,6 +12,7 @@ Live engineering failure log for RecoveryOps. Entries were added as failures wer
 1. **Risk-hold veto wasn't wired** — optional callback never passed; misdiagnosed risk-flagged payments could bypass human review
 2. **WRITE_OFF could close risk holds** — `CAUTION_RANK` measured money movement, not human visibility
 3. **Risk-hold veto couples to `failureReason`** — blinding the label (benchmark experiment) disables the deterministic veto
+4. **Write-off gate had no independent case-level backstop** — agent's own `diagnosisRootCause` was the sole authority; fixed to require a hard-decline signal or human authorization
 
 ### Benchmark integrity
 4. **Benchmark leaked answers through prior-attempt data** — agent read recovery hints from `outcome_detail`
@@ -224,3 +225,15 @@ The fix made the agent better: cases that previously reached `WRITTEN_OFF` on a 
 **Measured:** fixing the survivorship bias raised the labeled numbers (55.0% → 56.7%) and lowered the blind ones (45.0% → 38.3%) in the same run from the same fix. The agent still leads fixed/rules blind (38.3% vs 33.3%), just by less than the pre-fix number suggested.
 
 **Fix:** not made. A correct fix means giving `similarResolved` something to bucket on that survives blinding (method + instrument + amount band) without leaking ground truth — a schema and corpus change, not a query tweak. The blind-mode numbers are published with this confound disclosed.
+
+---
+
+### Write-off gate had no independent case-level backstop
+
+**What happened:** `unrecoverableDiagnosis` in `GateContext` was set solely from `proposal.diagnosisRootCause === "unrecoverable"` — the agent's own output. Unlike `riskHold` and `hardDecline`, both of which also read an independent case-level function (`riskHoldForCase`, `hardDeclineForCase`), the write-off check had no backstop. An agent that hallucinated "unrecoverable" on a borderline case could permanently close it with no human ever seeing it.
+
+**Why it mattered:** a write-off is irreversible from the recovery lane's perspective. The risk-hold veto was fixed earlier to read from case data rather than the agent's diagnosis precisely because the agent is not a trustworthy authority on its own actions. The write-off gate was the same structural gap.
+
+**Fix:** `safetyGate()` now requires either `ctx.hardDecline` (set from case data, not the diagnosis) or `ctx.humanAuthorization` for any `WRITE_OFF`. Hard declines have an independent card-network signal; genuinely unfunded accounts that lack that signal now escalate to a human, who can authorize the write-off via a directive. Two existing tests updated, two new tests added: one that pins the new escalation behavior, one that pins the hard-decline allow path, one that pins the human-auth allow path.
+
+**Safeguard:** `"escalates a write-off that has no independent hard-decline signal and no human auth"` in `tests/safety-gate.test.ts`.

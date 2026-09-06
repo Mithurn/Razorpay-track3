@@ -5,7 +5,7 @@
 Built for Razorpay AI Buildathon 2026 — Track 3: AI Revenue Recovery.
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-blue?logo=typescript&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-245%20passing-green)
+![Tests](https://img.shields.io/badge/tests-247%20passing-green)
 ![CI](https://github.com/Mithurn/RecoveryOps/actions/workflows/ci.yml/badge.svg)
 ![Razorpay](https://img.shields.io/badge/Razorpay-Test%20Mode-blue)
 
@@ -155,7 +155,7 @@ Full 60-case seed-42 run, measured from the provider's own usage blocks:
 | Contact window | 08:00–19:00 IST only (RBI Fair Practices Code) | No |
 | Write-off gate | Cannot write off without an unrecoverable root cause | No |
 
-The gate is a pure function — no I/O, no state. The test suite ([`tests/safety-gate.test.ts`](./tests/safety-gate.test.ts)) runs property checks across 4,608 input combinations. The risk-hold check reads `failureReason` directly from the case, independent of the agent's diagnosis — a misdiagnosed case cannot bypass human review. One weakness is documented: the write-off gate relies on the agent's own `diagnosisRootCause`, which has no independent case-level backstop the way risk-hold does. Flagged in [`BREAKS.md`](./BREAKS.md).
+The gate is a pure function — no I/O, no state. The test suite ([`tests/safety-gate.test.ts`](./tests/safety-gate.test.ts)) runs property checks across 4,608 input combinations. The risk-hold check reads `failureReason` directly from the case, independent of the agent's diagnosis — a misdiagnosed case cannot bypass human review. The write-off gate now has the same backstop: it requires either an independent hard-decline signal or explicit human authorization — the agent's own `diagnosisRootCause` is not sufficient on its own.
 
 ---
 
@@ -173,7 +173,7 @@ Three behaviours discovered empirically and documented in [`BREAKS.md`](./BREAKS
 
 ## What broke
 
-15 failures in [`BREAKS.md`](./BREAKS.md), written as they were found. Three worth naming here:
+16 failures in [`BREAKS.md`](./BREAKS.md), written as they were found. Three worth naming here:
 
 **Risk-hold veto was wired to the wrong signal.** The gate originally read `proposal.diagnosisRootCause === "risk_hold"` — a misdiagnosed case could bypass human review. Fix: gate now reads `failureReason` from the case directly.
 
@@ -211,7 +211,7 @@ npm test -- pipeline.integration.test.ts -t "escalates a risk-hold case"
 | Gateway | Razorpay test mode | Real API calls, real HMAC |
 | Frontend | React + Vite | Streaming hooks, fast dev loop |
 | Container | Docker Compose | Single-command environment |
-| Testing | Vitest | 245 tests, ESM-native |
+| Testing | Vitest | 247 tests, ESM-native |
 
 No agent framework for the decision loop — the step budget, wall-clock deadline, forced conclusion, and degrade-to-safe path are owned code, not framework config, because those bounds are what's being measured. No ORM — the append-only guarantee requires raw SQL grants. No DI container — dependencies are constructed once at `src/main.ts`.
 
@@ -235,9 +235,9 @@ src/            Backend — see src/BACKEND.md
 bench/          Three-arm evaluation harness (agent · fixed · rules)
 web/            React UI — see web/FRONTEND.md
 db/             Schema and role grants
-tests/          245 tests
+tests/          247 tests
 scripts/        verify-audit, explain CLIs
-BREAKS.md       15 documented failures, written as found
+BREAKS.md       16 documented failures, written as found
 EVIDENCE.md     Every README number mapped to the exact reproducing command
 RUN.md          Quickstart and demo walkthrough
 ```
@@ -259,7 +259,7 @@ npm install
 npm run db:schema             # apply schema + role grants
 npm run seed:room             # seed Recovery Room from recorded bench
 npm run dev                   # API :3000, web :5173
-npm test                      # 245 tests
+npm test                      # 247 tests
 ```
 
 ### Reproduce the evaluation

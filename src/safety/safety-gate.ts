@@ -95,6 +95,16 @@ export function safetyGate(
     return { outcome: "clamp", action: escalate(detail), rule: "write_off_unsupported", detail };
   }
 
+  // The agent's own diagnosis is the only source of unrecoverableDiagnosis — it has no independent
+  // case-level backstop the way riskHold and hardDecline do. Require an independent signal:
+  // either a hard-decline flag (set from case data, not the diagnosis) or explicit human sign-off.
+  // Without one, escalate so a human confirms before the case is permanently closed.
+  if (proposal.kind === "WRITE_OFF" && !ctx.hardDecline && !ctx.humanAuthorization) {
+    const detail =
+      "write-off without a hard-decline signal requires human sign-off; the unrecoverable diagnosis has no independent case-level backstop";
+    return { outcome: "clamp", action: escalate(detail), rule: "write_off_unsupported", detail };
+  }
+
   // Read from the case data, not the diagnosis.
   if (ctx.hardDecline && AUTO_REATTEMPT.has(proposal.kind)) {
     const detail =
