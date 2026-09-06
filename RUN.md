@@ -1,104 +1,96 @@
-# Running the Recovery Room
+# Running RecoveryOps
 
-## First time on a fresh machine
+---
+
+## First time setup
 
 ```bash
-cp .env.example .env          # fill in OPENROUTER_API_KEY (or GOOGLE_GENERATIVE_AI_API_KEY) + Razorpay test keys
-docker compose up -d          # postgres :5434, redis :6381
+cp .env.example .env
+# Fill in: OPENROUTER_API_KEY (or GOOGLE_GENERATIVE_AI_API_KEY)
+#          RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET (test mode keys)
+#          RAZORPAY_WEBHOOK_SECRET
+
+docker compose up -d      # Postgres :5434, Redis :6381
 npm install
-npm run db:schema             # applies db/schema.sql
+npm run db:schema         # applies db/schema.sql + role grants
 ```
 
-## Every session - one command
+## Every session — one command
 
 ```bash
 ./start.sh
 ```
 
-Brings up Postgres + Redis, applies the schema, seeds the room from the recorded 60-case run
-(free, no model calls), and starts the API (:3000) and the web app (:5173). Ctrl-C stops it.
+Brings up Postgres + Redis, applies the schema, seeds the room from the recorded 60-case evaluation (free, no model calls), and starts the API (:3000) and web app (:5173). Ctrl-C stops everything.
 
-`./start.sh --bare` skips the seed and keeps whatever is already in the database.
+`./start.sh --bare` skips seeding and keeps whatever is already in the database.
 
-Or run the pieces yourself:
+Open **http://localhost:5173**.
+
+---
+
+## What you'll see
+
+- **Header scoreboard** — agent 56.7% (₹53,966) vs fixed 33.3% (₹31,480) vs rules 60.0% (₹56,464). See [`README.md → Evaluation`](./README.md#evaluation) for the full table and what the result actually means.
+- **Case flow** — 34 recovered, 24 escalated, 2 written off, plus two fresh cases for the demo.
+- **Escalation queue** — risk-hold cases waiting for a human directive. The Retry / Send link / Send nudge / Write off buttons are live.
+
+Click any recovered case to see the agent's recorded reasoning, tool calls, safety gate ruling, and the full audit tape. Use the **Audit log** button to see every raw event including suppressed types.
+
+---
+
+## The two demo cases
+
+Two fresh cases sit in `INCOMING`, each showing a different safety story:
+
+**`cust_live_demo`** — click "Work this case now." The agent runs for real: reasoning streams token by token, tools fire, and it concludes with a proposal. Once an order or payment link exists:
+- **"Customer pays (Razorpay Checkout)"** — opens Razorpay's real hosted widget. Completing it fires a genuine Razorpay-signed webhook (requires a public tunnel pointed at `/webhooks/razorpay`, registered in the Razorpay test-mode dashboard).
+- **"Simulate payment (no real charge)"** — injects a self-signed webhook through the same handler. Signature verification, dedupe, and settle code run genuinely; the payment ID is always prefixed `pay_sim_`.
+
+**`cust_over_cap`** — ₹6,499 case, over the ₹5,000 auto-recovery exposure cap. Whatever the agent proposes, the safety gate clamps it to `ESCALATE`. Run this to see the gate actually bind, not just claim to.
+
+---
+
+## Model selection
+
+Check the model before running a live demo. The default (`minimax/minimax-m3:free`) degrades on the majority of cases without the playbook's timing hints (measured: 86.7% degrade rate, 8.3% root-cause accuracy on this corpus). For the model the published evaluation uses:
 
 ```bash
-docker compose up -d
-npm run db:schema
-npm run seed:room
-npm run dev
+AGENT_MODEL=google/gemini-3.6-flash npm run dev   # needs GOOGLE_GENERATIVE_AI_API_KEY
 ```
 
-Open **http://localhost:5173**. You'll see:
+Model spend is hard-capped by `AGENT_SESSION_CAP_USD` (default $0.50).
 
-- **Header scoreboard** - the batch result: agent ₹53,966 (56.7% recovered) vs the fixed
-  day-1/3/5/7 schedule ₹31,480 (33.3%). See the README for the full three-arm table, including the
-  rules-table baseline (which the agent does *not* cleanly beat on money), the root-cause accuracy
-  row it cannot produce, and the `--blind-reason` experiment that isolates what the diagnosis is
-  actually worth once the corpus's own answer-key label is hidden.
-- **Case flow** - 34 recovered, 24 escalated, 2 written off, plus two fresh cases: `cust_live_demo`
-  and `cust_over_cap`.
-- **Waiting on you** - the risk-hold escalations, with working retry / send-link / write-off buttons.
+---
 
-Click any recovered case to see the agent's recorded reasoning, the tools it called, the root
-cause, the safety gate's ruling, the attempt outcome, and the full audit tape.
-
-## The live demo
-
-Two fresh cases sit in `INCOMING`, each showing a different part of the safety story:
-
-- **`cust_live_demo`** → **"work this case now"**. The agent runs for real: its reasoning
-  streams token by token, it calls its tools, and it concludes with a proposal. Once a real order
-  or payment link exists, **"Customer pays (Razorpay Checkout)"** opens Razorpay's real hosted
-  widget against it : completing it fires a genuinely Razorpay-signed webhook (needs a public
-  tunnel pointed at `/webhooks/razorpay` and registered in the Razorpay test-mode dashboard). No
-  tunnel running, or want the offline fallback instead: **"Simulate payment (no real charge)"**
-  builds a self-signed webhook through the exact same handler : signature verification, dedupe,
-  settle and ledger code genuinely exercised, but the payment id is always prefixed `pay_sim_` so
-  it's never mistaken for a live capture. See [`web/FRONTEND.md` → "Live vs recorded
-  data"](./web/FRONTEND.md#live-vs-recorded-data--this-matters) for the full picture.
-- **`cust_over_cap`** : a ₹6,499 case, over the ₹5,000 auto-recovery exposure cap. Whatever the
-  agent proposes, the safety gate clamps it to `ESCALATE` before any Razorpay call is made. Worth
-  running to see the gate actually bind, not just claim to.
-
-Check `GET /model-health` (or the model line in the runtime config the UI reads from `/config`)
-before recording a live run : the default model (`minimax/minimax-m3:free`) is free but degrades
-on the majority of cases without the merchant playbook's timing hints (measured:
-`AGENT_MODEL=minimax/minimax-m3:free npm run bench -- --size 60 --seed 42 --mock` — 86.7% degrade
-rate, 8.3% root-cause accuracy on this corpus). For the model the headline eval actually uses:
+## Reproduce the evaluation
 
 ```bash
-AGENT_MODEL=google/gemini-3.6-flash npm run dev   # needs GOOGLE_GENERATIVE_AI_API_KEY, a few cents
+# Replay all three arms — free, ~1s (uses committed cache files)
+AGENT_MODEL=google/gemini-3.6-flash npm run bench -- --size 60 --seed 42 --mock
+
+# Blind-reason control
+AGENT_MODEL=google/gemini-3.6-flash npm run bench -- --size 60 --seed 42 --mock --blind-reason
+
+# Live agent run (~$3, ~7 min — needs API key + DB)
+AGENT_MODEL=google/gemini-3.6-flash npm run bench -- --size 60 --seed 1 --cap-usd 5.00
+
+# Single arm only
+npm run bench -- --arm rules --size 60 --mock
 ```
 
-Model spend for the whole server process is hard-capped by `AGENT_SESSION_CAP_USD` (default
-$0.50).
+> Always pass `AGENT_MODEL` with `--mock`. The cache is keyed by model ID — without it, the config default (`minimax/minimax-m3:free`) replays a weaker recording silently.
 
-## The evaluation
+A live run on `google/gemini-3.6-flash` costs ~$3 (450–490 model calls across 60 cases), so pass `--cap-usd 5.00` or the budget guard trips partway through.
 
-```bash
-# always pin AGENT_MODEL on --mock : the cache is keyed by model, and the config default
-# (minimax/minimax-m3:free) replays a much weaker recorded run without it, silently
-AGENT_MODEL=google/gemini-3.6-flash npm run bench -- --size 60 --mock       # replays, ~1s, free
-AGENT_MODEL=google/gemini-3.6-flash npm run bench -- --size 60 --cap-usd 5.00   # a real agent run
+---
 
-# --arm restricts which arm actually runs — the other two print as 0 in the same table, not
-# because they lost, but because they never ran this time
-npm run bench -- --arm rules --size 60 --mock   # just the rules-table baseline, no cache needed
-AGENT_MODEL=google/gemini-3.6-flash npm run bench -- --size 60 --mock --blind-reason  # see README
-```
-
-The bare `--cap-usd` default (30 cents) is calibrated for the zero-cost model, not the headline
-one : a real run on `google/gemini-3.6-flash` costs roughly $3 (450-490 model calls across 60
-cases, measured), so pass `--cap-usd 5.00` or the run trips its own budget guard partway through.
-
-`--mock` replays the agent's recorded turns from `bench/.cache/agent-turns-seed<N>-n60-<model>.json`
-(`-blind.json` under `--blind-reason`) : the cache is keyed by model as well as seed and size, so a
-different `AGENT_MODEL` needs its own recording first. Only the agent arm needs a cache; `fixed`
-and `rules` are pure functions and run for free either way.
-
-## Tests
+## Utilities
 
 ```bash
-npm test        # 233 tests; needs docker compose up
+npm run decision-table    # agent turn breakdown by root cause × action from cached runs
+npm run verify-audit      # prove UPDATE/DELETE on recovery_events is refused at DB level
+npm run explain -- <id>   # print full ordered audit tape for a case (all event types)
+npm test                  # 245 tests (needs docker compose up for integration tests)
+npm run test:unit         # 109 unit tests, zero services, ~2s
 ```

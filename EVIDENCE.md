@@ -24,7 +24,7 @@ The `--mock` flag replays from `bench/.cache/` — no network, no API key requir
 |------|-----------|-----------|---------------------|
 | 42 | 56.7% | 60.0% | `npm run bench -- --mock --seed 42` |
 | 7 | 51.7% | 58.3% | `npm run bench -- --mock --seed 7` |
-| 13 | 58.3% | 61.7% | `npm run bench -- --mock --seed 13` |
+| 13 | 61.7% | 63.3% | `npm run bench -- --mock --seed 13` |
 | 99 | 56.7% | 60.0% | `npm run bench -- --mock --seed 99` |
 | 2024 | 56.7% | 60.0% | `npm run bench -- --mock --seed 2024` |
 
