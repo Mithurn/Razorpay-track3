@@ -83,9 +83,9 @@ function requireAccessToken(token: string | undefined) {
 
 export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Promise<void> {
   const requireAuth = { onRequest: requireAccessToken(deps.demoAccessToken) };
-  app.get("/cases", async () => ({ cases: await deps.cases.listLive() }));
+  app.get("/cases", requireAuth, async () => ({ cases: await deps.cases.listLive() }));
 
-  app.get("/queue", async () => ({ cases: await deps.cases.listByLane("ESCALATED") }));
+  app.get("/queue", requireAuth, async () => ({ cases: await deps.cases.listByLane("ESCALATED") }));
 
   app.get("/model-health", async () => deps.modelHealth());
 

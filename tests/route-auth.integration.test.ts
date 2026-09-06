@@ -53,34 +53,37 @@ describe("mutating case routes require the demo access token", () => {
     app = undefined;
   });
 
-  for (const route of [
-    "/cases/x/recover",
-    "/cases/x/decision",
-    "/cases/x/simulate-capture",
-    "/cases/x/stop",
-    "/stop",
-    "/resume",
-  ]) {
-    it(`rejects ${route} with no Authorization header`, async () => {
+  for (const [method, route] of [
+    ["POST", "/cases/x/recover"],
+    ["POST", "/cases/x/decision"],
+    ["POST", "/cases/x/simulate-capture"],
+    ["POST", "/cases/x/stop"],
+    ["POST", "/stop"],
+    ["POST", "/resume"],
+    // List routes carry customerRef PII — gated alongside the mutating routes.
+    ["GET", "/cases"],
+    ["GET", "/queue"],
+  ] as const) {
+    it(`rejects ${method} ${route} with no Authorization header`, async () => {
       app = await buildApp("real-token");
-      const res = await app.inject({ method: "POST", url: route });
+      const res = await app.inject({ method, url: route });
       expect(res.statusCode).toBe(401);
     });
 
-    it(`rejects ${route} with the wrong token`, async () => {
+    it(`rejects ${method} ${route} with the wrong token`, async () => {
       app = await buildApp("real-token");
       const res = await app.inject({
-        method: "POST",
+        method,
         url: route,
         headers: { authorization: "Bearer wrong-token" },
       });
       expect(res.statusCode).toBe(401);
     });
 
-    it(`rejects ${route} whatever the header when no token is configured`, async () => {
+    it(`rejects ${method} ${route} whatever the header when no token is configured`, async () => {
       app = await buildApp(undefined);
       const res = await app.inject({
-        method: "POST",
+        method,
         url: route,
         headers: { authorization: "Bearer anything" },
       });

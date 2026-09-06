@@ -49,16 +49,16 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-// /cases/:id/audit/verify is the one GET route still gated by the token — it runs a live UPDATE
-// probe against the DB role.
+// GET routes that carry customerRef PII (/cases, /queue) and the audit probe are gated by the
+// token. Per-case detail and event endpoints are left open for the demo UI's SSE fetches.
 async function getAuthed<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`, { headers: authHeaders() });
   if (!res.ok) throw await readError(res, path);
   return res.json() as Promise<T>;
 }
 
-export const listCases = () => get<{ cases: RecoveryCase[] }>("/cases").then((r) => r.cases);
-export const queue = () => get<{ cases: RecoveryCase[] }>("/queue").then((r) => r.cases);
+export const listCases = () => getAuthed<{ cases: RecoveryCase[] }>("/cases").then((r) => r.cases);
+export const queue = () => getAuthed<{ cases: RecoveryCase[] }>("/queue").then((r) => r.cases);
 export const caseDetail = (id: string) => get<CaseDetail>(`/cases/${id}`);
 export const scoreboard = () =>
   get<Record<string, { summary: RunSummary }>>("/scoreboard").then((r) => ({
