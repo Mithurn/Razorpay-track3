@@ -420,7 +420,7 @@ The only layer running in test mode is the Razorpay gateway. These are the produ
 | Database | Docker Compose Postgres | Managed Postgres — schema and grants identical |
 | Queue | Docker Compose Redis | Managed Redis (Upstash, ElastiCache) |
 | LLM | OpenRouter / AI Studio key | Same providers, production keys |
-| Auth | Single shared `DEMO_ACCESS_TOKEN` guards write routes and the case-list/queue read routes (which carry `customerRef` PII). Per-case detail and event endpoints are open — intentional for the demo UI's fetch-based SSE; a production swap requires per-merchant JWT. | Per-merchant JWT |
+| Auth | Single shared `DEMO_ACCESS_TOKEN`. Write routes always require it. Case-list and queue read routes (which carry `customerRef` PII) apply it only when configured — open-demo mode (no token set) leaves them accessible so reviewers can run without setup. Per-case detail and event endpoints are always open for the SSE-based UI. | Per-merchant JWT |
 | Outreach | `CUSTOMER_NUDGE` logged, not dispatched | Messaging provider (Twilio, Exotel, MSG91) |
 
 ---

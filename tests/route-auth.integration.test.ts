@@ -60,9 +60,6 @@ describe("mutating case routes require the demo access token", () => {
     ["POST", "/cases/x/stop"],
     ["POST", "/stop"],
     ["POST", "/resume"],
-    // List routes carry customerRef PII — gated alongside the mutating routes.
-    ["GET", "/cases"],
-    ["GET", "/queue"],
   ] as const) {
     it(`rejects ${method} ${route} with no Authorization header`, async () => {
       app = await buildApp("real-token");
@@ -88,6 +85,32 @@ describe("mutating case routes require the demo access token", () => {
         headers: { authorization: "Bearer anything" },
       });
       expect(res.statusCode).toBe(401);
+    });
+  }
+
+  // List routes carry customerRef PII — gated by a soft auth that only activates when a token is
+  // configured. Open-demo mode (no token) keeps them accessible so reviewers can run without setup.
+  for (const route of ["/cases", "/queue"] as const) {
+    it(`rejects GET ${route} with no Authorization header when a token is configured`, async () => {
+      app = await buildApp("real-token");
+      const res = await app.inject({ method: "GET", url: route });
+      expect(res.statusCode).toBe(401);
+    });
+
+    it(`rejects GET ${route} with the wrong token when a token is configured`, async () => {
+      app = await buildApp("real-token");
+      const res = await app.inject({
+        method: "GET",
+        url: route,
+        headers: { authorization: "Bearer wrong-token" },
+      });
+      expect(res.statusCode).toBe(401);
+    });
+
+    it(`serves GET ${route} with no token configured (open-demo mode)`, async () => {
+      app = await buildApp(undefined);
+      const res = await app.inject({ method: "GET", url: route });
+      expect(res.statusCode).not.toBe(401);
     });
   }
 

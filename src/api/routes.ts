@@ -81,11 +81,21 @@ function requireAccessToken(token: string | undefined) {
   };
 }
 
+// Protects PII-carrying read routes only when a token is actually configured.
+// When DEMO_ACCESS_TOKEN is unset the server is in open-demo mode and these
+// routes serve without a credential — matching how the demo runs out of the box.
+function requireAuthIfConfigured(token: string | undefined) {
+  if (!token) return undefined;
+  return requireAccessToken(token);
+}
+
 export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Promise<void> {
   const requireAuth = { onRequest: requireAccessToken(deps.demoAccessToken) };
-  app.get("/cases", requireAuth, async () => ({ cases: await deps.cases.listLive() }));
+  const softAuth = requireAuthIfConfigured(deps.demoAccessToken);
+  const requireSoftAuth = softAuth ? { onRequest: softAuth } : {};
+  app.get("/cases", requireSoftAuth, async () => ({ cases: await deps.cases.listLive() }));
 
-  app.get("/queue", requireAuth, async () => ({ cases: await deps.cases.listByLane("ESCALATED") }));
+  app.get("/queue", requireSoftAuth, async () => ({ cases: await deps.cases.listByLane("ESCALATED") }));
 
   app.get("/model-health", async () => deps.modelHealth());
 
