@@ -513,8 +513,25 @@
 }
 .rail-item__actions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-xs);
   margin-top: var(--space-2xs);
+}
+.rail-item__note {
+  width: 100%;
+  resize: vertical;
+  padding: 4px 8px;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  color: var(--text-default);
+  background: var(--bg-raised-1);
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-sm);
+  outline: none;
+  box-sizing: border-box;
+}
+.rail-item__note:focus {
+  border-color: var(--accent);
 }
 
 .btn {

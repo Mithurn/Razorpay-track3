@@ -12,6 +12,8 @@
     "web": "vite --config web/vite.config.ts",
     "bench": "tsx --env-file-if-exists=.env bench/run.ts",
     "decision-table": "tsx bench/decision-table.ts",
+    "verify-audit": "tsx --env-file-if-exists=.env scripts/verify-audit.ts",
+    "explain": "tsx --env-file-if-exists=.env scripts/explain.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run --exclude '**/*.integration.test.ts'",

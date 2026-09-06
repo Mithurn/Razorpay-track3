@@ -333,9 +333,11 @@ function EscalationRow({
   onOpen: () => void;
   onError: (message: string) => void;
 }) {
+  const [note, setNote] = useState("");
+
   const act = async (decision: "approve" | "redirect" | "write_off", redirectTo?: string) => {
     try {
-      await decide(kase.id, { decision, redirectTo });
+      await decide(kase.id, { decision, redirectTo, note: note.trim() || undefined });
       onDone();
     } catch (err) {
       onError(err instanceof Error ? err.message : "request failed");
@@ -348,12 +350,23 @@ function EscalationRow({
         <span className="card__amount">{rupees(kase.amountPaise)}</span>
       </div>
       <span className="card__reason">{kase.failureReason.replace(/_/g, " ")}</span>
+      <textarea
+        className="rail-item__note"
+        placeholder="Operator note (optional)"
+        rows={2}
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        maxLength={500}
+      />
       <div className="rail-item__actions">
         <button className="btn btn--primary" onClick={() => act("approve")}>
           Retry
         </button>
         <button className="btn" onClick={() => act("redirect", "PAYMENT_LINK")}>
           Send link
+        </button>
+        <button className="btn" onClick={() => act("redirect", "CUSTOMER_NUDGE")}>
+          Send nudge
         </button>
         <button className="btn" onClick={() => act("write_off")}>
           Write off

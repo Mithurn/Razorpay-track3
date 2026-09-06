@@ -22,6 +22,8 @@ import {
   Inbox,
   RotateCw,
   CreditCard,
+  Mail,
+  ScrollText,
   type LucideIcon,
 } from "lucide-react";
 import type { Activity } from "../loop/activities.js";
@@ -50,6 +52,8 @@ export {
   Inbox,
   RotateCw,
   CreditCard,
+  Mail,
+  ScrollText,
 };
 
 export const ACTIVITY_ICON: Record<Activity["kind"], LucideIcon> = {
@@ -57,5 +61,6 @@ export const ACTIVITY_ICON: Record<Activity["kind"], LucideIcon> = {
   propose: ArrowDownToLine,
   gate: ShieldCheck,
   execute: Check,
+  nudge: Mail,
   outcome: Target,
 };

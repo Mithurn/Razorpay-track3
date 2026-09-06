@@ -61,6 +61,12 @@ export type StepDistribution = {
   max: number;
 };
 
+// Per-run safety ledger: how many gate evaluations fired, skipped, or clamped, and which rule.
+export type GateCounters = {
+  total: number;
+  byOutcome: { outcome: string; rule: string | null; count: number }[];
+};
+
 const div = (a: number, b: number) => (b === 0 ? 0 : a / b);
 
 function moneyMoves(a: Attempt): boolean {
@@ -149,6 +155,16 @@ function spendLines(spend: SpendSummary, agent: ArmMetrics): string[] {
   ];
 }
 
+function gateLines(g: GateCounters): string[] {
+  const pad = (label: string, v: string) => `  ${label.padEnd(28)}${v.padStart(16)}`;
+  const lines = [``, `safety gate — ${g.total} evaluations across agent arm:`];
+  for (const row of g.byOutcome) {
+    const label = row.rule ? `${row.outcome} · ${row.rule}` : row.outcome;
+    lines.push(pad(label, String(row.count)));
+  }
+  return lines;
+}
+
 function stepLines(s: StepDistribution): string[] {
   const pad = (label: string, v: string) => `  ${label.padEnd(28)}${v.padStart(16)}`;
   const degradeRate = s.turns > 0 ? ((s.degraded / s.turns) * 100).toFixed(1) : "0.0";
@@ -171,6 +187,7 @@ export function formatReport(
   exceptionArm?: string,
   spend?: SpendSummary,
   steps?: StepDistribution,
+  gates?: GateCounters,
 ): string {
   const rupees = (p: number) => `₹${(p / 100).toLocaleString("en-IN")}`;
   const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
@@ -198,6 +215,7 @@ export function formatReport(
     row("undiagnosed (degraded)", (m) => (m.rootCauseAccuracy === null ? "—" : `${m.undiagnosed}/${m.cases}`)),
     ...(spend && spend.calls > 0 ? spendLines(spend, agent) : []),
     ...(steps ? stepLines(steps) : []),
+    ...(gates ? gateLines(gates) : []),
     "",
     exceptionArm ? `exceptions — ${exceptionArm} arm (${exceptions.length}):` : "exceptions (no arm ran):",
     ...exceptions.slice(0, 40).map((e) => `  ${e.customerRef}  ${e.failureReason}  ${e.lane}  — ${e.groundTruthNote}`),

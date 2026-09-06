@@ -38,6 +38,8 @@ export type PipelineDeps = BuildDeps & {
   notifier: NotificationPort;
   clock: Clock;
   runAgent: AgentRunner;
+  agentModel?: string;
+  budget?: { calls: number; inputTokens: number; outputTokens: number; usdUsed: number };
   limits?: SafetyLimits;
   riskHoldForCase?: (kase: RecoveryCase) => boolean;
   hardDeclineForCase?: (kase: RecoveryCase) => boolean;
@@ -133,9 +135,22 @@ export class RecoveryPipeline {
     });
 
     const directive = await pendingDirective(this.deps.events, caseId, priorAttempts);
+    const budgetBefore = this.deps.budget
+      ? { calls: this.deps.budget.calls, inputTokens: this.deps.budget.inputTokens, outputTokens: this.deps.budget.outputTokens, usdUsed: this.deps.budget.usdUsed }
+      : null;
+    const agentStartMs = Date.now();
     const proposal = directive
       ? directedProposal(directive)
       : await this.deps.runAgent(await buildAgentDeps(kase, priorAttempts, this.deps), agentEvents);
+    const agentLatencyMs = Date.now() - agentStartMs;
+    const spend = budgetBefore && this.deps.budget
+      ? {
+          calls: this.deps.budget.calls - budgetBefore.calls,
+          inputTokens: this.deps.budget.inputTokens - budgetBefore.inputTokens,
+          outputTokens: this.deps.budget.outputTokens - budgetBefore.outputTokens,
+          usdDelta: +(this.deps.budget.usdUsed - budgetBefore.usdUsed).toFixed(6),
+        }
+      : null;
 
     await this.deps.events.append(
       directive
@@ -158,6 +173,9 @@ export class RecoveryPipeline {
               action: proposal.action,
               reasoning: proposal.reasoning,
               toolCalls: proposal.toolCalls,
+              model: this.deps.agentModel,
+              latencyMs: agentLatencyMs,
+              ...(spend ? { spend } : {}),
               activity: "propose",
             },
           },
@@ -222,6 +240,25 @@ export class RecoveryPipeline {
       detail: result.outcome === "allow" ? null : result.detail,
       proposed: proposal.action.kind,
       applied: result.outcome === "skip" ? null : result.action.kind,
+      // GateContext snapshot — lets the UI show all 9 rules with actual vs limit values.
+      ctx: {
+        attemptNo: ctx.attemptNo,
+        riskHold: ctx.riskHold,
+        hardDecline: ctx.hardDecline,
+        unrecoverableDiagnosis: ctx.unrecoverableDiagnosis,
+        confidence: ctx.confidence,
+        humanAuthorized: ctx.humanAuthorization !== null,
+        hoursSinceLastAttempt: ctx.hoursSinceLastAttempt,
+        hoursSinceLastContact: ctx.hoursSinceLastContact,
+        amountPaise: ctx.case.amountPaise,
+        limits: {
+          maxAttempts: this.limits.maxAttempts,
+          maxExposurePaise: this.limits.maxExposurePaise,
+          minConfidence: this.limits.minConfidence,
+          cooldownHours: this.limits.cooldownHours,
+          contactCooldownHours: this.limits.contactCooldownHours,
+        },
+      },
     };
 
     if (result.outcome === "skip") {

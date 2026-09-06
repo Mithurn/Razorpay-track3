@@ -3,6 +3,7 @@ import "./styles/room.css";
 import "./loop/loop.css";
 import "./room/room-extra.css";
 import { AttemptTimeline } from "./loop/AttemptTimeline.js";
+import { AuditLog } from "./loop/AuditLog.js";
 import { LoopGraph } from "./loop/LoopGraph.js";
 import { deriveLoopState, type StageId } from "./loop/useCaseLoopState.js";
 import { useLiveRun } from "./loop/useLiveRun.js";
@@ -28,7 +29,7 @@ import {
   verifyAudit,
 } from "./api.js";
 import type { AuditVerify } from "./api.js";
-import { Play, User, ArrowRight, Check, X, Square, Workflow } from "./ui/icons.js";
+import { Play, User, ArrowRight, Check, X, Square, Workflow, ScrollText } from "./ui/icons.js";
 import { Spinner } from "./ui/motion.js";
 import { Modal } from "./ui/Modal.js";
 import { Drawer } from "./ui/Drawer.js";
@@ -180,6 +181,7 @@ function Stage({
   const [detail, setDetail] = useState<CaseDetail | null>(null);
   const [showCustomer, setShowCustomer] = useState(false);
   const [showGraph, setShowGraph] = useState(false);
+  const [showAuditLog, setShowAuditLog] = useState(false);
   const [confirmingStop, setConfirmingStop] = useState(false);
   const [elapsedMs, setElapsedMs] = useState(0);
   const run = useLiveRun(caseId);
@@ -188,6 +190,7 @@ function Stage({
   useEffect(() => {
     setShowCustomer(false);
     setShowGraph(false);
+    setShowAuditLog(false);
     setConfirmingStop(false);
   }, [caseId]);
 
@@ -394,7 +397,13 @@ function Stage({
           >
             <Workflow size={13} /> Execution graph
           </button>
-          {run.live && !showGraph && (
+          <button
+            className={"btn btn--ghost" + (showAuditLog ? " btn--on" : "")}
+            onClick={() => setShowAuditLog((v) => !v)}
+          >
+            <ScrollText size={13} /> Audit log
+          </button>
+          {run.live && !showGraph && !showAuditLog && (
             <span className="stage__graph-hint">
               {STAGE_LABEL[(Object.entries(loopState.stages).find(([, st]) => st === "active")?.[0] ?? "INVESTIGATE") as StageId]}
             </span>
@@ -404,6 +413,10 @@ function Stage({
 
       <Modal open={showGraph} onClose={() => setShowGraph(false)} title="Execution graph">
         <LoopGraph state={loopState} />
+      </Modal>
+
+      <Modal open={showAuditLog} onClose={() => setShowAuditLog(false)} title="Raw audit log">
+        <AuditLog events={detail?.events ?? []} />
       </Modal>
 
       <div className="stage__timeline">

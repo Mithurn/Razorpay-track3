@@ -340,3 +340,58 @@
     animation: none;
   }
 }
+
+/* ── Audit log ──────────────────────────────────────────────────── */
+.audit-log {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.audit-log__meta {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+.audit-log__meta-hint {
+  color: var(--wait);
+}
+.audit-log__scroll {
+  overflow-x: auto;
+  border: 1px solid var(--line-subtle);
+  border-radius: var(--radius-sm);
+}
+.audit-log__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-xs);
+}
+.audit-log__table th {
+  text-align: left;
+  padding: 4px 8px;
+  background: var(--bg-raised-2);
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--line-subtle);
+  font-weight: var(--w-medium);
+  white-space: nowrap;
+}
+.audit-log__table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--line-subtle);
+  vertical-align: top;
+}
+.audit-log__table tr:last-child td {
+  border-bottom: none;
+}
+.audit-log__row--notable td {
+  background: color-mix(in oklch, var(--wait-surface) 60%, transparent);
+}
+.audit-log__row--gap td {
+  background: color-mix(in oklch, var(--deny-surface) 60%, transparent);
+}
+.audit-log__gap-badge {
+  margin-left: 4px;
+  color: var(--deny);
+}
+.audit-log__payload-text {
+  color: var(--text-muted);
+  word-break: break-word;
+}

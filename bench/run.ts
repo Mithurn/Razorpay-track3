@@ -18,7 +18,7 @@ import { BenchGateway } from "./bench-gateway.js";
 import { fixedScheduleRunner } from "./fixed-arm.js";
 import { rulesRunner } from "./rules-arm.js";
 import { recordingRunner, replayRunner } from "./mock-agent.js";
-import { scoreArm, exceptionList, formatReport, type CaseRecord, type StepDistribution } from "./metrics.js";
+import { scoreArm, exceptionList, formatReport, type CaseRecord, type StepDistribution, type GateCounters } from "./metrics.js";
 import { LoggingNotifier } from "../src/execution/notifier.js";
 import { readFileSync, existsSync } from "node:fs";
 import { MAX_AGENT_TURNS_PER_CASE, BENCH_CONCURRENCY } from "./constants.js";
@@ -103,8 +103,10 @@ async function main(): Promise<void> {
         );
   const results: Record<string, CaseRecord[]> = {};
 
+  let agentRunId: string | null = null;
   for (const arm of armsToRun) {
     const runId = randomUUID();
+    if (arm === "agent") agentRunId = runId;
     await runs.create(runId, arm, `${arm} seed=${seed} n=${size}`, { seed, size, mock: values.mock });
     const corpus = generateCorpus({ runId, size, seed, blindReason });
     const truth = new Map<string, GroundTruth>(corpus.map((c) => [c.id, c.groundTruth]));
@@ -134,7 +136,8 @@ async function main(): Promise<void> {
   const exceptionArm = results.agent ? "agent" : results.fixed ? "fixed" : null;
   const exceptions = exceptionArm ? exceptionList(results[exceptionArm as "agent" | "fixed"]!) : [];
   const steps = armsToRun.includes("agent") ? stepDistFromCache(cachePath) : undefined;
-  console.log(formatReport(agentM, fixedM, exceptions, rulesM, exceptionArm ?? undefined, budget, steps));
+  const gates = agentRunId ? await gateCountersFromDb(pool, agentRunId) : undefined;
+  console.log(formatReport(agentM, fixedM, exceptions, rulesM, exceptionArm ?? undefined, budget, steps, gates));
 
   await pool.end();
 }
@@ -212,6 +215,25 @@ async function collect(
 
 function blank(arm: string) {
   return scoreArm(arm, []);
+}
+
+async function gateCountersFromDb(db: ReturnType<typeof createPool>, runId: string): Promise<GateCounters> {
+  const { rows } = await db.query<{ outcome: string; rule: string | null; count: string }>(
+    `SELECT
+       re.payload->>'outcome' AS outcome,
+       re.payload->>'rule'    AS rule,
+       COUNT(*)::text         AS count
+     FROM recovery_events re
+     JOIN recovery_cases rc ON rc.id = re.case_id
+     WHERE rc.run_id = $1 AND re.type = 'GATE_APPLIED'
+     GROUP BY outcome, rule
+     ORDER BY COUNT(*) DESC`,
+    [runId],
+  );
+  return {
+    total: rows.reduce((s, r) => s + Number(r.count), 0),
+    byOutcome: rows.map((r) => ({ outcome: r.outcome, rule: r.rule, count: Number(r.count) })),
+  };
 }
 
 function stepDistFromCache(path: string): StepDistribution | undefined {

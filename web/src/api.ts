@@ -82,7 +82,7 @@ export async function simulateCapture(id: string): Promise<void> {
 
 export async function decide(
   id: string,
-  body: { decision: "approve" | "redirect" | "write_off"; redirectTo?: string },
+  body: { decision: "approve" | "redirect" | "write_off"; redirectTo?: string; note?: string },
 ): Promise<void> {
   await post(`/cases/${id}/decision`, body);
 }

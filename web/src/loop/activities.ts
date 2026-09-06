@@ -7,7 +7,7 @@ import { TOOL_LABELS } from "./useCaseLoopState.js";
 import { resultLine } from "./toolLine.js";
 import { rupees } from "../ui/format.js";
 
-export type ActivityKind = "investigate" | "propose" | "gate" | "execute" | "outcome";
+export type ActivityKind = "investigate" | "propose" | "gate" | "execute" | "nudge" | "outcome";
 export type Tone = "plain" | "clear" | "deny" | "wait" | "info";
 
 export type ToolEntry = {
@@ -105,6 +105,15 @@ function newPropose(ev: RawEvent): Activity {
       { label: "confidence", value: degraded ? "—" : confidence.toFixed(2) },
       { label: "proposes", value: action },
       { label: "tool calls", value: String(toolCalls) },
+      ...(p.model ? [{ label: "model", value: str(p.model)! }] : []),
+      ...(p.latencyMs !== undefined ? [{ label: "latency", value: `${Math.round(num(p.latencyMs) ?? 0)}ms` }] : []),
+      ...(p.spend && typeof p.spend === "object"
+        ? (() => {
+            const s = p.spend as Record<string, unknown>;
+            const usd = num(s.usdDelta);
+            return usd !== null && usd > 0 ? [{ label: "cost", value: `$${usd.toFixed(6)}` }] : [];
+          })()
+        : []),
       { label: "reasoning", value: reasoning },
     ],
     tools: [],
@@ -125,13 +134,47 @@ function newGate(ev: RawEvent): Activity {
       : outcome === "skip"
         ? `skipped this attempt — ${rule} (${detailText})`
         : `clamped ${proposed} → ${applied} — ${rule}`;
+  // ctx is present for events emitted after the gate-context payload was added.
+  // For older events fall back to the summary string.
+  const ctx = (typeof p.ctx === "object" && p.ctx !== null ? p.ctx : null) as Record<string, unknown> | null;
+  const limits = (ctx && typeof ctx.limits === "object" && ctx.limits !== null
+    ? ctx.limits
+    : null) as Record<string, unknown> | null;
+
+  function gateRows(): DetailRow[] {
+    if (!ctx || !limits) {
+      return [{ label: "checked", value: "all 9 guardrails — none triggered" }];
+    }
+    const attemptNo = Number(ctx.attemptNo ?? 0);
+    const maxAttempts = Number(limits.maxAttempts ?? 4);
+    const amountPaise = Number(ctx.amountPaise ?? 0);
+    const maxExposurePaise = Number(limits.maxExposurePaise ?? 0);
+    const confidence = Number(ctx.confidence ?? 1);
+    const minConf = Number(limits.minConfidence ?? 0);
+    const hAttempt = ctx.hoursSinceLastAttempt != null ? Number(ctx.hoursSinceLastAttempt).toFixed(1) : null;
+    const cooldown = Number(limits.cooldownHours ?? 6);
+    const hContact = ctx.hoursSinceLastContact != null ? Number(ctx.hoursSinceLastContact).toFixed(1) : null;
+    const contactCooldown = Number(limits.contactCooldownHours ?? 24);
+    const tick = "✓";
+    return [
+      { label: `${tick} risk_hold`, value: ctx.riskHold ? "flagged — blocked" : "clear" },
+      { label: `${tick} hard_decline`, value: ctx.hardDecline ? "flagged — blocked" : "clear" },
+      { label: `${tick} write_off_gate`, value: ctx.unrecoverableDiagnosis ? "unrecoverable" : "not unrecoverable" },
+      { label: `${tick} max_attempts`, value: `attempt ${attemptNo} of ${maxAttempts}` },
+      {
+        label: `${tick} exposure_cap`,
+        value: `₹${(amountPaise / 100).toFixed(0)} of ₹${(maxExposurePaise / 100).toFixed(0)} cap${ctx.humanAuthorized ? " (human override)" : ""}`,
+      },
+      { label: `${tick} low_confidence`, value: `${confidence} ≥ ${minConf} floor` },
+      { label: `${tick} cooldown`, value: hAttempt != null ? `${hAttempt}h since last charge attempt (need ${cooldown}h)` : "no prior charge attempts" },
+      { label: `${tick} contact_cooldown`, value: hContact != null ? `${hContact}h since last contact (need ${contactCooldown}h)` : "no prior contacts" },
+      { label: `${tick} contact_window`, value: "within RBI contact hours" },
+    ];
+  }
+
   const detail: DetailRow[] =
     outcome === "allow"
-      ? [
-          { label: "outcome", value: "allow" },
-          { label: "checked", value: "attempt cap · exposure cap · risk hold · cooldown" },
-          { label: "action", value: applied ?? proposed },
-        ]
+      ? [{ label: "outcome", value: "allow" }, ...gateRows(), { label: "action", value: applied ?? proposed }]
       : [
           { label: "outcome", value: outcome },
           { label: "rule", value: rule ?? "—" },
@@ -203,6 +246,28 @@ const LANE_VERB: Record<string, string> = {
   WRITTEN_OFF: "Written off",
   STOPPED: "Stopped",
 };
+
+function newNudge(ev: RawEvent): Activity {
+  const p = ev.payload;
+  const channel = str(p.channel) ?? "unknown";
+  const ref = str(p.messageRef) ?? "—";
+  return {
+    id: `nudge-${ev.at}`,
+    kind: "nudge",
+    title: "Outreach queued",
+    status: "done",
+    tone: "wait",
+    startedAt: ev.at,
+    endedAt: ev.at,
+    summary: `${channel} — decided action, not sent (no delivery provider configured)`,
+    detail: [
+      { label: "channel", value: channel },
+      { label: "ref", value: ref },
+      { label: "delivered", value: "no — no delivery provider is configured in this build" },
+    ],
+    tools: [],
+  };
+}
 
 function newOutcome(ev: RawEvent, rationale?: string): Activity {
   const p = ev.payload;
@@ -327,6 +392,10 @@ export function deriveActivities(events: RawEvent[]): Activity[] {
       case "ATTEMPT_OUTCOME":
         if (currentExecute && currentExecute.status === "active") closeExecute(currentExecute, ev);
         currentExecute = null;
+        break;
+
+      case "NUDGE_QUEUED":
+        push(newNudge(ev));
         break;
 
       case "CASE_RESOLVED":

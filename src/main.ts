@@ -77,6 +77,8 @@ const pipeline = new RecoveryPipeline({
   riskHoldForCase: isRiskHold,
   hardDeclineForCase: isHardDecline,
   stopRegistry: stopStore,
+  agentModel: config.AGENT_MODEL,
+  budget: agentBudget,
   similarCases: (kase, query) =>
     cases.similarResolved(kase.failureReason, {
       method: query.method ?? null,

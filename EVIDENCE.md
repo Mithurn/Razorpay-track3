@@ -73,7 +73,8 @@ The `--mock` flag replays from `bench/.cache/` — no network, no API key requir
 
 | Claim | Reproducing command |
 |-------|---------------------|
-| `recovery_app` role cannot UPDATE or DELETE | Start the server, open `/cases/<id>/audit/verify` with the bearer token — runs a live UPDATE probe and returns `{ enforced: true }` or the exact error |
+| `recovery_app` role cannot UPDATE or DELETE | `npm run verify-audit` — runs UPDATE + DELETE probes as the app role, checks sequence gaps, exits 0 only if all pass |
+| Full ordered audit tape for a case | `npm run explain -- <caseId>` — prints every event including suppressed types (AUDIT_GAP, NUDGE_QUEUED, etc.) |
 
 ---
 
