@@ -26,7 +26,7 @@ The `--mock` flag replays from `bench/.cache/` — no network, no API key requir
 | 7 | 51.7% | 58.3% | `npm run bench -- --mock --seed 7` |
 | 13 | 61.7% | 63.3% | `npm run bench -- --mock --seed 13` |
 | 99 | 56.7% | 60.0% | `npm run bench -- --mock --seed 99` |
-| 2024 | 56.7% | 60.0% | `npm run bench -- --mock --seed 2024` |
+| 2024 | 53.3% | 55.0% | `npm run bench -- --mock --seed 2024` |
 
 ---
 
@@ -82,5 +82,5 @@ The `--mock` flag replays from `bench/.cache/` — no network, no API key requir
 
 | Claim | Reproducing command |
 |-------|---------------------|
-| Pre-fix seed 42: 33/60 → post-fix 35/60 | Pre-fix number in BREAKS.md; post-fix: `npm run bench -- --mock --seed 42` |
+| Pre-fix seed 42: 33/60 → post-fix 34/60 | Pre-fix number in BREAKS.md; post-fix: `npm run bench -- --mock --seed 42` |
 | Blind-reason: pre-fix 45.0% → post-fix 38.3% | Same comparison; blind run: `npm run bench -- --mock --seed 42 --blind-reason` |

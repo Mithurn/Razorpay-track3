@@ -60,7 +60,7 @@ flowchart TD
 
 ## Evaluation
 
-60 synthetic cases, same gate and executor, three strategies. The last column reruns each arm with Razorpay's `error_reason` label blanked out:
+A single 60-case batch, same gate and executor, three strategies. The last column reruns each arm with Razorpay's `error_reason` label blanked out. All figures measured on `google/gemini-3.6-flash`; the repo default is a free model for local development — see [`RUN.md`](./RUN.md#model-selection).
 
 | Strategy | Recovered | Recovery Rate | ₹ Recovered | Root-Cause Accuracy | Rate, label hidden |
 |----------|----------:|--------------:|------------:|--------------------:|-------------------:|
@@ -141,7 +141,7 @@ Full 60-case seed-42 run, measured from the provider's own usage blocks:
 
 ---
 
-## Safety guarantees
+## Safety guarantees — stopping rules and compliant escalation
 
 | Rule | Enforces | Overridable by human |
 |------|----------|---------------------|
