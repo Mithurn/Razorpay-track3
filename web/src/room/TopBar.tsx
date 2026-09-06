@@ -25,6 +25,7 @@ export function TopBar({
   onError: (message: string) => void;
 }) {
   const recoveredLivePaise = metrics?.recoveredLivePaise ?? 0;
+  const recoveredSimulatedPaise = metrics?.recoveredSimulatedPaise ?? 0;
   const recoveredTotal = metrics?.recoveredPaise ?? 0;
   // The 60-case batch total is the hero figure — the number Track 3's bar grades. A live on-camera
   // capture is real money too, shown as a separate accent, never blended into the batch total.
@@ -75,7 +76,9 @@ export function TopBar({
               ? `${recoveredDelta} just captured, live`
               : recoveredLivePaise > 0
                 ? `+ ${rupees(recoveredLive)} live this session`
-                : null
+                : recoveredSimulatedPaise > 0
+                  ? `${rupees(recoveredSimulatedPaise)} simulated (no money moved)`
+                  : null
           }
         />
         <Metric label="Exposure at risk" value={rupees(exposure)} tone="plain" />

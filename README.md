@@ -5,7 +5,8 @@
 Built for Razorpay AI Buildathon 2026 — Track 3: AI Revenue Recovery.
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-blue?logo=typescript&logoColor=white)
-![Tests](https://img.shields.io/badge/tests-233%20passing-green)
+![Tests](https://img.shields.io/badge/tests-245%20passing-green)
+![CI](https://github.com/Mithurn/RecoveryOps/actions/workflows/ci.yml/badge.svg)
 ![Razorpay](https://img.shields.io/badge/Razorpay-Test%20Mode-blue)
 
 ![RecoveryOps: a case moving from investigation through the safety gate to a scheduled retry](./demo.gif)
@@ -395,7 +396,7 @@ merchant revenue is at risk anywhere in this build.
 | Gateway | Razorpay test mode | Real API calls, real HMAC |
 | Frontend | React + Vite | Streaming hooks, fast dev loop |
 | Container | Docker Compose | Single-command environment |
-| Testing | Vitest | 233 tests, ESM-native |
+| Testing | Vitest | 245 tests, ESM-native |
 
 No agent framework for the *decision loop* — the Vercel AI SDK handles tool-call transport, but
 the step budget, the wall-clock deadline, the forced final-step conclusion, and the degrade-to-safe
@@ -432,8 +433,9 @@ src/            Backend — see src/BACKEND.md
 bench/          Three-arm evaluation harness (agent · fixed · rules)
 web/            React UI — see web/FRONTEND.md
 db/             Schema and role grants
-tests/          233 tests
+tests/          245 tests
 BREAKS.md       15 documented failures, written as found
+EVIDENCE.md     Every README number mapped to the exact command that reproduces it
 ```
 
 ---
@@ -453,7 +455,7 @@ npm install
 npm run db:schema             # apply schema + role grants
 npm run seed:room             # seed Recovery Room from recorded bench
 npm run dev                   # API :3000, web :5173
-npm test                      # 233 tests
+npm test                      # 245 tests
 ```
 
 ### Reproduce the evaluation

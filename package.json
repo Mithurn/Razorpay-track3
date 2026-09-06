@@ -11,6 +11,7 @@
     "dev": "concurrently -k -n api,web -c blue,magenta \"npm:api\" \"npm:web\"",
     "web": "vite --config web/vite.config.ts",
     "bench": "tsx --env-file-if-exists=.env bench/run.ts",
+    "decision-table": "tsx bench/decision-table.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run --exclude '**/*.integration.test.ts'",

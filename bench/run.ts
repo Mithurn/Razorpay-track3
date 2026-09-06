@@ -18,8 +18,9 @@ import { BenchGateway } from "./bench-gateway.js";
 import { fixedScheduleRunner } from "./fixed-arm.js";
 import { rulesRunner } from "./rules-arm.js";
 import { recordingRunner, replayRunner } from "./mock-agent.js";
-import { scoreArm, exceptionList, formatReport, type CaseRecord } from "./metrics.js";
+import { scoreArm, exceptionList, formatReport, type CaseRecord, type StepDistribution } from "./metrics.js";
 import { LoggingNotifier } from "../src/execution/notifier.js";
+import { readFileSync, existsSync } from "node:fs";
 import { MAX_AGENT_TURNS_PER_CASE, BENCH_CONCURRENCY } from "./constants.js";
 
 type Arm = "agent" | "fixed" | "rules";
@@ -132,7 +133,8 @@ async function main(): Promise<void> {
   // would silently change what the list means.
   const exceptionArm = results.agent ? "agent" : results.fixed ? "fixed" : null;
   const exceptions = exceptionArm ? exceptionList(results[exceptionArm as "agent" | "fixed"]!) : [];
-  console.log(formatReport(agentM, fixedM, exceptions, rulesM, exceptionArm ?? undefined, budget));
+  const steps = armsToRun.includes("agent") ? stepDistFromCache(cachePath) : undefined;
+  console.log(formatReport(agentM, fixedM, exceptions, rulesM, exceptionArm ?? undefined, budget, steps));
 
   await pool.end();
 }
@@ -210,6 +212,33 @@ async function collect(
 
 function blank(arm: string) {
   return scoreArm(arm, []);
+}
+
+function stepDistFromCache(path: string): StepDistribution | undefined {
+  if (!existsSync(path)) return undefined;
+  try {
+    const raw = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
+    const toolCalls: number[] = [];
+    let degraded = 0;
+    for (const entry of Object.values(raw)) {
+      const e = entry as Record<string, unknown>;
+      const p = ("proposal" in e ? e.proposal : e) as { toolCalls?: number; degraded?: boolean };
+      toolCalls.push(p.toolCalls ?? 0);
+      if (p.degraded) degraded++;
+    }
+    if (toolCalls.length === 0) return undefined;
+    toolCalls.sort((a, b) => a - b);
+    const n = toolCalls.length;
+    return {
+      turns: n,
+      degraded,
+      p50: toolCalls[Math.floor(n * 0.5)]!,
+      p95: toolCalls[Math.floor(n * 0.95)]!,
+      max: toolCalls[n - 1]!,
+    };
+  } catch {
+    return undefined;
+  }
 }
 
 main().catch((err) => {

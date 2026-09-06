@@ -52,6 +52,15 @@ export type SpendSummary = {
   usdPerMOutput: number;
 };
 
+// Tool-call (step) distribution across all agent turns in a run.
+export type StepDistribution = {
+  turns: number;
+  degraded: number;
+  p50: number;
+  p95: number;
+  max: number;
+};
+
 const div = (a: number, b: number) => (b === 0 ? 0 : a / b);
 
 function moneyMoves(a: Attempt): boolean {
@@ -140,6 +149,20 @@ function spendLines(spend: SpendSummary, agent: ArmMetrics): string[] {
   ];
 }
 
+function stepLines(s: StepDistribution): string[] {
+  const pad = (label: string, v: string) => `  ${label.padEnd(28)}${v.padStart(16)}`;
+  const degradeRate = s.turns > 0 ? ((s.degraded / s.turns) * 100).toFixed(1) : "0.0";
+  return [
+    "",
+    `step budget — agent turns (tool calls per turn):`,
+    pad("turns", String(s.turns)),
+    pad("p50 tool calls", String(s.p50)),
+    pad("p95 tool calls", String(s.p95)),
+    pad("max tool calls", String(s.max)),
+    pad("degrade rate", `${degradeRate}% (${s.degraded}/${s.turns})`),
+  ];
+}
+
 export function formatReport(
   agent: ArmMetrics,
   fixed: ArmMetrics,
@@ -147,6 +170,7 @@ export function formatReport(
   rules?: ArmMetrics,
   exceptionArm?: string,
   spend?: SpendSummary,
+  steps?: StepDistribution,
 ): string {
   const rupees = (p: number) => `₹${(p / 100).toLocaleString("en-IN")}`;
   const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
@@ -173,6 +197,7 @@ export function formatReport(
     row("root-cause accuracy", (m) => (m.rootCauseAccuracy === null ? "— (no diagnosis)" : pct(m.rootCauseAccuracy))),
     row("undiagnosed (degraded)", (m) => (m.rootCauseAccuracy === null ? "—" : `${m.undiagnosed}/${m.cases}`)),
     ...(spend && spend.calls > 0 ? spendLines(spend, agent) : []),
+    ...(steps ? stepLines(steps) : []),
     "",
     exceptionArm ? `exceptions — ${exceptionArm} arm (${exceptions.length}):` : "exceptions (no arm ran):",
     ...exceptions.slice(0, 40).map((e) => `  ${e.customerRef}  ${e.failureReason}  ${e.lane}  — ${e.groundTruthNote}`),
