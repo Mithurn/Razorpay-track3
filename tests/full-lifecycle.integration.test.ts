@@ -11,7 +11,7 @@ import { CaseEventBus } from "../src/api/event-bus.js";
 import { registerRoutes } from "../src/api/routes.js";
 import { RecoveryPipeline, type PipelineDeps } from "../src/worker/pipeline.js";
 import { makeProcessor } from "../src/worker/recovery-worker.js";
-import { StopRegistry } from "../src/worker/stop-registry.js";
+import { InMemoryStopStore } from "../src/worker/stop-registry.js";
 import type { AgentProposal } from "../src/domain/recovery-action.js";
 import type { AgentEvents } from "../src/agent/recovery-agent.js";
 import type { OutcomeResolver, OutcomeVerdict } from "../src/domain/ports.js";
@@ -210,7 +210,7 @@ describe.runIf(adminUrl)(
     // move into a durable, relayed CASE_LANE_CHANGED.
     function buildStack(
       runAgent: PipelineDeps["runAgent"],
-      opts: { gateway?: FakeGateway; stopRegistry?: StopRegistry } = {},
+      opts: { gateway?: FakeGateway; stopRegistry?: InMemoryStopStore } = {},
     ) {
       const bus = new CaseEventBus();
       const eventLog = new PublishingEventLog(new PostgresEventLog(db), bus);
@@ -444,7 +444,7 @@ describe.runIf(adminUrl)(
 
     it("stop prevents the gateway from ever being called, resolves to STOPPED, and it's a structured event too", async () => {
       const id = await seed();
-      const stopRegistry = new StopRegistry();
+      const stopRegistry = new InMemoryStopStore();
       const { bus, cases, gateway, pipeline, process } = buildStack(
         scriptedAgent(
           {

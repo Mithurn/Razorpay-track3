@@ -5,7 +5,7 @@ import { PostgresCaseRepository } from "../src/persistence/case-repository.js";
 import { PostgresAttemptRepository } from "../src/persistence/attempt-repository.js";
 import { PostgresEventLog } from "../src/persistence/event-log.js";
 import { RecoveryPipeline, type PipelineDeps } from "../src/worker/pipeline.js";
-import { StopRegistry } from "../src/worker/stop-registry.js";
+import { InMemoryStopStore } from "../src/worker/stop-registry.js";
 import type { AgentProposal } from "../src/domain/recovery-action.js";
 import type { OutcomeResolver, OutcomeVerdict } from "../src/domain/ports.js";
 import type { GatewayOrder, GatewayPayment, GatewayPaymentLink, PaymentGateway } from "../src/domain/gateway.js";
@@ -97,7 +97,7 @@ describe.runIf(adminUrl)("RecoveryPipeline stop", () => {
     await db.end();
   });
 
-  const baseDeps = (stopRegistry: StopRegistry, runAgent: PipelineDeps["runAgent"], gateway = new FakeGateway()): PipelineDeps => ({
+  const baseDeps = (stopRegistry: InMemoryStopStore, runAgent: PipelineDeps["runAgent"], gateway = new FakeGateway()): PipelineDeps => ({
     cases: new PostgresCaseRepository(db),
     attempts: new PostgresAttemptRepository(db),
     events: new PostgresEventLog(db),
@@ -112,7 +112,7 @@ describe.runIf(adminUrl)("RecoveryPipeline stop", () => {
   it("requestStop resolves an idle case to STOPPED without ever calling the agent", async () => {
     const id = await seed();
     let agentCalled = false;
-    const stopRegistry = new StopRegistry();
+    const stopRegistry = new InMemoryStopStore();
     const pipeline = new RecoveryPipeline(
       baseDeps(stopRegistry, async () => {
         agentCalled = true;
@@ -136,7 +136,7 @@ describe.runIf(adminUrl)("RecoveryPipeline stop", () => {
     const id = await seed();
     let agentCalled = false;
     const gateway = new FakeGateway();
-    const stopRegistry = new StopRegistry();
+    const stopRegistry = new InMemoryStopStore();
     stopRegistry.stopCase(id, { reason: "user_requested" });
     const pipeline = new RecoveryPipeline(
       baseDeps(
@@ -159,7 +159,7 @@ describe.runIf(adminUrl)("RecoveryPipeline stop", () => {
   it("a stop that arrives while the agent is running still lands before the gate or gateway", async () => {
     const id = await seed();
     const gateway = new FakeGateway();
-    const stopRegistry = new StopRegistry();
+    const stopRegistry = new InMemoryStopStore();
     // Simulates the stop request landing mid-investigation: the agent call itself is what
     // triggers it, standing in for a stop POST arriving while the real model call is in flight.
     const pipeline = new RecoveryPipeline(
@@ -184,7 +184,7 @@ describe.runIf(adminUrl)("RecoveryPipeline stop", () => {
 
   it("the global brake blocks a case seeded after it was hit, and resumeAll lifts it", async () => {
     const id = await seed();
-    const stopRegistry = new StopRegistry();
+    const stopRegistry = new InMemoryStopStore();
     const pipeline = new RecoveryPipeline(baseDeps(stopRegistry, async () => proposal));
 
     stopRegistry.stopAll({ reason: "user_requested", note: "emergency" });

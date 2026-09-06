@@ -41,8 +41,8 @@ export type RouteDeps = {
   pipeline: {
     requestStop(caseId: string, request: StopRequest): Promise<void>;
     requestStopAll(request: StopRequest): Promise<{ stoppedNow: number }>;
-    resumeAll(): void;
-    isBraked(): boolean;
+    resumeAll(): Promise<void>;
+    isBraked(): Promise<boolean>;
   };
   modelHealth: () => Promise<{ model: string; reachable: boolean; detail?: string }>;
   verifyAppendOnly: () => Promise<AuditVerifyResult>;
@@ -93,7 +93,7 @@ export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Pro
 
   app.get("/scoreboard", async () => deps.runs.latestByArm());
 
-  app.get("/metrics", async () => ({ ...(await deps.cases.metrics()), braked: deps.pipeline.isBraked() }));
+  app.get("/metrics", async () => ({ ...(await deps.cases.metrics()), braked: await deps.pipeline.isBraked() }));
 
   app.get("/cases/:id", async (req, reply) => {
     const id = parseIdParam(req, reply);
@@ -173,7 +173,7 @@ export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Pro
   });
 
   app.post("/resume", requireAuth, async () => {
-    deps.pipeline.resumeAll();
+    await deps.pipeline.resumeAll();
     return { resumed: true };
   });
 
@@ -224,7 +224,7 @@ export async function registerRoutes(app: FastifyInstance, deps: RouteDeps): Pro
       reply,
       { type: "open" },
       (send) => deps.bus.subscribeRoom(send),
-      async (send) => send({ type: "metrics", ...(await deps.cases.metrics()), braked: deps.pipeline.isBraked() }),
+      async (send) => send({ type: "metrics", ...(await deps.cases.metrics()), braked: await deps.pipeline.isBraked() }),
     );
   });
 

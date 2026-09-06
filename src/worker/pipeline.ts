@@ -10,7 +10,7 @@ import type { AgentDeps } from "../agent/tools.js";
 import { reconstructAction } from "../execution/action-codec.js";
 import { TERMINAL_LANES, IN_FLIGHT_LANES } from "../domain/case.js";
 import { buildAgentDeps, type BuildDeps } from "./agent-deps.js";
-import { StopRegistry, type StopRequest } from "./stop-registry.js";
+import { InMemoryStopStore, type StopStore, type StopRequest } from "./stop-registry.js";
 import { directedProposal, pendingDirective, type HumanDirective } from "./human-directive.js";
 import { buildGateContext } from "./gate-context.js";
 
@@ -41,24 +41,24 @@ export type PipelineDeps = BuildDeps & {
   limits?: SafetyLimits;
   riskHoldForCase?: (kase: RecoveryCase) => boolean;
   hardDeclineForCase?: (kase: RecoveryCase) => boolean;
-  stopRegistry?: StopRegistry;
+  stopRegistry?: StopStore;
 };
 
 export class RecoveryPipeline {
   private readonly executor: AttemptExecutor;
   private readonly limits: SafetyLimits;
-  private readonly stopRegistry: StopRegistry;
+  private readonly stopRegistry: StopStore;
 
   constructor(private readonly deps: PipelineDeps) {
     this.executor = new AttemptExecutor(deps.attempts, deps.events, deps.gateway, deps.outcomeResolver, deps.notifier);
     this.limits = deps.limits ?? DEFAULT_LIMITS;
-    this.stopRegistry = deps.stopRegistry ?? new StopRegistry();
+    this.stopRegistry = deps.stopRegistry ?? new InMemoryStopStore();
   }
 
   // An idle/parked case resolves to STOPPED immediately; an in-flight one waits for its own
   // next checkpoint.
   async requestStop(caseId: string, request: StopRequest): Promise<void> {
-    this.stopRegistry.stopCase(caseId, request);
+    await this.stopRegistry.stopCase(caseId, request);
     const kase = await this.deps.cases.byId(caseId);
     if (kase && !IN_FLIGHT_LANES.includes(kase.lane) && !TERMINAL_LANES.includes(kase.lane)) {
       await this.stop(kase, request);
@@ -66,7 +66,7 @@ export class RecoveryPipeline {
   }
 
   async requestStopAll(request: StopRequest): Promise<{ stoppedNow: number }> {
-    this.stopRegistry.stopAll(request);
+    await this.stopRegistry.stopAll(request);
     const live = await this.deps.cases.listLive();
     let stoppedNow = 0;
     for (const kase of live) {
@@ -78,11 +78,11 @@ export class RecoveryPipeline {
     return { stoppedNow };
   }
 
-  resumeAll(): void {
-    this.stopRegistry.resumeAll();
+  async resumeAll(): Promise<void> {
+    await this.stopRegistry.resumeAll();
   }
 
-  isBraked(): boolean {
+  async isBraked(): Promise<boolean> {
     return this.stopRegistry.isBraked();
   }
 
@@ -114,7 +114,7 @@ export class RecoveryPipeline {
     const kase = await this.deps.cases.byId(caseId);
     if (!kase) throw new Error(`pipeline: no case ${caseId}`);
 
-    const stopBefore = this.stopRegistry.check(caseId);
+    const stopBefore = await this.stopRegistry.check(caseId);
     if (stopBefore) return this.stop(kase, stopBefore);
 
     if (kase.lane === "DIAGNOSING") {
@@ -164,7 +164,7 @@ export class RecoveryPipeline {
     );
 
     // A stop requested while the agent call was in flight must land before the gate or executor run.
-    const stopAfter = this.stopRegistry.check(caseId);
+    const stopAfter = await this.stopRegistry.check(caseId);
     if (stopAfter) return this.stop(kase, stopAfter);
 
     await this.enter(kase, "DECIDING");

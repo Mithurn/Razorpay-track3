@@ -1,26 +1,34 @@
 export type StopRequest = { reason: string; note?: string };
 
-export class StopRegistry {
+export interface StopStore {
+  stopCase(caseId: string, request: StopRequest): Promise<void>;
+  stopAll(request: StopRequest): Promise<void>;
+  resumeAll(): Promise<void>;
+  check(caseId: string): Promise<StopRequest | null>;
+  isBraked(): Promise<boolean>;
+}
+
+export class InMemoryStopStore implements StopStore {
   private readonly perCase = new Map<string, StopRequest>();
   private global: StopRequest | null = null;
 
-  stopCase(caseId: string, request: StopRequest): void {
+  async stopCase(caseId: string, request: StopRequest): Promise<void> {
     this.perCase.set(caseId, request);
   }
 
-  stopAll(request: StopRequest): void {
+  async stopAll(request: StopRequest): Promise<void> {
     this.global = request;
   }
 
-  resumeAll(): void {
+  async resumeAll(): Promise<void> {
     this.global = null;
   }
 
-  check(caseId: string): StopRequest | null {
+  async check(caseId: string): Promise<StopRequest | null> {
     return this.global ?? this.perCase.get(caseId) ?? null;
   }
 
-  isBraked(): boolean {
+  async isBraked(): Promise<boolean> {
     return this.global !== null;
   }
 }

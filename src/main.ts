@@ -20,7 +20,9 @@ import { DEFAULT_LIMITS } from "./safety/safety-gate.js";
 import { resolveModel } from "./agent/model.js";
 import { checkModelHealth } from "./agent/model-health.js";
 import { createBudget, guardModel } from "./agent/budget.js";
+import { Redis } from "ioredis";
 import { redisConnection, recoveryQueue, recoveryWorker, enqueueRecovery } from "./worker/queue.js";
+import { RedisStopStore } from "./worker/redis-stop-store.js";
 import { makeProcessor } from "./worker/recovery-worker.js";
 import { startReconcileSweep } from "./worker/reconcile-sweep.js";
 import { systemClock } from "./domain/attempt.js";
@@ -60,6 +62,10 @@ const agentModel = guardModel(
   agentBudget,
 );
 
+const connection = redisConnection(config.REDIS_URL);
+const stopRedis = new Redis(config.REDIS_URL, { maxRetriesPerRequest: null });
+const stopStore = new RedisStopStore(stopRedis);
+
 const pipeline = new RecoveryPipeline({
   cases,
   attempts,
@@ -70,6 +76,7 @@ const pipeline = new RecoveryPipeline({
   clock: systemClock,
   riskHoldForCase: isRiskHold,
   hardDeclineForCase: isHardDecline,
+  stopRegistry: stopStore,
   similarCases: (kase, query) =>
     cases.similarResolved(kase.failureReason, {
       method: query.method ?? null,
@@ -88,8 +95,6 @@ const pipeline = new RecoveryPipeline({
       events,
     ),
 });
-
-const connection = redisConnection(config.REDIS_URL);
 const queue = recoveryQueue(connection);
 const worker = recoveryWorker(connection, makeProcessor(pipeline, queue, bus, events));
 const sweep = startReconcileSweep(attempts, cases, queue);

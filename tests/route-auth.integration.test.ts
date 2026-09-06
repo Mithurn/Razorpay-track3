@@ -21,8 +21,8 @@ async function buildApp(
     pipeline: {
       requestStop: async () => undefined,
       requestStopAll: async () => ({ stoppedNow: 0 }),
-      resumeAll: () => undefined,
-      isBraked: () => false,
+      resumeAll: async () => undefined,
+      isBraked: async () => false,
     },
     modelHealth: async () => ({ model: "test", reachable: true }),
     verifyAppendOnly: async () => ({ enforced: true, role: "recovery_app" }),
